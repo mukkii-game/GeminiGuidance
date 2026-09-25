@@ -34,13 +34,19 @@ export class GeminiOrbManager {
     return orb;
   }
 
-  public update(playerX: number, playerY: number, onMerge?: (level: number, x: number, y: number) => void): void {
+  public update(
+    playerX: number,
+    playerY: number,
+    playerVx: number = 0,
+    playerVy: number = 0,
+    onMerge?: (level: number, x: number, y: number) => void
+  ): void {
     for (let i = 0; i < this.orbs.length; i++) {
       const orb = this.orbs[i];
 
       // Motion trail
       orb.trail.unshift({ x: orb.x, y: orb.y, alpha: 0.85 });
-      const maxTrail = orb.level === 3 ? 22 : orb.level === 2 ? 16 : 12;
+      const maxTrail = orb.level === 3 ? 24 : orb.level === 2 ? 18 : 14;
       if (orb.trail.length > maxTrail) {
         orb.trail.pop();
       }
@@ -52,63 +58,79 @@ export class GeminiOrbManager {
         orb.fuseTimer--;
       }
 
-      // --- Elastic Rubber Band Physics (ゴム紐弾性モデル) ---
-      const dx = playerX - orb.x;
-      const dy = playerY - orb.y;
+      // --- Whirling Flail & Orbital Bungee Physics (分銅旋回＆バネ弾性力学) ---
+      // Vector from Player (Anchor) to Gemini (Weight)
+      const dx = orb.x - playerX;
+      const dy = orb.y - playerY;
       const dist = Math.hypot(dx, dy) || 1;
-      const nx = dx / dist;
-      const ny = dy / dist;
 
-      // Rest distance (relaxed zone)
-      const restDist = 45;
+      // Unit radial vector (pointing from Player to Gemini)
+      const rx = dx / dist;
+      const ry = dy / dist;
 
-      if (dist > restDist) {
-        const stretch = dist - restDist;
-        // Non-linear rubber band tension:
-        // Grows exponentially as distance increases, creating immense slingshot return acceleration!
-        const baseTension = stretch * 0.0026;
-        const extremeTension = Math.pow(stretch / 135, 2.2) * 0.18;
-        const totalTension = Math.min(0.78, baseTension + extremeTension);
+      // Unit tangential vector (perpendicular, counter-clockwise)
+      const tx = -ry;
+      const ty = rx;
 
-        orb.vx += nx * totalTension;
-        orb.vy += ny * totalTension;
+      // 1. Spring-Tether Elastic Tension (バネの付いた分銅の弾性張力)
+      // Equilibrium distance (resting barrier radius)
+      const r0 = 48;
+
+      if (dist > r0) {
+        const stretch = dist - r0;
+        // Non-linear spring tension:
+        // When stretched far (e.g. player dashes into enemy), creates immense forward whip snap!
+        const baseTension = stretch * 0.0034;
+        const extremeTension = Math.pow(stretch / 125, 2.2) * 0.24;
+        const tensionForce = Math.min(0.96, baseTension + extremeTension);
+
+        // Pull toward player (-rx, -ry)
+        orb.vx -= rx * tensionForce;
+        orb.vy -= ry * tensionForce;
+      } else {
+        // Soft outward repulsion when compressed inside equilibrium zone
+        const pushForce = (r0 - dist) * 0.038;
+        orb.vx += rx * pushForce;
+        orb.vy += ry * pushForce;
       }
 
-      // Gentle orbital curvature guidance (ensures rubber band creates wide whip arcs)
-      const perpX = -ny;
-      const perpY = nx;
-      const dotPerp = orb.vx * perpX + orb.vy * perpY;
-      if (Math.abs(dotPerp) < 1.0) {
-        // Give slight lateral nudge to initiate slingshot whip rather than 1D bounce
-        const nudgeDir = orb.x < playerX ? -1 : 1;
-        orb.vx += perpX * nudgeDir * 0.06;
-        orb.vy += perpY * nudgeDir * 0.06;
+      // 2. Whirling & Tangential Momentum Coupling (円形旋回の遅延伝達＆外周遠心力)
+      // Transfer player's circling velocity into Gemini's angular speed!
+      const playerTangential = playerVx * tx + playerVy * ty;
+      const curTangential = orb.vx * tx + orb.vy * ty;
+
+      // Whirling acceleration: circling the ship spins the flail into a wide, lagging ellipse
+      orb.vx += tx * (playerTangential * 0.24);
+      orb.vy += ty * (playerTangential * 0.24);
+
+      // 3. Resting Barrier Orbit (近くにいる時、割と近くのままバリアとして旋回)
+      if (dist < 85 && Math.abs(curTangential) < 2.4) {
+        const spinDir = curTangential < -0.1 ? -1 : 1;
+        orb.vx += tx * (0.11 * spinDir);
+        orb.vy += ty * (0.11 * spinDir);
       }
 
-      // Air resistance / slight momentum damping
-      orb.vx *= 0.991;
-      orb.vy *= 0.991;
+      // 4. Momentum Retention & Slight Air Resistance
+      orb.vx *= 0.9935;
+      orb.vy *= 0.9935;
 
-      // Speed limits (allows ferocious slingshot speeds up to 9.5!)
-      const maxSpeed = 8.5 + (orb.level - 1) * 1.5;
+      // 5. Terminal Velocity Ceiling (allows explosive flail swings up to 14.5 px/frame!)
+      const maxSpeed = 11.5 + (orb.level - 1) * 2.0;
       const curSpeed = Math.hypot(orb.vx, orb.vy);
       if (curSpeed > maxSpeed) {
         orb.vx = (orb.vx / curSpeed) * maxSpeed;
         orb.vy = (orb.vy / curSpeed) * maxSpeed;
-      } else if (curSpeed < 1.0) {
-        // Keep minimum alive momentum
-        orb.vx += (Math.random() - 0.5) * 0.4;
-        orb.vy += (Math.random() - 0.5) * 0.4;
       }
 
+      // Update position
       orb.x += orb.vx;
       orb.y += orb.vy;
 
-      // Screen edge boundary reflection (keeps Gemini bouncing in the arena)
-      if (orb.x < 14) { orb.x = 14; orb.vx = Math.abs(orb.vx) * 0.88; }
-      if (orb.x > 346) { orb.x = 346; orb.vx = -Math.abs(orb.vx) * 0.88; }
-      if (orb.y < 24) { orb.y = 24; orb.vy = Math.abs(orb.vy) * 0.88; }
-      if (orb.y > 516) { orb.y = 516; orb.vy = -Math.abs(orb.vy) * 0.88; }
+      // Screen edge boundary reflection (bounces off arena borders like a wrecking ball)
+      if (orb.x < 14) { orb.x = 14; orb.vx = Math.abs(orb.vx) * 0.90; }
+      if (orb.x > 346) { orb.x = 346; orb.vx = -Math.abs(orb.vx) * 0.90; }
+      if (orb.y < 24) { orb.y = 24; orb.vy = Math.abs(orb.vy) * 0.90; }
+      if (orb.y > 516) { orb.y = 516; orb.vy = -Math.abs(orb.vy) * 0.90; }
     }
 
     // Check for Gemini Fusion (合体)

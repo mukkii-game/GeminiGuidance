@@ -120,6 +120,10 @@ export class BossManager {
       b.quoteTimer--;
     }
 
+    if (b.hitCooldown && b.hitCooldown > 0) {
+      b.hitCooldown--;
+    }
+
     // Entrance flight
     if (b.y < b.targetY) {
       b.y += 0.65;

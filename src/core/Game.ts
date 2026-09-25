@@ -254,10 +254,12 @@ export class Game {
       }
     }
 
-    // Update Gemini Orbs (ジェミニ誘導 & 合体)
+    // Update Gemini Orbs (ジェミニ誘導 & 合体 - 分銅旋回)
     this.geminiManager.update(
       this.player.state.x,
       this.player.state.y,
+      this.player.state.vx,
+      this.player.state.vy,
       (level, x, y) => {
         // Fusion Callback
         this.audio.playGeminiMerge(level);
@@ -462,27 +464,29 @@ export class Game {
       }
     }
 
-    // 2. Gemini Orbs vs Airborne Enemies (貫通 vs 跳ね返り)
+    // 2. Gemini Orbs vs Airborne Enemies (完全貫通・分銅ブレード)
     for (const orb of this.geminiManager.orbs) {
       for (let i = this.enemyManager.enemies.length - 1; i >= 0; i--) {
         const e = this.enemyManager.enemies[i];
         const dist = Math.hypot(orb.x - e.x, orb.y - e.y);
 
         if (dist < orb.radius + e.width * 0.45) {
+          // If enemy is currently in hit cooldown, let the flail pass through smoothly
+          if (e.hitCooldown && e.hitCooldown > 0) {
+            continue;
+          }
+
           e.hp -= orb.damage;
+          e.hitCooldown = 6; // Hit cooldown for multi-hit slicing without stopping
 
           if (e.hp > 0) {
-            // ENEMY SURVIVED: Gemini DOES NOT PIERCE! (跳ね返り recoil)
-            const nx = (orb.x - e.x) / (dist || 1);
-            const ny = (orb.y - e.y) / (dist || 1);
-            orb.vx = nx * 3.4;
-            orb.vy = ny * 3.4;
-
+            // ENEMY SURVIVED: Gemini PIERCES THROUGH! (No bounce, continuous whirling flail!)
             this.audio.playGeminiBounce();
             this.addExplosion(e.x, e.y, 14, false);
+            this.player.addScore(50 * orb.damage);
 
           } else {
-            // ENEMY DESTROYED: Gemini PIERCES RIGHT THROUGH! (貫通する - no recoil)
+            // ENEMY DESTROYED: Gemini OBLITERATES & PIERCES!
             this.audio.playAirExplosion();
             this.addExplosion(e.x, e.y, 18 + orb.level * 4, false);
 
@@ -500,7 +504,7 @@ export class Game {
             if (formationId) {
               const remainingInFormation = this.enemyManager.enemies.some(en => en.formationId === formationId);
               if (!remainingInFormation) {
-                // FORMATION WIPED! Drop floating Gemini logo item!
+                // FORMATION WIPED! Drop floating Gemini logo item & repair shield!
                 this.spawnGeminiDropItem(deadX, deadY);
                 this.player.repair(20);
                 this.addFloatingText(deadX, deadY - 24, 'FORMATION WIPE! +20 SHIELD', '#22c55e');
@@ -511,38 +515,37 @@ export class Game {
         }
       }
 
-      // 3. Gemini Orbs vs Boss
+      // 3. Gemini Orbs vs Boss (完全貫通・周回スライス)
       if (this.bossManager.currentBoss) {
-        const res = this.bossManager.hit(orb.damage, orb.x, orb.y);
-        if (res.bossHit) {
-          // Boss survives hits, so Gemini bounces off
-          const b = this.bossManager.currentBoss;
-          const dist = Math.hypot(orb.x - b.x, orb.y - b.y) || 1;
-          orb.vx = ((orb.x - b.x) / dist) * 3.6;
-          orb.vy = ((orb.y - b.y) / dist) * 3.6;
+        const b = this.bossManager.currentBoss;
+        if (!b.hitCooldown || b.hitCooldown <= 0) {
+          const res = this.bossManager.hit(orb.damage, orb.x, orb.y);
+          if (res.bossHit) {
+            b.hitCooldown = 6; // Grinding slice damage interval
+            // GEMINI DOES NOT BOUNCE! Slices right through maintaining full orbital momentum!
+            this.audio.playGeminiBounce();
+            this.addExplosion(orb.x, orb.y, 22, false);
+            this.player.addScore(res.points);
 
-          this.audio.playGeminiBounce();
-          this.addExplosion(orb.x, orb.y, 22, false);
-          this.player.addScore(res.points);
+            if (res.defeated) {
+              // Boss Defeat Chain
+              for (let k = 0; k < 12; k++) {
+                setTimeout(() => {
+                  const rx = this.bossManager.currentBoss ? this.bossManager.currentBoss.x + (Math.random() - 0.5) * 120 : 180;
+                  const ry = this.bossManager.currentBoss ? this.bossManager.currentBoss.y + (Math.random() - 0.5) * 80 : 120;
+                  this.addExplosion(rx, ry, 36, false);
+                  this.audio.playAirExplosion();
+                }, k * 120);
+              }
+              this.player.addScore(15000);
+              this.addFloatingText(this.canvas.width / 2, 160, 'BOSS DESTROYED!', '#22c55e');
 
-          if (res.defeated) {
-            // Boss Defeat Chain
-            for (let k = 0; k < 12; k++) {
               setTimeout(() => {
-                const rx = this.bossManager.currentBoss ? this.bossManager.currentBoss.x + (Math.random() - 0.5) * 120 : 180;
-                const ry = this.bossManager.currentBoss ? this.bossManager.currentBoss.y + (Math.random() - 0.5) * 80 : 120;
-                this.addExplosion(rx, ry, 36, false);
-                this.audio.playAirExplosion();
-              }, k * 120);
+                this.state = 'STAGE_CLEAR';
+                this.stageClearTimer = 0;
+                this.audio.playStageClear();
+              }, 1600);
             }
-            this.player.addScore(15000);
-            this.addFloatingText(this.canvas.width / 2, 160, 'BOSS DESTROYED!', '#22c55e');
-
-            setTimeout(() => {
-              this.state = 'STAGE_CLEAR';
-              this.stageClearTimer = 0;
-              this.audio.playStageClear();
-            }, 1600);
           }
         }
       }

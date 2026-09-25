@@ -150,6 +150,9 @@ export class EnemyManager {
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const e = this.enemies[i];
       e.age++;
+      if (e.hitCooldown && e.hitCooldown > 0) {
+        e.hitCooldown--;
+      }
 
       // Update movement pattern (non-invaders)
       if (e.pattern !== 'INVADER') {

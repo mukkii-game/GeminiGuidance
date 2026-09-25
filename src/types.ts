@@ -108,6 +108,7 @@ export interface EnemyEntity {
   color: string;
   angle: number;
   shootCooldown: number;
+  hitCooldown?: number;
 }
 
 export type GroundType = 
@@ -165,6 +166,7 @@ export interface BossEntity {
   timer: number;
   weakPoints: WeakPoint[];
   defeated: boolean;
+  hitCooldown?: number;
 }
 
 export interface ParticleEffect {

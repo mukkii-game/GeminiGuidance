@@ -348,10 +348,25 @@ export class ArcadeRenderer {
   }
 
   // --- Autonomous Gemini Orbs (ジェミニ誘導 - Safe to touch!) ---
-  private renderGeminiOrbs(orbs: GeminiOrb[], _playerX: number, _playerY: number): void {
+  private renderGeminiOrbs(orbs: GeminiOrb[], playerX: number, playerY: number): void {
     const ctx = this.ctx;
 
     for (const orb of orbs) {
+      // 0. Energy Tether / Flail Chain (分銅のエネルギー鎖 / テンションコード)
+      const dist = Math.hypot(orb.x - playerX, orb.y - playerY);
+      ctx.save();
+      const tetherAlpha = Math.min(0.55, 0.18 + (dist / 280) * 0.35);
+      const tetherColor = orb.level === 3 ? `rgba(244, 114, 182, ${tetherAlpha})` : `rgba(56, 189, 248, ${tetherAlpha})`;
+      ctx.strokeStyle = tetherColor;
+      ctx.lineWidth = Math.max(0.8, 1.8 - (dist / 320) * 0.8);
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(playerX, playerY);
+      ctx.lineTo(orb.x, orb.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+
       // 1. Shimmering Energy Aura (Safe to Player, deadly to enemies!)
       ctx.save();
       const auraColor = orb.level === 3 ? 'rgba(236, 72, 153, 0.28)' : orb.level === 2 ? 'rgba(168, 85, 247, 0.24)' : 'rgba(56, 189, 248, 0.22)';

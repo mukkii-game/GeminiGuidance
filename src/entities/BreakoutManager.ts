@@ -81,18 +81,6 @@ export class BreakoutManager {
       const distSq = dx * dx + dy * dy;
 
       if (distSq < orb.radius * orb.radius) {
-        // Collision detected! Determine reflection normal
-        const overlapX = (halfW + orb.radius) - Math.abs(orb.x - b.x);
-        const overlapY = (halfH + orb.radius) - Math.abs(orb.y - b.y);
-
-        if (overlapX < overlapY) {
-          // Horizontal bounce (hit from left or right)
-          orb.vx = orb.x < b.x ? -Math.abs(orb.vx) : Math.abs(orb.vx);
-        } else {
-          // Vertical bounce (hit from top or bottom)
-          orb.vy = orb.y < b.y ? -Math.abs(orb.vy) : Math.abs(orb.vy);
-        }
-
         b.hp -= orb.damage;
         const broken = b.hp <= 0;
         if (broken) {
