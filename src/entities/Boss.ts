@@ -1,4 +1,4 @@
-import { BossEntity, BossType, WeakPoint } from '../types';
+import { BossEntity, BossType, EnemyType, WeakPoint } from '../types';
 
 export class BossManager {
   public currentBoss: BossEntity | null = null;
@@ -7,25 +7,25 @@ export class BossManager {
     let name = '';
     let stageTitle = '';
     let dialogueQuote = '';
-    let width = 140;
+    let width = 200;
     let height = 90;
-    let hp = 80;
-    let targetY = 85;
+    let hp = 100;
+    let targetY = 75;
     const weakPoints: WeakPoint[] = [];
 
     switch (type) {
       case 'STAGE1_DEEPSEEK_KIMI':
         stageTitle = 'チャイナ・シンドローム';
         dialogueQuote = '雷雲旋風拳！ サンダークラウド……フォーメーション！';
-        name = 'DEEPSEEK, KIMI & QWEN : THUNDER CLOUD FORMATION';
-        width = 140;
-        height = 80;
-        hp = 80;
-        targetY = 85;
+        name = 'DEEPSEEK, KIMI & QWEN : THUNDER CLOUD DREADNOUGHT';
+        width = 200;
+        height = 90;
+        hp = 100;
+        targetY = 75;
         weakPoints.push(
-          { id: 'wp_ds', xOffset: -45, yOffset: 0, radius: 22, hp: 25, maxHp: 25, active: true, label: 'DEEPSEEK' },
-          { id: 'wp_kimi', xOffset: 45, yOffset: 0, radius: 22, hp: 25, maxHp: 25, active: true, label: 'KIMI' },
-          { id: 'wp_core', xOffset: 0, yOffset: 6, radius: 20, hp: 30, maxHp: 30, active: true, label: 'QWEN' }
+          { id: 'wp_ds', xOffset: -60, yOffset: 0, radius: 28, hp: 30, maxHp: 30, active: true, label: 'DEEPSEEK' },
+          { id: 'wp_kimi', xOffset: 60, yOffset: 0, radius: 28, hp: 30, maxHp: 30, active: true, label: 'KIMI' },
+          { id: 'wp_core', xOffset: 0, yOffset: 10, radius: 26, hp: 40, maxHp: 40, active: true, label: 'QWEN' }
         );
         break;
 
@@ -33,14 +33,14 @@ export class BossManager {
         stageTitle = 'イーロンズ・ゲート';
         dialogueQuote = 'スペース・エックス！';
         name = 'GROK 4.7 : SPACEX HEAVY STARSHIP FLEET';
-        width = 160;
-        height = 80;
-        hp = 110;
-        targetY = 65; // Grok perches high up at the top
+        width = 210;
+        height = 90;
+        hp = 120;
+        targetY = 60; // Perched high up behind the Breakout wall
         weakPoints.push(
-          { id: 'wp_cursor_l', xOffset: -52, yOffset: 0, radius: 18, hp: 30, maxHp: 30, active: true, label: '{CURSOR}' },
-          { id: 'wp_cursor_r', xOffset: 52, yOffset: 0, radius: 18, hp: 30, maxHp: 30, active: true, label: '{CURSOR}' },
-          { id: 'wp_grok_engine', xOffset: 0, yOffset: 0, radius: 26, hp: 50, maxHp: 50, active: true, label: 'GROK' }
+          { id: 'wp_cursor_l', xOffset: -65, yOffset: 0, radius: 24, hp: 35, maxHp: 35, active: true, label: '{CURSOR}' },
+          { id: 'wp_cursor_r', xOffset: 65, yOffset: 0, radius: 24, hp: 35, maxHp: 35, active: true, label: '{CURSOR}' },
+          { id: 'wp_grok_engine', xOffset: 0, yOffset: 0, radius: 32, hp: 50, maxHp: 50, active: true, label: 'GROK' }
         );
         break;
 
@@ -48,15 +48,15 @@ export class BossManager {
         stageTitle = 'ザ・ファブル';
         dialogueQuote = 'ファブル—— お前らが勝手にそう呼んでるだけだ—— 俺は、ただコーディングするだけの——プロだ！';
         name = 'CLAUDE FABLE : APEX CODE PRO';
-        width = 160;
+        width = 210;
         height = 100;
-        hp = 150;
-        targetY = 90;
+        hp = 160;
+        targetY = 80;
         weakPoints.push(
-          { id: 'wp_sonnet_l', xOffset: -50, yOffset: -15, radius: 18, hp: 25, maxHp: 25, active: true, label: 'SONNET' },
-          { id: 'wp_sonnet_r', xOffset: 50, yOffset: -15, radius: 18, hp: 25, maxHp: 25, active: true, label: 'SONNET' },
-          { id: 'wp_opus_ring', xOffset: 0, yOffset: 32, radius: 22, hp: 35, maxHp: 35, active: true, label: 'OPUS' },
-          { id: 'wp_fable_core', xOffset: 0, yOffset: -5, radius: 28, hp: 90, maxHp: 90, active: true, label: 'FABLE' }
+          { id: 'wp_sonnet_l', xOffset: -65, yOffset: -10, radius: 24, hp: 30, maxHp: 30, active: true, label: 'SONNET' },
+          { id: 'wp_sonnet_r', xOffset: 65, yOffset: -10, radius: 24, hp: 30, maxHp: 30, active: true, label: 'SONNET' },
+          { id: 'wp_opus_ring', xOffset: 0, yOffset: 30, radius: 26, hp: 40, maxHp: 40, active: true, label: 'OPUS' },
+          { id: 'wp_fable_core', xOffset: 0, yOffset: -5, radius: 32, hp: 90, maxHp: 90, active: true, label: 'FABLE' }
         );
         break;
 
@@ -64,15 +64,15 @@ export class BossManager {
         stageTitle = '魔法使いチャッピー';
         dialogueQuote = 'アブラマハリクマハリタカブラ！';
         name = 'GPT-6 ASTRA : WIZARD CHAPPY';
-        width = 200;
-        height = 110;
-        hp = 200;
-        targetY = 95;
+        width = 240;
+        height = 115;
+        hp = 220;
+        targetY = 85;
         weakPoints.push(
-          { id: 'wp_luna', xOffset: -65, yOffset: -25, radius: 20, hp: 30, maxHp: 30, active: true, label: 'LUNA' },
-          { id: 'wp_terra', xOffset: 65, yOffset: -25, radius: 22, hp: 40, maxHp: 40, active: true, label: 'TERRA' },
-          { id: 'wp_sol', xOffset: 0, yOffset: 35, radius: 24, hp: 50, maxHp: 50, active: true, label: 'SOL' },
-          { id: 'wp_astra', xOffset: 0, yOffset: -5, radius: 30, hp: 100, maxHp: 100, active: true, label: 'ASTRA' }
+          { id: 'wp_luna', xOffset: -75, yOffset: -25, radius: 24, hp: 35, maxHp: 35, active: true, label: 'LUNA' },
+          { id: 'wp_terra', xOffset: 75, yOffset: -25, radius: 26, hp: 45, maxHp: 45, active: true, label: 'TERRA' },
+          { id: 'wp_sol', xOffset: 0, yOffset: 35, radius: 28, hp: 55, maxHp: 55, active: true, label: 'SOL' },
+          { id: 'wp_astra', xOffset: 0, yOffset: -5, radius: 35, hp: 110, maxHp: 110, active: true, label: 'ASTRA' }
         );
         break;
     }
@@ -82,7 +82,7 @@ export class BossManager {
       name,
       stageTitle,
       dialogueQuote,
-      quoteTimer: 240, // Show dialogue banner prominently for 4 seconds
+      quoteTimer: 180,
       x: canvasWidth / 2,
       y: -height,
       targetY,
@@ -108,6 +108,7 @@ export class BossManager {
     playerX: number,
     playerY: number,
     onSpawnBullet?: (x: number, y: number, vx: number, vy: number) => void,
+    onSpawnTackleMinion?: (type: EnemyType, x: number, y: number, vx: number, vy: number) => void,
     onSpawnRocketFleet?: () => void,
     onBossShout?: (quote: string) => void
   ): void {
@@ -121,92 +122,62 @@ export class BossManager {
 
     // Entrance flight
     if (b.y < b.targetY) {
-      b.y += 0.55;
+      b.y += 0.65;
       return;
     }
 
-    // --- STAGE 1: China Syndrome (サンダークラウド・フォーメーション！) ---
-    if (b.type === 'STAGE1_DEEPSEEK_KIMI') {
-      // 3-way coordinated attack formation
-      // Cycle: 0-140: Hover triangle, 140-260: Synchronized 3-way tackle attack (体当たり)!
-      const cycle = b.timer % 280;
+    // --- 1. デカくてゆっくりうごく (Huge, majestic, slow sway at top) ---
+    b.x = canvasWidth / 2 + Math.sin(b.timer * 0.012) * 65;
+    b.y = b.targetY + Math.cos(b.timer * 0.016) * 10;
 
-      if (cycle < 140) {
-        // Formation hover
-        b.x = canvasWidth / 2 + Math.sin(b.timer * 0.02) * 60;
-        b.y = b.targetY + Math.cos(b.timer * 0.025) * 15;
+    // --- 2. ザコが体当たりしてくる (Minion Targeted Body Slam) ---
+    // Every 140 ticks (~2.3s), boss launches a tackle minion aimed directly at Solvalou!
+    if (onSpawnTackleMinion && b.timer % 140 === 70) {
+      let minionType: EnemyType = 'MISTRAL_FLAME';
+      const launchSide = (b.timer % 280 === 70) ? -55 : 55;
 
-        // Individual weakpoint offsets in rotating triangle
-        const angle = b.timer * 0.03;
-        b.weakPoints[0].xOffset = Math.cos(angle) * 44;
-        b.weakPoints[0].yOffset = Math.sin(angle) * 25;
-        b.weakPoints[1].xOffset = Math.cos(angle + (Math.PI * 2) / 3) * 44;
-        b.weakPoints[1].yOffset = Math.sin(angle + (Math.PI * 2) / 3) * 25;
-        b.weakPoints[2].xOffset = Math.cos(angle + (Math.PI * 4) / 3) * 44;
-        b.weakPoints[2].yOffset = Math.sin(angle + (Math.PI * 4) / 3) * 25;
-      } else {
-        // 体当たり攻撃！ (Tackle swoop toward player)
-        const swoopProgress = (cycle - 140) / 140;
-        const swoopAngle = swoopProgress * Math.PI;
-        b.y = b.targetY + Math.sin(swoopAngle) * 140;
-        b.x += (playerX - b.x) * 0.025;
-
-        // Spread out during tackle
-        b.weakPoints[0].xOffset = -55;
-        b.weakPoints[1].xOffset = 55;
-        b.weakPoints[2].xOffset = 0;
-        b.weakPoints[2].yOffset = 20;
-
-        if (cycle === 145 && onBossShout) {
+      if (b.type === 'STAGE1_DEEPSEEK_KIMI') {
+        minionType = Math.random() > 0.5 ? 'MISTRAL_FLAME' : 'KIMI_MOON';
+        if (b.timer % 280 === 70 && onBossShout) {
           onBossShout('雷雲旋風拳！ サンダークラウド……フォーメーション！');
         }
+      } else if (b.type === 'STAGE2_GROK_CURSOR') {
+        minionType = 'CURSOR_PROBE';
+      } else if (b.type === 'STAGE3_CLAUDE_FABLE') {
+        minionType = 'CLAUDE_HAIKU';
+      } else {
+        minionType = 'GPT6_LUNA';
       }
 
-    // --- STAGE 2: Elon's Gate (スペース・エックス！) ---
-    } else if (b.type === 'STAGE2_GROK_CURSOR') {
-      // Grok sits majestically at the top
-      b.x = canvasWidth / 2 + Math.sin(b.timer * 0.012) * 35;
-      b.y = b.targetY + Math.cos(b.timer * 0.015) * 8;
+      const launchX = b.x + launchSide;
+      const launchY = b.y + 25;
 
-      // Periodically shout "スペース・エックス！" and launch rocket fleet from bottom!
-      if (b.timer % 240 === 60) {
-        if (onBossShout) {
-          onBossShout('スペース・エックス！');
-        }
-        b.quoteTimer = 160;
-        if (onSpawnRocketFleet) {
-          onSpawnRocketFleet();
-        }
-      }
+      const dx = playerX - launchX;
+      const dy = playerY - launchY;
+      const dist = Math.hypot(dx, dy) || 1;
+      const tackleSpeed = 2.45; // Readable, dodgeable high-speed tackle!
 
-    // --- STAGE 3: The Fable (プロだ！) ---
-    } else if (b.type === 'STAGE3_CLAUDE_FABLE') {
-      b.x = canvasWidth / 2 + Math.sin(b.timer * 0.016) * 70;
-      b.y = b.targetY + Math.cos(b.timer * 0.02) * 20;
-
-      // Occasional surgical sweep
-      if (b.timer % 260 === 180 && onBossShout) {
-        onBossShout('俺はプロだ！');
-        b.quoteTimer = 140;
-      }
-
-    // --- STAGE 4: Wizard Chappy (アブラマハリクマハリタカブラ！) ---
-    } else {
-      b.x = canvasWidth / 2 + Math.sin(b.timer * 0.014) * 65;
-      b.y = b.targetY + Math.cos(b.timer * 0.018) * 16;
-
-      if (b.timer % 260 === 80 && onBossShout) {
-        onBossShout('アブラマハリクマハリタカブラ！');
-        b.quoteTimer = 160;
-      }
+      onSpawnTackleMinion(
+        minionType,
+        launchX,
+        launchY,
+        (dx / dist) * tackleSpeed,
+        (dy / dist) * tackleSpeed
+      );
     }
 
-    // Very rare, deliberate slow bullet firing from active core only
-    if (onSpawnBullet && b.timer % 200 === 0) {
+    // Stage 2 Grok launches SpaceX Starship fleet from bottom
+    if (b.type === 'STAGE2_GROK_CURSOR' && b.timer % 280 === 180) {
+      if (onBossShout) onBossShout('スペース・エックス！');
+      if (onSpawnRocketFleet) onSpawnRocketFleet();
+    }
+
+    // Very rare, slow white bullet from center
+    if (onSpawnBullet && b.timer % 240 === 0) {
       const bdx = playerX - b.x;
       const bdy = playerY - b.y;
       const dist = Math.hypot(bdx, bdy) || 1;
-      onSpawnBullet(b.x, b.y + 20, (bdx / dist) * 0.60, (bdy / dist) * 0.60);
+      onSpawnBullet(b.x, b.y + 25, (bdx / dist) * 0.60, (bdy / dist) * 0.60);
     }
   }
 
@@ -226,7 +197,7 @@ export class BossManager {
       const wpY = b.y + wp.yOffset;
       const dist = Math.hypot(hitX - wpX, hitY - wpY);
 
-      if (dist < wp.radius + 14) {
+      if (dist < wp.radius + 16) {
         hitSomething = true;
         wp.hp -= damage;
         b.hp -= damage;

@@ -285,6 +285,11 @@ export class Game {
         this.player.state.x,
         this.player.state.y,
         (bx, by, bvx, bvy) => this.spawnBullet(bx, by, bvx, bvy),
+        (type, mx, my, mvx, mvy) => {
+          // Boss launches minion targeting player for high-speed body tackle!
+          this.enemyManager.spawnTackleMinion(type, mx, my, mvx, mvy);
+          this.addFloatingText(mx, my - 12, 'TACKLE!', '#ef4444');
+        },
         () => {
           // Grok launches SpaceX Starship fleet from bottom!
           this.enemyManager.spawn('SPACEX_ROCKET', 70, this.canvas.height + 60, 'ROCKET_ASCENT');

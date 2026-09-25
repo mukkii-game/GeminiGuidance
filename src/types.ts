@@ -85,7 +85,8 @@ export type MovementPattern =
   | 'SPAROID_CRUISE'
   | 'ROCKET_ASCENT'
   | 'INVADER'
-  | 'UFO_FLYBY';
+  | 'UFO_FLYBY'
+  | 'TACKLE_DASH';
 
 export interface EnemyEntity {
   id: string;

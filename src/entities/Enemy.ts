@@ -122,6 +122,16 @@ export class EnemyManager {
     return ufo;
   }
 
+  /**
+   * Spawn boss escort minion performing a direct high-speed body tackle (体当たり)
+   */
+  public spawnTackleMinion(type: EnemyType, x: number, y: number, vx: number, vy: number): EnemyEntity {
+    const minion = this.spawn(type, x, y, 'TACKLE_DASH', 'minion_tackle', 1);
+    minion.vx = vx;
+    minion.vy = vy;
+    return minion;
+  }
+
   public clear(): void {
     this.enemies = [];
   }
@@ -270,6 +280,11 @@ export class EnemyManager {
     switch (e.pattern) {
       case 'UFO_FLYBY': {
         // Horizontal cruise across top
+        break;
+      }
+
+      case 'TACKLE_DASH': {
+        // Linear high-speed body tackle
         break;
       }
 

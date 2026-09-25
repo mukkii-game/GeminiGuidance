@@ -96,11 +96,8 @@ export class StageManager {
       events.push({ tick: 140, type: 'UFO' });
       events.push({ tick: 320, type: 'UFO' });
       events.push({ tick: 500, type: 'UFO' });
-
-      // Fallback boss alert if not triggered by clearing all invaders early
-      events.push({ tick: 680, type: 'ALERT' });
-      events.push({ tick: 720, type: 'BOSS', bossType: 'STAGE1_DEEPSEEK_KIMI' });
-
+      events.push({ tick: 700, type: 'UFO' });
+      // NOTE: Boss ONLY spawns after all 15 invaders are destroyed!
     } else if (stage === 2) {
       // --- STAGE 2: ブロック崩し (Arkanoid Wall & Boss Behind Blocks) ---
       // (Ticks 0-220: Stage intro with Polygon Elon Hologram Transmission)
