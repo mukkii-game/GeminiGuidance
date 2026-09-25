@@ -1,4 +1,4 @@
-import { InputState } from '../types';
+import { InputState, PhysicsPresetId } from '../types';
 
 export class InputManager {
   public state: InputState = {
@@ -6,6 +6,7 @@ export class InputManager {
     y: 440,
     active: false,
     isTouch: false,
+    isPointerDown: false,
     crtTogglePressed: false,
     audioTogglePressed: false,
   };
@@ -38,6 +39,7 @@ export class InputManager {
     this.canvas.addEventListener('mousedown', (e) => {
       if (e.button === 0) {
         this.state.active = true;
+        this.state.isPointerDown = true;
         const rect = this.canvas.getBoundingClientRect();
         const scaleX = this.canvas.width / rect.width;
         const scaleY = this.canvas.height / rect.height;
@@ -46,6 +48,10 @@ export class InputManager {
           y: (e.clientY - rect.top) * scaleY,
         };
       }
+    });
+
+    window.addEventListener('mouseup', () => {
+      this.state.isPointerDown = false;
     });
 
     // Touch Events: Relative Delta Dragging (Ergonomic 1-finger control)
@@ -60,6 +66,7 @@ export class InputManager {
         this.lastTouchY = (touch.clientY - rect.top) * scaleY;
         this.state.active = true;
         this.state.isTouch = true;
+        this.state.isPointerDown = true;
         this.lastClick = { x: this.lastTouchX, y: this.lastTouchY };
       }
     }, { passive: false });
@@ -84,6 +91,11 @@ export class InputManager {
         this.lastTouchY = currentY;
       }
     }, { passive: false });
+
+    this.canvas.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      this.state.isPointerDown = false;
+    }, { passive: false });
   }
 
   private setupKeyboard(): void {
@@ -104,20 +116,23 @@ export class InputManager {
       if (e.code === 'KeyP') {
         this.cyclePresetPressed = true;
       }
+      if (e.code === 'Space' || e.code === 'KeyZ' || e.code === 'KeyO') {
+        this.state.orbitTogglePressed = true;
+      }
       if (e.code === 'Digit1') {
-        this.state.presetSelectPressed = 'BALANCED';
+        this.state.presetSelectPressed = 'SNAP_SLING';
       }
       if (e.code === 'Digit2') {
-        this.state.presetSelectPressed = 'HEAVY_FLAIL';
+        this.state.presetSelectPressed = 'HYPER_BOOMERANG';
       }
       if (e.code === 'Digit3') {
-        this.state.presetSelectPressed = 'SNAP_YOYO';
+        this.state.presetSelectPressed = 'GIGANTIC_SPRING';
       }
       if (e.code === 'Digit4') {
-        this.state.presetSelectPressed = 'LUNAR_ORBIT';
+        this.state.presetSelectPressed = 'HEAVY_WRECKER';
       }
       if (e.code === 'Digit5') {
-        this.state.presetSelectPressed = 'WHIP_SLASH';
+        this.state.presetSelectPressed = 'RAPID_ORBIT';
       }
     });
 
@@ -172,7 +187,13 @@ export class InputManager {
     return val;
   }
 
-  public consumePresetSelect(): string | null {
+  public consumeOrbitToggle(): boolean {
+    const val = !!this.state.orbitTogglePressed;
+    this.state.orbitTogglePressed = false;
+    return val;
+  }
+
+  public consumePresetSelect(): PhysicsPresetId | 'CYCLE' | null {
     if (this.cyclePresetPressed) {
       this.cyclePresetPressed = false;
       return 'CYCLE';

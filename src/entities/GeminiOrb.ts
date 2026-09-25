@@ -1,114 +1,84 @@
 import { GeminiOrb, PhysicsPresetConfig, PhysicsPresetId } from '../types';
 
 export const PHYSICS_PRESETS: Record<PhysicsPresetId, PhysicsPresetConfig> = {
-  BALANCED: {
-    id: 'BALANCED',
-    name: 'BALANCED',
-    nameJa: 'バランス型 (現行)',
-    descJa: '程よい重みと弾性を兼ね備えた万能設定',
-    r0: 48,
-    baseTension: 0.0016,
-    extremeDiv: 140,
-    extremePow: 2.0,
-    extremeMult: 0.12,
-    maxTension: 0.48,
-    pushForce: 0.018,
-    whirlTransfer: 0.12,
-    barrierSpeed: 1.6,
-    barrierAccel: 0.055,
-    damping: 0.992,
-    maxSpeedBase: 6.2,
-    maxSpeedPerLevel: 1.0,
+  SNAP_SLING: {
+    id: 'SNAP_SLING',
+    name: 'SNAP SLING',
+    nameJa: '標準スリング (ヨーヨー)',
+    descJa: '直感的な引っ張り飛ばしと頂点滞在の標準設定',
+    springK: 0.0028,
+    springNonlinear: 0.065,
+    damping: 0.993,
+    maxSpeed: 8.5,
+    apexThreshold: 1.6,
+    orbitBaseSpeed: 0.065,
+    orbitTransfer: 0.20,
   },
-  HEAVY_FLAIL: {
-    id: 'HEAVY_FLAIL',
-    name: 'HEAVY FLAIL',
-    nameJa: '重量鉄球 (フエイル)',
-    descJa: 'ズッシリ重く、遠心力で巨大な大車輪スイング',
-    r0: 42,
-    baseTension: 0.0012,
-    extremeDiv: 155,
-    extremePow: 2.1,
-    extremeMult: 0.10,
-    maxTension: 0.42,
-    pushForce: 0.014,
-    whirlTransfer: 0.08,
-    barrierSpeed: 1.3,
-    barrierAccel: 0.038,
+  HYPER_BOOMERANG: {
+    id: 'HYPER_BOOMERANG',
+    name: 'HYPER BOOMERANG',
+    nameJa: '大遠投ブーメラン',
+    descJa: '高慣性・低空気抵抗。画面端まで飛んで大きく湾曲',
+    springK: 0.0018,
+    springNonlinear: 0.040,
+    damping: 0.997,
+    maxSpeed: 10.0,
+    apexThreshold: 1.4,
+    orbitBaseSpeed: 0.055,
+    orbitTransfer: 0.16,
+  },
+  GIGANTIC_SPRING: {
+    id: 'GIGANTIC_SPRING',
+    name: 'GIGANTIC SPRING',
+    nameJa: '超ゴムバネ (高反発)',
+    descJa: '離すほど急激に加速が跳ね上がる猛烈なゴムパチンコ',
+    springK: 0.0035,
+    springNonlinear: 0.120,
+    damping: 0.990,
+    maxSpeed: 11.5,
+    apexThreshold: 1.8,
+    orbitBaseSpeed: 0.075,
+    orbitTransfer: 0.24,
+  },
+  HEAVY_WRECKER: {
+    id: 'HEAVY_WRECKER',
+    name: 'HEAVY WRECKER',
+    nameJa: '重量分銅 (高質量)',
+    descJa: '重い質量感。折り返しでの滞在時間が長く集中粉砕',
+    springK: 0.0022,
+    springNonlinear: 0.050,
     damping: 0.995,
-    maxSpeedBase: 6.8,
-    maxSpeedPerLevel: 1.1,
+    maxSpeed: 7.8,
+    apexThreshold: 2.0,
+    orbitBaseSpeed: 0.045,
+    orbitTransfer: 0.14,
   },
-  SNAP_YOYO: {
-    id: 'SNAP_YOYO',
-    name: 'SNAP YO-YO',
-    nameJa: '高弾性ヨーヨー',
-    descJa: '強烈なバネ戻り。直線突進スリングショット特化',
-    r0: 52,
-    baseTension: 0.0028,
-    extremeDiv: 120,
-    extremePow: 2.1,
-    extremeMult: 0.20,
-    maxTension: 0.65,
-    pushForce: 0.024,
-    whirlTransfer: 0.16,
-    barrierSpeed: 1.9,
-    barrierAccel: 0.075,
-    damping: 0.988,
-    maxSpeedBase: 7.6,
-    maxSpeedPerLevel: 1.2,
-  },
-  LUNAR_ORBIT: {
-    id: 'LUNAR_ORBIT',
-    name: 'LUNAR ORBIT',
-    nameJa: '安定公転バリア',
-    descJa: '自機を常時旋回して守る月面衛星シールド',
-    r0: 54,
-    baseTension: 0.0020,
-    extremeDiv: 130,
-    extremePow: 2.0,
-    extremeMult: 0.14,
-    maxTension: 0.50,
-    pushForce: 0.022,
-    whirlTransfer: 0.15,
-    barrierSpeed: 2.2,
-    barrierAccel: 0.085,
-    damping: 0.991,
-    maxSpeedBase: 5.8,
-    maxSpeedPerLevel: 0.8,
-  },
-  WHIP_SLASH: {
-    id: 'WHIP_SLASH',
-    name: 'WHIP SLASH',
-    nameJa: '超しなり鞭 (ウィップ)',
-    descJa: '追従遅延が大きく、画面端から大きく薙ぎ払う',
-    r0: 58,
-    baseTension: 0.0011,
-    extremeDiv: 160,
-    extremePow: 1.9,
-    extremeMult: 0.09,
-    maxTension: 0.38,
-    pushForce: 0.012,
-    whirlTransfer: 0.22,
-    barrierSpeed: 1.4,
-    barrierAccel: 0.045,
-    damping: 0.994,
-    maxSpeedBase: 6.9,
-    maxSpeedPerLevel: 1.1,
+  RAPID_ORBIT: {
+    id: 'RAPID_ORBIT',
+    name: 'RAPID ORBIT',
+    nameJa: '高速公転バリア',
+    descJa: 'クリック時の公転スピードと追従性が最も高い防御型',
+    springK: 0.0030,
+    springNonlinear: 0.060,
+    damping: 0.992,
+    maxSpeed: 8.2,
+    apexThreshold: 1.5,
+    orbitBaseSpeed: 0.095,
+    orbitTransfer: 0.32,
   },
 };
 
 export const PRESET_ORDER: PhysicsPresetId[] = [
-  'BALANCED',
-  'HEAVY_FLAIL',
-  'SNAP_YOYO',
-  'LUNAR_ORBIT',
-  'WHIP_SLASH',
+  'SNAP_SLING',
+  'HYPER_BOOMERANG',
+  'GIGANTIC_SPRING',
+  'HEAVY_WRECKER',
+  'RAPID_ORBIT',
 ];
 
 export class GeminiOrbManager {
   public orbs: GeminiOrb[] = [];
-  public currentPresetId: PhysicsPresetId = 'BALANCED';
+  public currentPresetId: PhysicsPresetId = 'SNAP_SLING';
   private orbCounter: number = 0;
 
   public setPreset(id: PhysicsPresetId): PhysicsPresetConfig {
@@ -129,9 +99,81 @@ export class GeminiOrbManager {
     return PHYSICS_PRESETS[this.currentPresetId];
   }
 
-  public getTelemetry(playerX: number, playerY: number): { dist: number; speed: number; tangentSpeed: number } {
+  public toggleOrbit(playerX: number, playerY: number): boolean {
+    if (this.orbs.length === 0) return false;
+    const firstOrb = this.orbs[0];
+    const willOrbit = firstOrb.mode !== 'ORBIT';
+
+    for (const orb of this.orbs) {
+      if (willOrbit) {
+        orb.mode = 'ORBIT';
+        const dx = orb.x - playerX;
+        const dy = orb.y - playerY;
+        const dist = Math.hypot(dx, dy) || 1;
+        orb.orbitRadius = Math.max(38, Math.min(240, dist));
+        orb.orbitAngle = Math.atan2(dy, dx);
+        orb.orbitAngularVel = 0.065;
+      } else {
+        orb.mode = 'SLING';
+      }
+    }
+    return willOrbit;
+  }
+
+  public setMode(mode: 'SLING' | 'ORBIT', playerX: number, playerY: number): void {
+    for (const orb of this.orbs) {
+      if (orb.mode !== mode) {
+        if (mode === 'ORBIT') {
+          orb.mode = 'ORBIT';
+          const dx = orb.x - playerX;
+          const dy = orb.y - playerY;
+          const dist = Math.hypot(dx, dy) || 1;
+          orb.orbitRadius = Math.max(38, Math.min(240, dist));
+          orb.orbitAngle = Math.atan2(dy, dx);
+          orb.orbitAngularVel = 0.065;
+        } else {
+          orb.mode = 'SLING';
+        }
+      }
+    }
+  }
+
+  public getEffectiveDamage(orb: GeminiOrb): number {
+    const baseDamage = orb.level === 1 ? 1 : orb.level === 2 ? 3 : 8;
+    const speed = Math.hypot(orb.vx, orb.vy);
+    if (speed > 3.0) {
+      // Kinetic speed scaling (勢いが強いと威力が大)
+      const multiplier = 1 + (speed - 3.0) / 4.0;
+      return Math.round(baseDamage * multiplier);
+    }
+    return baseDamage;
+  }
+
+  public getEffectiveRadius(orb: GeminiOrb): number {
+    const baseR = orb.level === 1 ? 16 : orb.level === 2 ? 24 : 32;
+    const speed = Math.hypot(orb.vx, orb.vy);
+    if (speed > 4.5) {
+      // Speed expansion (サイズも大きくなる)
+      return baseR * 1.3;
+    }
+    if (orb.isHoveringApex) {
+      // Apex dwell resonance expansion
+      return baseR * 1.25;
+    }
+    return baseR;
+  }
+
+  public getTelemetry(playerX: number, playerY: number): {
+    dist: number;
+    speed: number;
+    tangentSpeed: number;
+    mode: 'SLING' | 'ORBIT';
+    isApex: boolean;
+    orbitRadius: number;
+    effectiveDamage: number;
+  } {
     if (this.orbs.length === 0) {
-      return { dist: 0, speed: 0, tangentSpeed: 0 };
+      return { dist: 0, speed: 0, tangentSpeed: 0, mode: 'SLING', isApex: false, orbitRadius: 0, effectiveDamage: 1 };
     }
     const orb = this.orbs[0];
     const dx = orb.x - playerX;
@@ -143,21 +185,35 @@ export class GeminiOrbManager {
     const ty = rx;
     const speed = Math.hypot(orb.vx, orb.vy);
     const tangentSpeed = orb.vx * tx + orb.vy * ty;
-    return { dist: Math.round(dist), speed: Math.round(speed * 10) / 10, tangentSpeed: Math.round(tangentSpeed * 10) / 10 };
+    return {
+      dist: Math.round(dist),
+      speed: Math.round(speed * 10) / 10,
+      tangentSpeed: Math.round(tangentSpeed * 10) / 10,
+      mode: orb.mode,
+      isApex: orb.isHoveringApex,
+      orbitRadius: Math.round(orb.orbitRadius),
+      effectiveDamage: this.getEffectiveDamage(orb),
+    };
   }
 
-  public spawn(x: number, y: number, initialVx: number = 0, initialVy: number = -2.8): GeminiOrb {
+  public spawn(x: number, y: number, initialVx: number = 0, initialVy: number = -4.0): GeminiOrb {
     const orb: GeminiOrb = {
       id: `gemini_${++this.orbCounter}`,
       x,
       y,
-      vx: initialVx || (Math.random() - 0.5) * 3.0,
-      vy: initialVy || -3.2,
+      vx: initialVx || (Math.random() - 0.5) * 2.0,
+      vy: initialVy || -4.5,
       level: 1,
       radius: 16,
       damage: 1,
       trail: [],
       fuseTimer: 20,
+      mode: 'SLING',
+      orbitRadius: 75,
+      orbitAngle: -Math.PI / 2,
+      orbitAngularVel: 0.065,
+      apexDwellTimer: 0,
+      isHoveringApex: false,
     };
     this.orbs.push(orb);
     return orb;
@@ -171,11 +227,12 @@ export class GeminiOrbManager {
     onMerge?: (level: number, x: number, y: number) => void
   ): void {
     const cfg = PHYSICS_PRESETS[this.currentPresetId];
+
     for (let i = 0; i < this.orbs.length; i++) {
       const orb = this.orbs[i];
 
       // Motion trail
-      orb.trail.unshift({ x: orb.x, y: orb.y, alpha: 0.85 });
+      orb.trail.unshift({ x: orb.x, y: orb.y, alpha: 0.88 });
       const maxTrail = orb.level === 3 ? 24 : orb.level === 2 ? 18 : 14;
       if (orb.trail.length > maxTrail) {
         orb.trail.pop();
@@ -188,74 +245,90 @@ export class GeminiOrbManager {
         orb.fuseTimer--;
       }
 
-      // --- Whirling Flail & Orbital Bungee Physics (分銅旋回＆バネ弾性力学) ---
-      // Vector from Player (Anchor) to Gemini (Weight)
-      const dx = orb.x - playerX;
-      const dy = orb.y - playerY;
+      // Vector from Gemini to Player
+      const dx = playerX - orb.x;
+      const dy = playerY - orb.y;
       const dist = Math.hypot(dx, dy) || 1;
+      const ux = dx / dist; // unit vector pointing toward player
+      const uy = dy / dist;
 
-      // Unit radial vector (pointing from Player to Gemini)
-      const rx = dx / dist;
-      const ry = dy / dist;
+      if (orb.mode === 'ORBIT') {
+        // --- MODE ②: TETHERED ORBIT / WHIRLING FLAIL (公転紐ロック旋回) ---
+        // Tangential unit vector (counter-clockwise)
+        const tx = -Math.sin(orb.orbitAngle);
+        const ty = Math.cos(orb.orbitAngle);
 
-      // Unit tangential vector (perpendicular, counter-clockwise)
-      const tx = -ry;
-      const ty = rx;
+        // Player ship movement transferred into orbit spin
+        const playerTangential = playerVx * tx + playerVy * ty;
+        orb.orbitAngularVel += (playerTangential / orb.orbitRadius) * cfg.orbitTransfer;
 
-      // 1. Spring-Tether Elastic Tension (バネの付いた分銅の弾性張力)
-      const r0 = cfg.r0;
+        // Air damping + baseline automatic spin
+        orb.orbitAngularVel = orb.orbitAngularVel * 0.985 + (cfg.orbitBaseSpeed * 0.015);
+        orb.orbitAngularVel = Math.max(-0.25, Math.min(0.25, orb.orbitAngularVel));
 
-      if (dist > r0) {
-        const stretch = dist - r0;
-        const baseTension = stretch * cfg.baseTension;
-        const extremeTension = Math.pow(stretch / cfg.extremeDiv, cfg.extremePow) * cfg.extremeMult;
-        const tensionForce = Math.min(cfg.maxTension, baseTension + extremeTension);
+        // Advance angle
+        orb.orbitAngle += orb.orbitAngularVel;
 
-        // Pull toward player (-rx, -ry)
-        orb.vx -= rx * tensionForce;
-        orb.vy -= ry * tensionForce;
+        // Position strictly on tether radius
+        orb.x = playerX + Math.cos(orb.orbitAngle) * orb.orbitRadius;
+        orb.y = playerY + Math.sin(orb.orbitAngle) * orb.orbitRadius;
+
+        // Tangential velocity for damage and fling release
+        orb.vx = playerVx + tx * (orb.orbitRadius * orb.orbitAngularVel);
+        orb.vy = playerVy + ty * (orb.orbitRadius * orb.orbitAngularVel);
+
+        orb.isHoveringApex = false;
+        orb.apexDwellTimer = 0;
+
       } else {
-        // Soft outward repulsion when compressed inside equilibrium zone
-        const pushForce = (r0 - dist) * cfg.pushForce;
-        orb.vx += rx * pushForce;
-        orb.vy += ry * pushForce;
+        // --- MODE ①: YO-YO & BOOMERANG SLING PHYSICS (スリング＆ヨーヨー・ブーメラン) ---
+        // Rubber band tension accelerates Gemini toward the ship:
+        const stretch = Math.max(0, dist - 16);
+        const linearForce = stretch * cfg.springK;
+        const nonlinearForce = cfg.springNonlinear * Math.pow(stretch / 100, 2);
+        const totalAccel = Math.min(1.4, linearForce + nonlinearForce);
+
+        orb.vx += ux * totalAccel;
+        orb.vy += uy * totalAccel;
+
+        // Momentum damping
+        orb.vx *= cfg.damping;
+        orb.vy *= cfg.damping;
+
+        // When resting near ship with low speed, smoothly settle
+        if (dist < 32 && Math.hypot(orb.vx, orb.vy) < 1.2) {
+          orb.vx *= 0.92;
+          orb.vy *= 0.92;
+        }
+
+        // Terminal speed limit
+        const curSpeed = Math.hypot(orb.vx, orb.vy);
+        const maxSpd = cfg.maxSpeed + (orb.level - 1) * 1.5;
+        if (curSpeed > maxSpd) {
+          orb.vx = (orb.vx / curSpeed) * maxSpd;
+          orb.vy = (orb.vy / curSpeed) * maxSpd;
+        }
+
+        // Apex Dwell Detection (折り返し地点での減速・停止判定)
+        // When Gemini has flown out (dist > 50px) and speed drops below apexThreshold:
+        if (dist > 50 && curSpeed < cfg.apexThreshold) {
+          orb.isHoveringApex = true;
+          orb.apexDwellTimer++;
+        } else {
+          orb.isHoveringApex = false;
+          orb.apexDwellTimer = 0;
+        }
+
+        // Update position
+        orb.x += orb.vx;
+        orb.y += orb.vy;
+
+        // Soft screen edge bounce
+        if (orb.x < 14) { orb.x = 14; orb.vx = Math.abs(orb.vx) * 0.92; }
+        if (orb.x > 346) { orb.x = 346; orb.vx = -Math.abs(orb.vx) * 0.92; }
+        if (orb.y < 24) { orb.y = 24; orb.vy = Math.abs(orb.vy) * 0.92; }
+        if (orb.y > 516) { orb.y = 516; orb.vy = -Math.abs(orb.vy) * 0.92; }
       }
-
-      // 2. Whirling & Tangential Momentum Coupling (自機の旋回運動からの角加速度)
-      const playerTangential = playerVx * tx + playerVy * ty;
-      const curTangential = orb.vx * tx + orb.vy * ty;
-
-      orb.vx += tx * (playerTangential * cfg.whirlTransfer);
-      orb.vy += ty * (playerTangential * cfg.whirlTransfer);
-
-      // 3. Resting Barrier Orbit (近くにいる時の安定公転)
-      if (dist < 85 && Math.abs(curTangential) < cfg.barrierSpeed) {
-        const spinDir = curTangential < -0.05 ? -1 : 1;
-        orb.vx += tx * (cfg.barrierAccel * spinDir);
-        orb.vy += ty * (cfg.barrierAccel * spinDir);
-      }
-
-      // 4. Momentum Retention & Slight Air Resistance
-      orb.vx *= cfg.damping;
-      orb.vy *= cfg.damping;
-
-      // 5. Terminal Velocity Ceiling
-      const maxSpeed = cfg.maxSpeedBase + (orb.level - 1) * cfg.maxSpeedPerLevel;
-      const curSpeed = Math.hypot(orb.vx, orb.vy);
-      if (curSpeed > maxSpeed) {
-        orb.vx = (orb.vx / curSpeed) * maxSpeed;
-        orb.vy = (orb.vy / curSpeed) * maxSpeed;
-      }
-
-      // Update position
-      orb.x += orb.vx;
-      orb.y += orb.vy;
-
-      // Screen edge boundary reflection (bounces off arena borders like a wrecking ball)
-      if (orb.x < 14) { orb.x = 14; orb.vx = Math.abs(orb.vx) * 0.90; }
-      if (orb.x > 346) { orb.x = 346; orb.vx = -Math.abs(orb.vx) * 0.90; }
-      if (orb.y < 24) { orb.y = 24; orb.vy = Math.abs(orb.vy) * 0.90; }
-      if (orb.y > 516) { orb.y = 516; orb.vy = -Math.abs(orb.vy) * 0.90; }
     }
 
     // Check for Gemini Fusion (合体)

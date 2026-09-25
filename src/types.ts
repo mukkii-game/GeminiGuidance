@@ -1,25 +1,19 @@
 export type GameState = 'TITLE' | 'PLAYING' | 'STAGE_CLEAR' | 'GAME_OVER' | 'GAME_CLEAR' | 'TEST_STAGE';
 
-export type PhysicsPresetId = 'BALANCED' | 'HEAVY_FLAIL' | 'SNAP_YOYO' | 'LUNAR_ORBIT' | 'WHIP_SLASH';
+export type PhysicsPresetId = 'SNAP_SLING' | 'HYPER_BOOMERANG' | 'GIGANTIC_SPRING' | 'HEAVY_WRECKER' | 'RAPID_ORBIT';
 
 export interface PhysicsPresetConfig {
   id: PhysicsPresetId;
   name: string;
   nameJa: string;
   descJa: string;
-  r0: number;
-  baseTension: number;
-  extremeDiv: number;
-  extremePow: number;
-  extremeMult: number;
-  maxTension: number;
-  pushForce: number;
-  whirlTransfer: number;
-  barrierSpeed: number;
-  barrierAccel: number;
-  damping: number;
-  maxSpeedBase: number;
-  maxSpeedPerLevel: number;
+  springK: number;         // 線形バネ係数 (伸びに対する引き戻し基本力)
+  springNonlinear: number; // 距離²非線形ゴム反発係数 (大きく離した時の猛加速)
+  damping: number;         // 慣性保存率 (空気抵抗の少なさ)
+  maxSpeed: number;        // 最高投擲速度
+  apexThreshold: number;   // 頂点滞在判定速度 (折り返し時の減速敷居値)
+  orbitBaseSpeed: number;  // クリック公転時の自動公転角速度
+  orbitTransfer: number;   // 自機移動から公転スピンへの加速度伝達
 }
 
 export interface InputState {
@@ -27,11 +21,13 @@ export interface InputState {
   y: number;
   active: boolean;
   isTouch: boolean;
+  isPointerDown?: boolean;
   crtTogglePressed?: boolean;
   audioTogglePressed?: boolean;
   presetSelectPressed?: PhysicsPresetId;
   testStageTogglePressed?: boolean;
   levelUpPressed?: boolean;
+  orbitTogglePressed?: boolean;
 }
 
 export interface PlayerState {
@@ -80,6 +76,12 @@ export interface GeminiOrb {
   damage: number;
   trail: Array<{ x: number; y: number; alpha: number }>;
   fuseTimer: number; // sparkling burst when leveled up
+  mode: 'SLING' | 'ORBIT';
+  orbitRadius: number;
+  orbitAngle: number;
+  orbitAngularVel: number;
+  apexDwellTimer: number;
+  isHoveringApex: boolean;
 }
 
 export type EnemyType = 
@@ -91,7 +93,7 @@ export type EnemyType =
   // Stage 2 (xAI & Dev Forge)
   | 'CURSOR_PROBE' 
   | 'GROK_RAIDER' 
-  | 'COPILOT_GLIDER'
+  | 'COPILOT_GLIDER' 
   | 'SPACEX_ROCKET'
   // Stage 3 (Anthropic Alignment: Fable > Opus > Sonnet > Haiku)
   | 'CLAUDE_HAIKU' 
@@ -135,6 +137,10 @@ export interface EnemyEntity {
   angle: number;
   shootCooldown: number;
   hitCooldown?: number;
+  collisionType?: 'PENETRATE' | 'REFLECT';
+  mass?: number; // 1 = light (full bounce), 3 = medium (half bounce), 999 = heavy/immovable (zero enemy knockback)
+  knockbackVx?: number;
+  knockbackVy?: number;
 }
 
 export type GroundType = 

@@ -65,6 +65,8 @@ export class BreakoutManager {
     points: number;
     hitX: number;
     hitY: number;
+    normalX: number;
+    normalY: number;
   } {
     for (const b of this.blocks) {
       if (!b.active) continue;
@@ -81,6 +83,24 @@ export class BreakoutManager {
       const distSq = dx * dx + dy * dy;
 
       if (distSq < orb.radius * orb.radius) {
+        let nx = dx;
+        let ny = dy;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 0.001) {
+          nx /= dist;
+          ny /= dist;
+        } else {
+          const overlapX = halfW - Math.abs(orb.x - b.x);
+          const overlapY = halfH - Math.abs(orb.y - b.y);
+          if (overlapX < overlapY) {
+            nx = orb.x < b.x ? -1 : 1;
+            ny = 0;
+          } else {
+            nx = 0;
+            ny = orb.y < b.y ? -1 : 1;
+          }
+        }
+
         b.hp -= orb.damage;
         const broken = b.hp <= 0;
         if (broken) {
@@ -94,10 +114,12 @@ export class BreakoutManager {
           points: b.points,
           hitX: closestX,
           hitY: closestY,
+          normalX: nx,
+          normalY: ny,
         };
       }
     }
 
-    return { hit: false, block: null, broken: false, points: 0, hitX: 0, hitY: 0 };
+    return { hit: false, block: null, broken: false, points: 0, hitX: 0, hitY: 0, normalX: 0, normalY: 0 };
   }
 }

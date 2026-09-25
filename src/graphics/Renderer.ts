@@ -74,7 +74,15 @@ export class ArcadeRenderer {
     stageTick: number,
     elonIntroTimer: number = 0,
     presetConfig?: PhysicsPresetConfig,
-    telemetry?: { dist: number; speed: number; tangentSpeed: number },
+    telemetry?: {
+      dist: number;
+      speed: number;
+      tangentSpeed: number;
+      mode?: 'SLING' | 'ORBIT';
+      isApex?: boolean;
+      orbitRadius?: number;
+      effectiveDamage?: number;
+    },
     testBossDamage: number = 0
   ): void {
     const ctx = this.ctx;
@@ -361,36 +369,101 @@ export class ArcadeRenderer {
     const ctx = this.ctx;
 
     for (const orb of orbs) {
-      // 0. Energy Tether / Flail Chain (分銅のエネルギー鎖 / テンションコード)
       const dist = Math.hypot(orb.x - playerX, orb.y - playerY);
+      const speed = Math.hypot(orb.vx, orb.vy);
+      const isFast = speed > 4.5;
+      const effectiveR = isFast ? orb.radius * 1.3 : orb.isHoveringApex ? orb.radius * 1.25 : orb.radius;
+
+      // 0. Energy Tether (Rubber sling vs locked orbit cable)
       ctx.save();
-      const tetherAlpha = Math.min(0.55, 0.18 + (dist / 280) * 0.35);
-      const tetherColor = orb.level === 3 ? `rgba(244, 114, 182, ${tetherAlpha})` : `rgba(56, 189, 248, ${tetherAlpha})`;
-      ctx.strokeStyle = tetherColor;
-      ctx.lineWidth = Math.max(0.8, 1.8 - (dist / 320) * 0.8);
-      ctx.setLineDash([4, 3]);
-      ctx.beginPath();
-      ctx.moveTo(playerX, playerY);
-      ctx.lineTo(orb.x, orb.y);
-      ctx.stroke();
-      ctx.setLineDash([]);
+      if (orb.mode === 'ORBIT') {
+        // --- MODE ②: Locked Orbital Ring & Energy Cable ---
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.22)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 4]);
+        ctx.beginPath();
+        ctx.arc(playerX, playerY, orb.orbitRadius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Direct laser chain
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 2.4;
+        ctx.beginPath();
+        ctx.moveTo(playerX, playerY);
+        ctx.lineTo(orb.x, orb.y);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.0;
+        ctx.beginPath();
+        ctx.moveTo(playerX, playerY);
+        ctx.lineTo(orb.x, orb.y);
+        ctx.stroke();
+
+        for (let s = 1; s <= 3; s++) {
+          const ratio = s / 4;
+          const kx = playerX + (orb.x - playerX) * ratio;
+          const ky = playerY + (orb.y - playerY) * ratio;
+          ctx.fillStyle = '#ec4899';
+          ctx.beginPath();
+          ctx.arc(kx, ky, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+      } else {
+        // --- MODE ①: Yo-Yo & Boomerang Rubber Sling ---
+        const tensionRatio = Math.min(1.0, dist / 220);
+        const tetherAlpha = 0.25 + tensionRatio * 0.65;
+        const tetherColor = tensionRatio > 0.6 ? `rgba(254, 240, 138, ${tetherAlpha})` : `rgba(56, 189, 248, ${tetherAlpha})`;
+        ctx.strokeStyle = tetherColor;
+        ctx.lineWidth = 1.0 + tensionRatio * 2.0;
+        ctx.beginPath();
+        ctx.moveTo(playerX, playerY);
+        ctx.lineTo(orb.x, orb.y);
+        ctx.stroke();
+
+        if (dist > 40) {
+          ctx.fillStyle = '#ffffff';
+          const beadCount = Math.floor(dist / 40);
+          for (let b = 1; b <= beadCount; b++) {
+            const ratio = b / (beadCount + 1);
+            const bx = playerX + (orb.x - playerX) * ratio;
+            const by = playerY + (orb.y - playerY) * ratio;
+            ctx.beginPath();
+            ctx.arc(bx, by, 1.8, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
       ctx.restore();
 
-      // 1. Shimmering Energy Aura (Safe to Player, deadly to enemies!)
+      // 1. Shimmering Energy Aura & Apex Flare
       ctx.save();
-      const auraColor = orb.level === 3 ? 'rgba(236, 72, 153, 0.28)' : orb.level === 2 ? 'rgba(168, 85, 247, 0.24)' : 'rgba(56, 189, 248, 0.22)';
-      const strokeColor = orb.level === 3 ? '#f472b6' : orb.level === 2 ? '#c084fc' : '#38bdf8';
+      const auraColor = orb.level === 3 ? 'rgba(236, 72, 153, 0.32)' : orb.level === 2 ? 'rgba(168, 85, 247, 0.28)' : 'rgba(56, 189, 248, 0.25)';
+      const strokeColor = orb.isHoveringApex ? '#fde047' : isFast ? '#ffffff' : orb.level === 3 ? '#f472b6' : orb.level === 2 ? '#c084fc' : '#38bdf8';
       
       ctx.fillStyle = auraColor;
       ctx.beginPath();
-      ctx.arc(orb.x, orb.y, orb.radius + 4, 0, Math.PI * 2);
+      ctx.arc(orb.x, orb.y, effectiveR + 4, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = isFast ? 2.5 : 1.5;
       ctx.beginPath();
-      ctx.arc(orb.x, orb.y, orb.radius + 2, 0, Math.PI * 2);
+      ctx.arc(orb.x, orb.y, effectiveR + 2, 0, Math.PI * 2);
       ctx.stroke();
+
+      if (orb.isHoveringApex) {
+        ctx.strokeStyle = '#fde047';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(orb.x - effectiveR - 6, orb.y);
+        ctx.lineTo(orb.x + effectiveR + 6, orb.y);
+        ctx.moveTo(orb.x, orb.y - effectiveR - 6);
+        ctx.lineTo(orb.x, orb.y + effectiveR + 6);
+        ctx.stroke();
+      }
       ctx.restore();
 
       // 2. Motion Trail
@@ -408,6 +481,8 @@ export class ArcadeRenderer {
       if (sprite) {
         ctx.save();
         ctx.translate(orb.x, orb.y);
+        const scale = isFast ? 1.25 : orb.isHoveringApex ? 1.15 : 1.0;
+        ctx.scale(scale, scale);
         ctx.drawImage(sprite, -sprite.width / 2, -sprite.height / 2);
         ctx.restore();
       }
@@ -492,6 +567,22 @@ export class ArcadeRenderer {
           ctx.fillRect(-e.width / 2, -e.height / 2, e.width, e.height);
         }
 
+        ctx.restore();
+      }
+
+      // In TEST_STAGE: show clear collision property badges!
+      if (e.pattern === 'DUMMY') {
+        ctx.save();
+        ctx.font = '8px "DotGothic16", monospace';
+        ctx.textAlign = 'center';
+        if (e.collisionType === 'PENETRATE') {
+          ctx.fillStyle = '#22c55e';
+          ctx.fillText('【貫通:滞在】', e.x, e.y - e.height / 2 - 4);
+        } else {
+          const massStr = (e.mass || 2) >= 100 ? '重壁' : (e.mass || 2) >= 3 ? '中' : '軽';
+          ctx.fillStyle = '#f97316';
+          ctx.fillText(`【反射:反作用 ${massStr}】`, e.x, e.y - e.height / 2 - 4);
+        }
         ctx.restore();
       }
     }
@@ -795,7 +886,16 @@ export class ArcadeRenderer {
     stage: number,
     geminiOrbs: GeminiOrb[],
     boss: BossEntity | null,
-    presetConfig?: PhysicsPresetConfig
+    presetConfig?: PhysicsPresetConfig,
+    telemetry?: {
+      dist: number;
+      speed: number;
+      tangentSpeed: number;
+      mode?: 'SLING' | 'ORBIT';
+      isApex?: boolean;
+      orbitRadius?: number;
+      effectiveDamage?: number;
+    }
   ): void {
     const ctx = this.ctx;
     const w = this.canvas.width;
@@ -834,6 +934,18 @@ export class ArcadeRenderer {
     ctx.strokeRect(btnPresetX, 5, 80, 15);
     ctx.fillStyle = '#fde047';
     ctx.fillText(`[1-5:${presetConfig?.name.slice(0, 5) || 'STD'}]`, btnPresetX + 40, 15);
+
+    // Mode Toggle Button (SLING / ORBIT)
+    const curMode = telemetry?.mode || 'SLING';
+    const isOrbit = curMode === 'ORBIT';
+    const btnModeX = btnPresetX - 68;
+    ctx.fillStyle = isOrbit ? 'rgba(56, 189, 248, 0.40)' : 'rgba(234, 179, 8, 0.30)';
+    ctx.fillRect(btnModeX, 5, 64, 15);
+    ctx.strokeStyle = isOrbit ? '#38bdf8' : '#fde047';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(btnModeX, 5, 64, 15);
+    ctx.fillStyle = isOrbit ? '#38bdf8' : '#fde047';
+    ctx.fillText(isOrbit ? '⚡ORBIT' : '🚀SLING', btnModeX + 32, 15);
 
     // Player SHIELD / Armor Bar (Damage System)
     const shieldX = 14;
@@ -923,7 +1035,15 @@ export class ArcadeRenderer {
     geminiOrbs: GeminiOrb[],
     boss: BossEntity | null,
     presetConfig?: PhysicsPresetConfig,
-    telemetry?: { dist: number; speed: number; tangentSpeed: number },
+    telemetry?: {
+      dist: number;
+      speed: number;
+      tangentSpeed: number;
+      mode?: 'SLING' | 'ORBIT';
+      isApex?: boolean;
+      orbitRadius?: number;
+      effectiveDamage?: number;
+    },
     testBossDamage: number = 0
   ): void {
     const ctx = this.ctx;
@@ -948,34 +1068,47 @@ export class ArcadeRenderer {
     ctx.font = '7px "Press Start 2P", monospace';
     ctx.fillText(`SHLD:${player.hp}%`, 56, 15);
 
+    // Mode Toggle Button (SLING / ORBIT)
+    const curMode = telemetry?.mode || 'SLING';
+    const isOrbit = curMode === 'ORBIT';
+    ctx.fillStyle = isOrbit ? 'rgba(56, 189, 248, 0.45)' : 'rgba(234, 179, 8, 0.35)';
+    ctx.fillRect(144, 4, 76, 16);
+    ctx.strokeStyle = isOrbit ? '#38bdf8' : '#fde047';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(144, 4, 76, 16);
+    ctx.fillStyle = isOrbit ? '#38bdf8' : '#fde047';
+    ctx.font = '7px "DotGothic16", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(isOrbit ? '⚡公転[SPACE]' : '🚀スリング', 182, 15);
+
     // Lv Toggle Button
     const lv = geminiOrbs[0]?.level || 1;
     ctx.fillStyle = 'rgba(236, 72, 153, 0.25)';
-    ctx.fillRect(150, 4, 58, 16);
+    ctx.fillRect(224, 4, 44, 16);
     ctx.strokeStyle = '#ec4899';
     ctx.lineWidth = 1;
-    ctx.strokeRect(150, 4, 58, 16);
+    ctx.strokeRect(224, 4, 44, 16);
     ctx.fillStyle = '#ec4899';
     ctx.font = '6px "Press Start 2P", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(`Lv.${lv} [L]`, 179, 15);
+    ctx.fillText(`Lv.${lv}[L]`, 246, 15);
 
     // Return to Game Button
     ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
-    ctx.fillRect(214, 4, 136, 16);
+    ctx.fillRect(272, 4, 82, 16);
     ctx.strokeStyle = '#ef4444';
     ctx.lineWidth = 1;
-    ctx.strokeRect(214, 4, 136, 16);
+    ctx.strokeRect(272, 4, 82, 16);
     ctx.fillStyle = '#f87171';
-    ctx.fillText('✕ RETURN (T)', 282, 15);
+    ctx.fillText('✕ RETURN(T)', 313, 15);
 
     // 2. 5 Preset Switcher Tabs (x: 10 to 350, y: 24 to 42, width 64 each, gap 5)
     const tabs: Array<{ id: PhysicsPresetId; label: string; num: string }> = [
-      { id: 'BALANCED', label: 'バランス', num: '1' },
-      { id: 'HEAVY_FLAIL', label: '重量鉄球', num: '2' },
-      { id: 'SNAP_YOYO', label: 'ヨーヨー', num: '3' },
-      { id: 'LUNAR_ORBIT', label: '衛星バリア', num: '4' },
-      { id: 'WHIP_SLASH', label: 'しなり鞭', num: '5' },
+      { id: 'SNAP_SLING', label: 'スリング', num: '1' },
+      { id: 'HYPER_BOOMERANG', label: 'ブーメラン', num: '2' },
+      { id: 'GIGANTIC_SPRING', label: '超ゴムバネ', num: '3' },
+      { id: 'HEAVY_WRECKER', label: '重量分銅', num: '4' },
+      { id: 'RAPID_ORBIT', label: '公転バリア', num: '5' },
     ];
 
     const tabW = 64;
@@ -1009,7 +1142,7 @@ export class ArcadeRenderer {
 
       ctx.font = '6px "Press Start 2P", monospace';
       ctx.fillStyle = '#94a3b8';
-      ctx.fillText(`r0:${presetConfig.r0}px | TEN:${presetConfig.maxTension} | WHIRL:${presetConfig.whirlTransfer} | SPD:${presetConfig.maxSpeedBase}`, 10, 65);
+      ctx.fillText(`K:${presetConfig.springK} | NONLIN:${presetConfig.springNonlinear} | DAMP:${presetConfig.damping} | MAX:${presetConfig.maxSpeed}`, 10, 65);
     }
 
     // 4. Real-time Telemetry Bar at Screen Bottom
@@ -1023,7 +1156,12 @@ export class ArcadeRenderer {
     ctx.font = '7px "Press Start 2P", monospace';
     ctx.fillStyle = '#38bdf8';
     ctx.textAlign = 'left';
-    ctx.fillText(`DIST:${telemetry?.dist || 0}px  SPD:${telemetry?.speed || 0}  TGT:${telemetry?.tangentSpeed || 0}`, 10, btmY + 15);
+    ctx.fillText(`DIST:${telemetry?.dist || 0}px SPD:${telemetry?.speed || 0} [${curMode}]`, 10, btmY + 15);
+
+    if (telemetry?.isApex) {
+      ctx.fillStyle = '#fde047';
+      ctx.fillText('★APEX DWELL★', 188, btmY + 15);
+    }
 
     ctx.fillStyle = '#22c55e';
     ctx.textAlign = 'right';

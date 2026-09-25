@@ -230,6 +230,18 @@ export class Game {
       return;
     }
 
+    // Handle Orbit / Sling Mode toggle hotkey (Space / KeyZ / KeyO)
+    if (this.input.consumeOrbitToggle()) {
+      const isOrbit = this.geminiManager.toggleOrbit(this.player.state.x, this.player.state.y);
+      this.audio.playGeminiBounce();
+      this.addFloatingText(
+        this.player.state.x,
+        this.player.state.y - 30,
+        isOrbit ? '⚡ ORBIT LOCK (公転紐)' : '🚀 SLING MODE (反発ヨーヨー)',
+        isOrbit ? '#38bdf8' : '#fde047'
+      );
+    }
+
     // Handle Preset Selection (KeyP, Digit1-5)
     const presetChoice = this.input.consumePresetSelect();
     if (presetChoice) {
@@ -253,11 +265,21 @@ export class Game {
       this.addFloatingText(this.player.state.x, this.player.state.y - 30, 'GEMINI LEVEL UP!', '#ec4899');
     }
 
-    // Handle Click/Touch on HUD Buttons
+    // Handle Click/Touch on HUD Buttons or Field Orbit Toggle
     let clickedUI = false;
     const click = this.input.consumeClick();
     if (click) {
       clickedUI = this.handlePointerClick(click.x, click.y);
+      if (!clickedUI && click.y > 45 && (this.state === 'PLAYING' || this.state === 'TEST_STAGE')) {
+        const isOrbit = this.geminiManager.toggleOrbit(this.player.state.x, this.player.state.y);
+        this.audio.playGeminiBounce();
+        this.addFloatingText(
+          this.player.state.x,
+          this.player.state.y - 30,
+          isOrbit ? '⚡ ORBIT LOCK (公転紐)' : '🚀 SLING MODE (反発ヨーヨー)',
+          isOrbit ? '#38bdf8' : '#fde047'
+        );
+      }
     }
 
     // Test Stage Update Dispatch
@@ -491,11 +513,22 @@ export class Game {
 
   // --- Collision Detections ---
   private handleCollisions(): void {
-    // 0. Breakout Blocks Collision (Stage 2)
-    if (this.stage === 2 && this.breakoutManager.blocks.length > 0) {
+    // 0. Breakout Blocks Collision (Stage 2 & Test Stage)
+    if ((this.stage === 2 || this.state === 'TEST_STAGE') && this.breakoutManager.blocks.length > 0) {
       for (const orb of this.geminiManager.orbs) {
         const res = this.breakoutManager.checkGeminiCollision(orb);
         if (res.hit && res.block) {
+          // Elastic reflection off Breakout Block!
+          if (orb.mode === 'SLING') {
+            const dot = orb.vx * res.normalX + orb.vy * res.normalY;
+            if (dot < 0) {
+              orb.vx -= 1.95 * dot * res.normalX;
+              orb.vy -= 1.95 * dot * res.normalY;
+              orb.x = res.hitX + res.normalX * (orb.radius + 1.5);
+              orb.y = res.hitY + res.normalY * (orb.radius + 1.5);
+            }
+          }
+
           if (res.broken) {
             this.audio.playBlockBreak();
             this.addExplosion(res.hitX, res.hitY, 14, false);
@@ -514,44 +547,75 @@ export class Game {
 
     // 1. Gemini Orbs vs Enemy Bullets (たまはジェミニでけせる！ジェミニは止まらない！)
     for (const orb of this.geminiManager.orbs) {
+      const orbRadius = this.geminiManager.getEffectiveRadius(orb);
       for (let bi = this.enemyBullets.length - 1; bi >= 0; bi--) {
         const b = this.enemyBullets[bi];
         const dist = Math.hypot(orb.x - b.x, orb.y - b.y);
 
-        if (dist < orb.radius + b.radius) {
+        if (dist < orbRadius + b.radius) {
           // Bullet erased instantly!
           this.enemyBullets.splice(bi, 1);
           this.audio.playBulletErased();
           this.addExplosion(b.x, b.y, 8, false);
           this.player.addScore(50);
-          // Gemini movement continues completely unhindered!
         }
       }
     }
 
-    // 2. Gemini Orbs vs Airborne Enemies (完全貫通・分銅ブレード)
+    // 2. Gemini Orbs vs Airborne Enemies (貫通 vs 反射・作用反作用ノックバック)
     for (const orb of this.geminiManager.orbs) {
+      const orbRadius = this.geminiManager.getEffectiveRadius(orb);
+      const effectiveDmg = this.geminiManager.getEffectiveDamage(orb);
+
       for (let i = this.enemyManager.enemies.length - 1; i >= 0; i--) {
         const e = this.enemyManager.enemies[i];
         const dist = Math.hypot(orb.x - e.x, orb.y - e.y);
 
-        if (dist < orb.radius + e.width * 0.45) {
-          // If enemy is currently in hit cooldown, let the flail pass through smoothly
+        if (dist < orbRadius + e.width * 0.45) {
           if (e.hitCooldown && e.hitCooldown > 0) {
             continue;
           }
 
-          e.hp -= orb.damage;
-          e.hitCooldown = 6; // Hit cooldown for multi-hit slicing without stopping
+          // Damage application
+          e.hp -= effectiveDmg;
+          e.hitCooldown = e.collisionType === 'REFLECT' ? 7 : 4; // Faster 4-frame tick for penetrating!
+
+          // Reaction / Reflection Physics
+          if (e.collisionType === 'REFLECT') {
+            const nx = (orb.x - e.x) / (dist || 1);
+            const ny = (orb.y - e.y) / (dist || 1);
+
+            // Reflect Gemini in SLING mode
+            if (orb.mode === 'SLING') {
+              const dot = orb.vx * nx + orb.vy * ny;
+              if (dot < 0) {
+                orb.vx -= 1.90 * dot * nx;
+                orb.vy -= 1.90 * dot * ny;
+                orb.x = e.x + nx * (orbRadius + e.width * 0.46);
+                orb.y = e.y + ny * (orbRadius + e.width * 0.46);
+              }
+            } else {
+              orb.orbitAngularVel = -orb.orbitAngularVel * 0.85;
+            }
+
+            // Knockback on enemy (if mass < 100)
+            if ((e.mass || 2) < 100) {
+              const kFactor = Math.min(1.4, 1.4 / (e.mass || 2));
+              const speed = Math.hypot(orb.vx, orb.vy);
+              e.knockbackVx = -nx * (Math.max(2.5, speed * 0.75) * kFactor);
+              e.knockbackVy = -ny * (Math.max(2.5, speed * 0.75) * kFactor);
+            }
+          }
 
           if (e.hp > 0) {
-            // ENEMY SURVIVED: Gemini PIERCES THROUGH! (No bounce, continuous whirling flail!)
             this.audio.playGeminiBounce();
             this.addExplosion(e.x, e.y, 14, false);
-            this.player.addScore(50 * orb.damage);
-
+            this.player.addScore(50 * effectiveDmg);
+            if (orb.isHoveringApex) {
+              this.addFloatingText(e.x, e.y - 14, `APEX SHRED! -${effectiveDmg}`, '#38bdf8');
+            }
           } else {
-            // ENEMY DESTROYED: Gemini OBLITERATES & PIERCES!
+            // ENEMY DESTROYED
             this.audio.playAirExplosion();
             this.addExplosion(e.x, e.y, 18 + orb.level * 4, false);
 
@@ -582,7 +646,6 @@ export class Game {
             if (formationId) {
               const remainingInFormation = this.enemyManager.enemies.some(en => en.formationId === formationId);
               if (!remainingInFormation) {
-                // FORMATION WIPED! Drop floating Gemini logo item & repair shield!
                 this.spawnGeminiDropItem(deadX, deadY);
                 this.player.repair(20);
                 this.addFloatingText(deadX, deadY - 24, 'FORMATION WIPE! +20 SHIELD', '#22c55e');
@@ -593,20 +656,35 @@ export class Game {
         }
       }
 
-      // 3. Gemini Orbs vs Boss (完全貫通・周回スライス)
+      // 3. Gemini Orbs vs Boss (巨大反射体 / リフレクション)
       if (this.bossManager.currentBoss) {
         const b = this.bossManager.currentBoss;
         if (!b.hitCooldown || b.hitCooldown <= 0) {
-          const res = this.bossManager.hit(orb.damage, orb.x, orb.y);
+          const res = this.bossManager.hit(effectiveDmg, orb.x, orb.y);
           if (res.bossHit) {
-            b.hitCooldown = 6; // Grinding slice damage interval
-            // GEMINI DOES NOT BOUNCE! Slices right through maintaining full orbital momentum!
+            b.hitCooldown = 6;
             this.audio.playGeminiBounce();
             this.addExplosion(orb.x, orb.y, 22, false);
             this.player.addScore(res.points);
 
+            // Elastic reflection off boss body in SLING mode!
+            if (orb.mode === 'SLING') {
+              const bdx = orb.x - b.x;
+              const bdy = orb.y - b.y;
+              const bdist = Math.hypot(bdx, bdy) || 1;
+              const bnx = bdx / bdist;
+              const bny = bdy / bdist;
+              const dot = orb.vx * bnx + orb.vy * bny;
+              if (dot < 0) {
+                orb.vx -= 1.95 * dot * bnx;
+                orb.vy -= 1.95 * dot * bny;
+                orb.x = b.x + bnx * (b.width * 0.45 + orbRadius + 2);
+                orb.y = b.y + bny * (b.height * 0.45 + orbRadius + 2);
+              }
+            }
+
             if (this.state === 'TEST_STAGE') {
-              this.testBossTotalDamage += orb.damage;
+              this.testBossTotalDamage += effectiveDmg;
               if (b.hp < 10000) {
                 b.hp = 99999;
                 b.defeated = false;
@@ -935,16 +1013,15 @@ export class Game {
 
   private spawnTestDummies(): void {
     const w = this.canvas.width;
-    // Row 1 of dummies (y: 135)
-    this.enemyManager.spawn('DEEPSEEK_FLASH', w * 0.2, 135, 'DUMMY');
-    this.enemyManager.spawn('MISTRAL_FLAME', w * 0.4, 135, 'DUMMY');
-    this.enemyManager.spawn('QWEN_CUBE', w * 0.6, 135, 'DUMMY');
-    this.enemyManager.spawn('KIMI_MOON', w * 0.8, 135, 'DUMMY');
+    // Row 1: Soft Penetrating Dummies (貫通ダミー - 滞在連続ダメージ検証用)
+    this.enemyManager.spawn('DEEPSEEK_FLASH', w * 0.25, 135, 'DUMMY');
+    this.enemyManager.spawn('MISTRAL_FLAME', w * 0.50, 135, 'DUMMY');
+    this.enemyManager.spawn('CLAUDE_HAIKU', w * 0.75, 135, 'DUMMY');
 
-    // Row 2 of dummies (y: 185)
-    this.enemyManager.spawn('CURSOR_PROBE', w * 0.25, 185, 'DUMMY');
-    this.enemyManager.spawn('CLAUDE_SONNET', w * 0.5, 185, 'DUMMY');
-    this.enemyManager.spawn('SPACEX_ROCKET', w * 0.75, 185, 'DUMMY');
+    // Row 2: Reaction & Reflection Dummies (反射ダミー - 作用反作用＆ノックバック検証用)
+    this.enemyManager.spawn('CURSOR_PROBE', w * 0.25, 195, 'DUMMY'); // mass 1.0 (light, high knockback)
+    this.enemyManager.spawn('QWEN_CUBE', w * 0.50, 195, 'DUMMY');    // mass 3.0 (medium, moderate knockback)
+    this.enemyManager.spawn('SPACEX_ROCKET', w * 0.75, 195, 'DUMMY'); // mass 999 (heavy, zero knockback, pure bounce)
   }
 
   private updateTestStage(dtFactor: number = 1.0): void {
@@ -1037,8 +1114,21 @@ export class Game {
     const w = this.canvas.width;
 
     if (this.state === 'TEST_STAGE') {
-      // 1. [LV UP(L)] button (x: 150 to 210, y: 4 to 20)
-      if (x >= 148 && x <= 212 && y >= 2 && y <= 22) {
+      // 1. [MODE: SLING / ORBIT] button (x: 144 to 220, y: 4 to 20)
+      if (x >= 142 && x <= 222 && y >= 2 && y <= 22) {
+        const isOrbit = this.geminiManager.toggleOrbit(this.player.state.x, this.player.state.y);
+        this.audio.playGeminiBounce();
+        this.addFloatingText(
+          this.player.state.x,
+          this.player.state.y - 30,
+          isOrbit ? '⚡ ORBIT LOCK (公転紐)' : '🚀 SLING MODE (反発ヨーヨー)',
+          isOrbit ? '#38bdf8' : '#fde047'
+        );
+        return true;
+      }
+
+      // 2. [LV UP(L)] button (x: 224 to 268, y: 4 to 20)
+      if (x >= 222 && x <= 270 && y >= 2 && y <= 22) {
         for (const orb of this.geminiManager.orbs) {
           this.geminiManager.levelUpOrb(orb);
         }
@@ -1047,15 +1137,15 @@ export class Game {
         return true;
       }
 
-      // 2. [EXIT(T)] button (x: 214 to 350, y: 4 to 20)
-      if (x >= 212 && x <= 352 && y >= 2 && y <= 22) {
+      // 3. [EXIT(T)] button (x: 272 to 354, y: 4 to 20)
+      if (x >= 270 && x <= 356 && y >= 2 && y <= 22) {
         this.exitTestStage();
         return true;
       }
 
-      // 4. Preset Tabs (y: 22 to 40)
-      if (y >= 22 && y <= 40) {
-        const tabW = (w - 20 - 4 * 5) / 5;
+      // 4. Preset Tabs (y: 22 to 44)
+      if (y >= 22 && y <= 44) {
+        const tabW = 64;
         for (let i = 0; i < PRESET_ORDER.length; i++) {
           const tabX = 10 + i * (tabW + 5);
           if (x >= tabX && x <= tabX + tabW) {
@@ -1070,18 +1160,32 @@ export class Game {
     } else {
       // Normal HUD buttons
       // [LAB(T)] button
-      if (x >= w - 64 && x <= w - 6 && y >= 16 && y <= 32) {
+      if (x >= w - 50 && x <= w - 6 && y >= 4 && y <= 22) {
         this.enterTestStage();
         return true;
       }
 
-      // [MODE(P)] button
-      if (x >= 140 && x <= 218 && y >= 16 && y <= 32) {
+      // [1-5:PRESET] button
+      if (x >= w - 136 && x <= w - 54 && y >= 4 && y <= 22) {
         const p = this.geminiManager.cyclePreset();
         this.addFloatingText(this.player.state.x, this.player.state.y - 30, `MODE: ${p.nameJa}`, '#fde047');
         this.audio.playGeminiBounce();
         return true;
       }
+
+      // [SLING/ORBIT] button
+      if (x >= w - 206 && x <= w - 140 && y >= 4 && y <= 22) {
+        const isOrbit = this.geminiManager.toggleOrbit(this.player.state.x, this.player.state.y);
+        this.audio.playGeminiBounce();
+        this.addFloatingText(
+          this.player.state.x,
+          this.player.state.y - 30,
+          isOrbit ? '⚡ ORBIT LOCK (公転紐)' : '🚀 SLING MODE (反発ヨーヨー)',
+          isOrbit ? '#38bdf8' : '#fde047'
+        );
+        return true;
+      }
+
       return false;
     }
   }

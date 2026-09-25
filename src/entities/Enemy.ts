@@ -23,38 +23,40 @@ export class EnemyManager {
     let hp = 1;
     let points = 100;
     let color = '#38bdf8';
+    let collisionType: 'PENETRATE' | 'REFLECT' = 'PENETRATE';
+    let mass: number = 2.0;
 
     switch (type) {
       case 'GPT6_LUNA':
-        width = 44; height = 44; hp = 1; points = 150; color = '#10a37f'; break;
+        width = 44; height = 44; hp = 1; points = 150; color = '#10a37f'; collisionType = 'PENETRATE'; mass = 1.0; break;
       case 'DEEPSEEK_FLASH':
-        width = 52; height = 44; hp = 1; points = pattern === 'UFO_FLYBY' ? 1000 : 120; color = '#4D6BFE'; break;
+        width = 52; height = 44; hp = 1; points = pattern === 'UFO_FLYBY' ? 1000 : 120; color = '#4D6BFE'; collisionType = 'PENETRATE'; mass = 1.0; break;
       case 'KIMI_MOON':
-        width = 46; height = 46; hp = 2; points = 200; color = '#1783FF'; break;
+        width = 46; height = 46; hp = 2; points = 200; color = '#1783FF'; collisionType = 'PENETRATE'; mass = 2.0; break;
       case 'QWEN_CUBE':
-        width = 46; height = 46; hp = 2; points = 180; color = '#6F69F7'; break;
+        width = 46; height = 46; hp = 2; points = 180; color = '#6F69F7'; collisionType = 'REFLECT'; mass = 3.0; break;
       case 'MISTRAL_FLAME':
-        width = 46; height = 46; hp = 1; points = 140; color = '#FF8205'; break;
+        width = 46; height = 46; hp = 1; points = 140; color = '#FF8205'; collisionType = 'PENETRATE'; mass = 1.0; break;
       case 'CURSOR_PROBE':
-        width = 46; height = 46; hp = 1; points = 160; color = '#ffffff'; break;
+        width = 46; height = 46; hp = 1; points = 160; color = '#ffffff'; collisionType = 'REFLECT'; mass = 1.0; break;
       case 'GROK_RAIDER':
-        width = 50; height = 50; hp = 3; points = 300; color = '#ffffff'; break;
+        width = 50; height = 50; hp = 3; points = 300; color = '#ffffff'; collisionType = 'REFLECT'; mass = 3.0; break;
       case 'COPILOT_GLIDER':
-        width = 48; height = 48; hp = 2; points = 180; color = '#38bdf8'; break;
+        width = 48; height = 48; hp = 2; points = 180; color = '#38bdf8'; collisionType = 'PENETRATE'; mass = 2.0; break;
       case 'CLAUDE_HAIKU':
-        width = 42; height = 42; hp = 1; points = 150; color = '#f87171'; break;
+        width = 42; height = 42; hp = 1; points = 150; color = '#f87171'; collisionType = 'PENETRATE'; mass = 1.0; break;
       case 'CLAUDE_SONNET':
-        width = 54; height = 54; hp = 3; points = 350; color = '#D97757'; break;
+        width = 54; height = 54; hp = 3; points = 350; color = '#D97757'; collisionType = 'PENETRATE'; mass = 3.0; break;
       case 'CLAUDE_OPUS':
-        width = 72; height = 72; hp = 6; points = 800; color = '#ea580c'; break;
+        width = 72; height = 72; hp = 6; points = 800; color = '#ea580c'; collisionType = 'REFLECT'; mass = 999; break;
       case 'PERPLEXITY_SPINNER':
-        width = 48; height = 48; hp = 2; points = 200; color = '#22B8CD'; break;
+        width = 48; height = 48; hp = 2; points = 200; color = '#22B8CD'; collisionType = 'PENETRATE'; mass = 2.0; break;
       case 'GPT6_TERRA':
-        width = 58; height = 58; hp = 4; points = 500; color = '#38bdf8'; break;
+        width = 58; height = 58; hp = 4; points = 500; color = '#38bdf8'; collisionType = 'PENETRATE'; mass = 3.0; break;
       case 'GPT6_SOL':
-        width = 76; height = 76; hp = 8; points = 1200; color = '#fbbf24'; break;
+        width = 76; height = 76; hp = 8; points = 1200; color = '#fbbf24'; collisionType = 'PENETRATE'; mass = 5.0; break;
       case 'SPACEX_ROCKET':
-        width = 24; height = 76; hp = 12; points = 1000; color = '#ffffff'; break;
+        width = 24; height = 76; hp = 12; points = 1000; color = '#ffffff'; collisionType = 'REFLECT'; mass = 999; break;
     }
 
     if (customHp !== undefined) {
@@ -79,6 +81,10 @@ export class EnemyManager {
       color,
       angle: 0, // LOGOS NEVER ROTATE! Always stay upright.
       shootCooldown: 320 + Math.floor(Math.random() * 200),
+      collisionType,
+      mass,
+      knockbackVx: 0,
+      knockbackVy: 0,
     };
 
     this.enemies.push(enemy);
@@ -159,6 +165,14 @@ export class EnemyManager {
         this.applyPattern(e, canvasWidth, playerX, playerY);
         e.x += e.vx;
         e.y += e.vy;
+      }
+
+      // Apply and decay knockback impulses from Gemini impact
+      if (e.knockbackVx !== undefined && (Math.abs(e.knockbackVx) > 0.05 || Math.abs(e.knockbackVy || 0) > 0.05)) {
+        e.x += e.knockbackVx;
+        e.y += (e.knockbackVy || 0);
+        e.knockbackVx *= 0.86;
+        e.knockbackVy = (e.knockbackVy || 0) * 0.86;
       }
 
       // Keep logos strictly upright (no rotation)
