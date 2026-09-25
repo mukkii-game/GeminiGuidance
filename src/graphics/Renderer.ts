@@ -168,44 +168,37 @@ export class ArcadeRenderer {
     }
   }
 
-  // --- Gemini Orbs & Tether Chains (ジェミニ誘導) ---
+  // --- Autonomous Gemini Orbs (ジェミニ誘導) ---
   private renderGeminiOrbs(orbs: GeminiOrb[], playerX: number, playerY: number): void {
     const ctx = this.ctx;
 
-    // Celestial Orbit Guide (Like the Moon's orbital path around Earth)
-    if (orbs.length > 0) {
-      ctx.save();
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.18)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([4, 6]);
-      ctx.beginPath();
-      ctx.arc(playerX, playerY, 52, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
-
     for (const orb of orbs) {
-      // 1. Radiant Energy Tether (Connecting Solvalou to the Gemini Orb)
-      ctx.save();
-      const dist = Math.hypot(playerX - orb.x, playerY - orb.y);
-      const segments = Math.max(3, Math.floor(dist / 14));
+      const distToPlayer = Math.hypot(playerX - orb.x, playerY - orb.y);
 
-      ctx.strokeStyle = orb.level === 3 ? 'rgba(200, 240, 255, 0.7)' : orb.level === 2 ? 'rgba(160, 100, 255, 0.5)' : 'rgba(80, 160, 255, 0.4)';
-      ctx.lineWidth = orb.level === 3 ? 2.5 : orb.level === 2 ? 1.8 : 1.2;
+      // 1. Spawning / Hazard Proximity Warning Aura
+      if (orb.spawnTimer && orb.spawnTimer > 0) {
+        // Pop-up grace indicator (safe phase)
+        ctx.save();
+        ctx.strokeStyle = 'rgba(74, 222, 128, 0.6)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(orb.x, orb.y, orb.radius + 6, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      } else if (distToPlayer < 52) {
+        // Proximity Danger Alert! (Lethal if player collides!)
+        ctx.save();
+        const pulse = Math.sin(Date.now() * 0.02) * 3;
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.75)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(orb.x, orb.y, orb.radius + 5 + pulse, 0, Math.PI * 2);
+        ctx.stroke();
 
-      ctx.beginPath();
-      ctx.moveTo(playerX, playerY);
-      for (let s = 1; s < segments; s++) {
-        const t = s / segments;
-        const px = playerX + (orb.x - playerX) * t;
-        const py = playerY + (orb.y - playerY) * t;
-        // Subtle electric jitter
-        const jitter = (Math.random() - 0.5) * (orb.level === 3 ? 4 : 2);
-        ctx.lineTo(px + jitter, py + jitter);
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.15)';
+        ctx.fill();
+        ctx.restore();
       }
-      ctx.lineTo(orb.x, orb.y);
-      ctx.stroke();
-      ctx.restore();
 
       // 2. Motion Trail
       for (let i = 0; i < orb.trail.length; i++) {
@@ -599,33 +592,34 @@ export class ArcadeRenderer {
       }
 
       // 4. Instructions / Rules
-      ctx.font = '11px "DotGothic16", monospace';
-      ctx.fillStyle = '#f87171';
-      ctx.fillText('▼ 自機に対空ショットはありません！', w / 2, 280);
+      ctx.font = '10px "DotGothic16", monospace';
+      ctx.fillStyle = '#ef4444';
+      ctx.fillText('▼ 危険！ジェミニに当たると自機も即撃破！', w / 2, 276);
       ctx.fillStyle = '#e2e8f0';
-      ctx.fillText('地上の生成AIコアを爆撃してジェミニを解放', w / 2, 300);
+      ctx.fillText('地上の生成AIコアを爆撃してジェミニを解放せよ', w / 2, 294);
       ctx.fillStyle = '#38bdf8';
-      ctx.fillText('ジェミニは月のように自機周囲を公転！', w / 2, 320);
+      ctx.fillText('弱誘導で迫るジェミニを旋回で交わし敵へぶつけろ！', w / 2, 312);
       ctx.fillStyle = '#fef08a';
-      ctx.fillText('自機を振ってスイング攻撃＆合体で巨大化！', w / 2, 340);
+      ctx.fillText('遠くに離れると加速！危険な誘導スイングで撃破！', w / 2, 330);
 
       // Separator Line
       ctx.strokeStyle = '#1e293b';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(20, 362);
-      ctx.lineTo(w - 20, 362);
+      ctx.moveTo(20, 348);
+      ctx.lineTo(w - 20, 348);
       ctx.stroke();
 
       // 5. Asset Attribution (Required by User)
       ctx.font = '10px "DotGothic16", monospace';
       ctx.fillStyle = '#38bdf8';
-      ctx.fillText('【 アセット・素材提供クレジット 】', w / 2, 380);
+      ctx.fillText('【 アセット・素材提供クレジット 】', w / 2, 366);
 
       ctx.fillStyle = '#cbd5e1';
-      ctx.fillText('■ 効果音: 効果音ラボ (soundeffect-lab.info)', w / 2, 402);
-      ctx.fillText('■ メインロゴ: NANO BANANA (ImageFX / Imagen)', w / 2, 422);
-      ctx.fillText('■ 敵対勢力: GenAI Official Logos (2026)', w / 2, 442);
+      ctx.fillText('■ BGM音源: 魔王魂 (maou.audio)', w / 2, 386);
+      ctx.fillText('■ 効果音: 効果音ラボ (soundeffect-lab.info)', w / 2, 404);
+      ctx.fillText('■ メインロゴ: NANO BANANA', w / 2, 422);
+      ctx.fillText('■ 敵対勢力: GenAI Official Logos (2026)', w / 2, 440);
 
       // Controls guide
       ctx.fillStyle = '#64748b';

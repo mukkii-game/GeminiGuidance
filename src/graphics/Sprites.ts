@@ -396,27 +396,27 @@ export class SpriteSheet {
     // Kimi Official Path
     const KIMI_PATH = "M11.065 11.199l7.257-7.2c.137-.136.06-.41-.116-.41H14.3a.164.164 0 00-.117.051l-7.82 7.756c-.122.12-.302.013-.302-.179V3.82c0-.127-.083-.23-.185-.23H3.186c-.103 0-.186.103-.186.23V19.77c0 .128.083.23.186.23h2.69c.103 0 .186-.102.186-.23v-3.25c0-.069.025-.135.069-.178l2.424-2.406a.158.158 0 01.205-.023l6.484 4.772a7.677 7.677 0 003.453 1.283c.108.012.2-.095.2-.23v-3.06c0-.117-.07-.212-.164-.227a5.028 5.028 0 01-2.027-.807l-5.613-4.064c-.117-.078-.132-.279-.028-.381z";
 
-    // 1. OpenAI Hierarchy
-    this.registerSvgSprite('GPT6_LUNA', 24, 24, './assets/logos/openai_luna.svg', OPENAI_PATH, '#10a37f');
-    this.registerSvgSprite('GPT6_TERRA', 34, 34, './assets/logos/openai_terra.svg', OPENAI_PATH, '#38bdf8');
-    this.registerSvgSprite('GPT6_SOL', 44, 44, './assets/logos/openai_sol.svg', OPENAI_PATH, '#fbbf24');
-    this.registerSvgSprite('GPT6_ASTRA', 48, 48, './assets/logos/openai_astra.svg', OPENAI_PATH, '#ffffff');
+    // 1. OpenAI Hierarchy (Enlarged prominent logos)
+    this.registerSvgSprite('GPT6_LUNA', 44, 44, './assets/logos/openai_luna.svg', OPENAI_PATH, '#10a37f');
+    this.registerSvgSprite('GPT6_TERRA', 58, 58, './assets/logos/openai_terra.svg', OPENAI_PATH, '#38bdf8');
+    this.registerSvgSprite('GPT6_SOL', 76, 76, './assets/logos/openai_sol.svg', OPENAI_PATH, '#fbbf24');
+    this.registerSvgSprite('GPT6_ASTRA', 84, 84, './assets/logos/openai_astra.svg', OPENAI_PATH, '#ffffff');
 
     // 2. Anthropic Claude Hierarchy (Fable > Opus > Sonnet > Haiku)
-    this.registerSvgSprite('CLAUDE_HAIKU', 22, 22, './assets/logos/claude_haiku.svg', CLAUDE_PATH, '#fca5a5');
-    this.registerSvgSprite('CLAUDE_SONNET', 28, 28, './assets/logos/claude_sonnet.svg', CLAUDE_PATH, '#D97757');
-    this.registerSvgSprite('CLAUDE_OPUS', 38, 38, './assets/logos/claude_opus.svg', CLAUDE_PATH, '#ea580c');
-    this.registerSvgSprite('CLAUDE_FABLE', 48, 48, './assets/logos/claude_fable.svg', CLAUDE_PATH, '#fbbf24');
+    this.registerSvgSprite('CLAUDE_HAIKU', 42, 42, './assets/logos/claude_haiku.svg', CLAUDE_PATH, '#fca5a5');
+    this.registerSvgSprite('CLAUDE_SONNET', 54, 54, './assets/logos/claude_sonnet.svg', CLAUDE_PATH, '#D97757');
+    this.registerSvgSprite('CLAUDE_OPUS', 72, 72, './assets/logos/claude_opus.svg', CLAUDE_PATH, '#ea580c');
+    this.registerSvgSprite('CLAUDE_FABLE', 84, 84, './assets/logos/claude_fable.svg', CLAUDE_PATH, '#fbbf24');
 
-    // 3. Other Major AI Players
-    this.registerSvgSprite('DEEPSEEK_FLASH', 28, 24, './assets/logos/deepseek.svg', DEEPSEEK_PATH, '#4D6BFE');
-    this.registerSvgSprite('GROK_RAIDER', 28, 28, './assets/logos/grok.svg', GROK_PATH, '#f8fafc');
-    this.registerSvgSprite('CURSOR_PROBE', 26, 26, './assets/logos/cursor.svg');
-    this.registerSvgSprite('MISTRAL_FLAME', 24, 24, './assets/logos/mistral.svg');
-    this.registerSvgSprite('KIMI_MOON', 26, 26, './assets/logos/kimi.svg', KIMI_PATH, '#1783FF');
-    this.registerSvgSprite('COPILOT_GLIDER', 26, 26, './assets/logos/copilot.svg');
-    this.registerSvgSprite('PERPLEXITY_SPINNER', 26, 26, './assets/logos/perplexity.svg', PERPLEXITY_PATH, '#22B8CD');
-    this.registerSvgSprite('QWEN_CUBE', 26, 26, './assets/logos/qwen.svg');
+    // 3. Other Major AI Players (Enlarged)
+    this.registerSvgSprite('DEEPSEEK_FLASH', 52, 44, './assets/logos/deepseek.svg', DEEPSEEK_PATH, '#4D6BFE');
+    this.registerSvgSprite('GROK_RAIDER', 50, 50, './assets/logos/grok.svg', GROK_PATH, '#f8fafc');
+    this.registerSvgSprite('CURSOR_PROBE', 46, 46, './assets/logos/cursor.svg');
+    this.registerSvgSprite('MISTRAL_FLAME', 46, 46, './assets/logos/mistral.svg');
+    this.registerSvgSprite('KIMI_MOON', 46, 46, './assets/logos/kimi.svg', KIMI_PATH, '#1783FF');
+    this.registerSvgSprite('COPILOT_GLIDER', 48, 48, './assets/logos/copilot.svg');
+    this.registerSvgSprite('PERPLEXITY_SPINNER', 48, 48, './assets/logos/perplexity.svg', PERPLEXITY_PATH, '#22B8CD');
+    this.registerSvgSprite('QWEN_CUBE', 46, 46, './assets/logos/qwen.svg');
   }
 
   private registerSvgSprite(key: string, w: number, h: number, svgPath: string, fallbackPath?: string, fallbackColor?: string): void {

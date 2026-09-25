@@ -1,4 +1,4 @@
-import { EnemyType, GroundType, BossType } from '../types';
+import { EnemyType, GroundType, BossType, MovementPattern } from '../types';
 
 export interface SpawnEvent {
   tick: number;
@@ -8,7 +8,7 @@ export interface SpawnEvent {
   bossType?: BossType;
   x?: number;
   y?: number;
-  pattern?: string;
+  pattern?: MovementPattern;
   count?: number;
   spacing?: number;
 }
@@ -48,7 +48,7 @@ export class StageManager {
     };
 
     // Helper to spawn stream of enemies
-    const addStream = (startTick: number, etype: EnemyType, pattern: string, count: number, startX: number) => {
+    const addStream = (startTick: number, etype: EnemyType, pattern: MovementPattern, count: number, startX: number) => {
       for (let i = 0; i < count; i++) {
         events.push({
           tick: startTick + i * 16,

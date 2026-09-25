@@ -52,6 +52,8 @@ export interface GeminiOrb {
   orbitDist: number;
   trail: Array<{ x: number; y: number; alpha: number }>;
   fuseTimer: number; // for sparkling fusion effect
+  spawnTimer: number; // grace period when popping from ground target
+  hazardActive: boolean; // lethal on collision with player!
 }
 
 export type EnemyType = 
@@ -76,6 +78,17 @@ export type EnemyType =
   // Shared
   | 'MINI_CLONE';
 
+export type MovementPattern = 
+  | 'STRAIGHT_DOWN'
+  | 'S_CURVE_LEFT'
+  | 'S_CURVE_RIGHT'
+  | 'SWOOP_DIVE'
+  | 'PINCER_LEFT'
+  | 'PINCER_RIGHT'
+  | 'ZIG_ZAG'
+  | 'TARGET_RAM'
+  | 'MINI_BULLET';
+
 export interface EnemyEntity {
   id: string;
   type: EnemyType;
@@ -88,7 +101,7 @@ export interface EnemyEntity {
   hp: number;
   maxHp: number;
   age: number;
-  pattern: string;
+  pattern: MovementPattern | string;
   points: number;
   color: string;
   angle: number;

@@ -66,17 +66,7 @@ export class Game {
       btnAudio.addEventListener('click', () => {
         this.audio.resume();
         const enabled = this.audio.toggle();
-        btnAudio.textContent = enabled ? 'SND: ON' : 'SND: OFF';
-      });
-    }
-
-    const btnCrt = document.getElementById('btn-crt');
-    const container = document.getElementById('game-container');
-    if (btnCrt && container) {
-      btnCrt.addEventListener('click', () => {
-        container.classList.toggle('crt-off');
-        const isOff = container.classList.contains('crt-off');
-        btnCrt.textContent = isOff ? 'CRT: OFF' : 'CRT: ON';
+        btnAudio.textContent = enabled ? 'BGM/SE: ON' : 'BGM/SE: OFF';
       });
     }
   }
@@ -241,7 +231,6 @@ export class Game {
         this.player.addScore(level === 3 ? 5000 : 2000);
       }
     );
-    this.audio.updateGeminiHum(this.geminiManager.orbs.length, this.geminiManager.getAverageSpeed());
 
     // Update Stage Timeline & Spawning
     this.handleStageTimeline();
@@ -362,6 +351,24 @@ export class Game {
 
   // --- Collision Detections (Gemini Orbital Flail vs Airborne Foes) ---
   private handleCollisions(): void {
+    // 0. Lethal Gemini Guidance: Player vs Gemini Orb (接触すると自機撃破！)
+    if (this.player.state.alive && this.player.state.invulnerableTimer <= 0) {
+      for (const orb of this.geminiManager.orbs) {
+        if (!orb.hazardActive) continue;
+        const dist = Math.hypot(this.player.state.x - orb.x, this.player.state.y - orb.y);
+        if (dist < 10 + orb.radius * 0.72) {
+          const killed = this.player.hit();
+          if (killed) {
+            this.audio.playPlayerDeath();
+            this.addExplosion(this.player.state.x, this.player.state.y, 36, false);
+            this.addFloatingText(this.player.state.x, this.player.state.y - 20, 'GEMINI CRASH!', '#ef4444');
+            this.playerRespawnTimer = 0;
+            break;
+          }
+        }
+      }
+    }
+
     // 1. Gemini Orbs vs Airborne Enemies
     for (const orb of this.geminiManager.orbs) {
       for (let i = this.enemyManager.enemies.length - 1; i >= 0; i--) {

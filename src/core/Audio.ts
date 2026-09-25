@@ -1,25 +1,18 @@
 /**
- * Authentic Retro Arcade Sound Engine (Xevious & Namco 1983 Era)
- * Combines curated retro sound effects from 効果音ラボ with
- * Web Audio API FM/PSG sound chip synthesis (Namco 15xx WSG emulation).
+ * Authentic Arcade Sound Engine
+ * BGM: 魔王魂 (maou.audio) 8bit Battle Track
+ * SFX: 効果音ラボ (soundeffect-lab.info) Curated STG Effects + Namco Blaster FM Synthesis
  */
 export class SoundEngine {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   private sfxGain: GainNode | null = null;
-  private bgmGain: GainNode | null = null;
+  private bgmAudio: HTMLAudioElement | null = null;
   public enabled: boolean = true;
 
-  // Audio Buffers for curated retro assets
+  // Audio Buffers for curated retro SFX
   private buffers: Map<string, AudioBuffer> = new Map();
   private loaded: boolean = false;
-
-  private bgmInterval: number | null = null;
-  private bgmStep: number = 0;
-  private bgmRunning: boolean = false;
-
-  private geminiOsc: OscillatorNode | null = null;
-  private geminiGain: GainNode | null = null;
 
   constructor() {
     // Initialized on first user interaction
@@ -38,12 +31,8 @@ export class SoundEngine {
       this.sfxGain.gain.setValueAtTime(0.9, this.ctx.currentTime);
       this.sfxGain.connect(this.masterGain);
 
-      this.bgmGain = this.ctx.createGain();
-      this.bgmGain.gain.setValueAtTime(0.28, this.ctx.currentTime);
-      this.bgmGain.connect(this.masterGain);
-
-      this.setupGeminiHum();
       this.loadSoundAssets();
+      this.initBgm();
     } catch (e) {
       console.warn('AudioContext init failed', e);
     }
@@ -63,27 +52,61 @@ export class SoundEngine {
     if (this.masterGain && this.ctx) {
       this.masterGain.gain.setValueAtTime(this.enabled ? 0.85 : 0.0, this.ctx.currentTime);
     }
+    if (this.bgmAudio) {
+      if (this.enabled) {
+        this.bgmAudio.play().catch(() => {});
+      } else {
+        this.bgmAudio.pause();
+      }
+    }
     return this.enabled;
+  }
+
+  private initBgm(): void {
+    if (this.bgmAudio) return;
+    try {
+      this.bgmAudio = new Audio('./sounds/maou_bgm_8bit18.mp3');
+      this.bgmAudio.loop = true;
+      this.bgmAudio.volume = 0.32;
+    } catch (err) {
+      console.warn('Failed to initialize BGM audio', err);
+    }
+  }
+
+  public startBgm(): void {
+    if (!this.enabled) return;
+    if (!this.bgmAudio) {
+      this.initBgm();
+    }
+    if (this.bgmAudio) {
+      this.bgmAudio.play().catch(() => {});
+    }
+  }
+
+  public stopBgm(): void {
+    if (this.bgmAudio) {
+      this.bgmAudio.pause();
+      this.bgmAudio.currentTime = 0;
+    }
   }
 
   private async loadSoundAssets(): Promise<void> {
     if (this.loaded || !this.ctx) return;
     this.loaded = true;
 
-    // Curated high-energy arcade sounds from 効果音ラボ
+    // Curated STG effects from 効果音ラボ
     const soundFiles: Record<string, string> = {
-      bomb_crisp: './sounds/bomb1.mp3',             // チュドーン！ (Classic anime/arcade explosion)
+      bomb_crisp: './sounds/bomb1.mp3',             // チュドーン！ (Classic STG explosion)
       bomb_big: './sounds/big_explosion1.mp3',      // ドカーン！ (Boss & player destruction)
       beam_laser: './sounds/beamgun1.mp3',          // ビーム砲
       bullet_fire: './sounds/beamgun2.mp3',         // 敵Sparoid発射音
       hit_impact: './sounds/shot_struck1.mp3',      // 着弾・装甲ヒット音
-      sound_wave: './sounds/sound_wave1.mp3',       // 怪音波・共鳴
       gemini_merge: './sounds/power_up1.mp3',       // パワーアップ
       gemini_whoosh: './sounds/speed_up1.mp3',      // スイング風切り音
-      boss_alert: './sounds/boss_alert.mp3',        // 宇宙基地サイレン
+      boss_alert: './sounds/boss_alert.mp3',        // ボス出現時サイレン
       stage_clear: './sounds/levelup1.mp3',         // レベルアップ
       start_fanfare: './sounds/start_fanfare.mp3',  // 出撃ファンファーレ
-      decision: './sounds/decision1.mp3',           // スタート音
+      decision: './sounds/decision1.mp3',           // 決定音
       cursor: './sounds/cursor1.mp3',               // カーソル
     };
 
@@ -160,7 +183,6 @@ export class SoundEngine {
   public playGroundExplosion(): void {
     this.playBuffer('bomb_crisp', 1.0, 1.0);
 
-    // Sub-bass thump
     if (this.ctx && this.sfxGain && this.enabled) {
       const now = this.ctx.currentTime;
       const osc = this.ctx.createOscillator();
@@ -181,27 +203,11 @@ export class SoundEngine {
   public playAirExplosion(): void {
     this.playBuffer('bomb_crisp', 0.85, 1.3);
     this.playBuffer('hit_impact', 0.95, 1.15);
-
-    // Metal bite
-    if (this.ctx && this.sfxGain && this.enabled) {
-      const now = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(520, now);
-      osc.frequency.exponentialRampToValueAtTime(90, now + 0.14);
-      gain.gain.setValueAtTime(0.4, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.14);
-      osc.connect(gain);
-      gain.connect(this.sfxGain);
-      osc.start(now);
-      osc.stop(now + 0.15);
-    }
   }
 
   /** Enemy Sparoid white bullet firing */
   public playEnemyBulletFire(): void {
-    this.playBuffer('bullet_fire', 0.4, 1.45);
+    this.playBuffer('bullet_fire', 0.35, 1.45);
   }
 
   /** Gemini swing whoosh */
@@ -213,42 +219,11 @@ export class SoundEngine {
   public playGeminiMerge(level: number): void {
     const rate = 1.0 + (level - 1) * 0.15;
     this.playBuffer('gemini_merge', 0.95, rate);
-
-    // Ascending arcade chime
-    if (!this.enabled || !this.ctx || !this.sfxGain) return;
-    const now = this.ctx.currentTime;
-    const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
-    notes.forEach((pitch, i) => {
-      const osc = this.ctx!.createOscillator();
-      const gain = this.ctx!.createGain();
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(pitch * (1 + (level - 1) * 0.18), now + i * 0.045);
-      gain.gain.setValueAtTime(0.25, now + i * 0.045);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.045 + 0.12);
-      osc.connect(gain);
-      gain.connect(this.sfxGain!);
-      osc.start(now + i * 0.045);
-      osc.stop(now + i * 0.045 + 0.13);
-    });
   }
 
-  /** Boss alert siren */
+  /** Boss alert siren (played once on boss approach) */
   public playBossAlert(): void {
-    if (this.playBuffer('boss_alert', 0.85)) return;
-
-    if (!this.enabled || !this.ctx || !this.sfxGain) return;
-    const now = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(440, now);
-    osc.frequency.linearRampToValueAtTime(880, now + 0.4);
-    gain.gain.setValueAtTime(0.4, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
-    osc.connect(gain);
-    gain.connect(this.sfxGain);
-    osc.start(now);
-    osc.stop(now + 0.41);
+    this.playBuffer('boss_alert', 0.85);
   }
 
   /** Game Start Fanfare */
@@ -267,78 +242,5 @@ export class SoundEngine {
   /** Player destruction */
   public playPlayerDeath(): void {
     this.playBuffer('bomb_big', 1.0, 0.85);
-  }
-
-  // --- Dynamic Gemini Celestial Hum ---
-  private setupGeminiHum(): void {
-    if (!this.ctx || !this.sfxGain) return;
-    try {
-      this.geminiOsc = this.ctx.createOscillator();
-      this.geminiOsc.type = 'sine';
-      this.geminiOsc.frequency.setValueAtTime(260, this.ctx.currentTime);
-
-      this.geminiGain = this.ctx.createGain();
-      this.geminiGain.gain.setValueAtTime(0, this.ctx.currentTime);
-
-      this.geminiOsc.connect(this.geminiGain);
-      this.geminiGain.connect(this.sfxGain);
-      this.geminiOsc.start();
-    } catch {
-      // Ignored
-    }
-  }
-
-  public updateGeminiHum(activeOrbsCount: number, averageSpeed: number): void {
-    if (!this.ctx || !this.geminiGain || !this.geminiOsc) return;
-    if (!this.enabled || activeOrbsCount === 0) {
-      this.geminiGain.gain.setValueAtTime(0, this.ctx.currentTime);
-      return;
-    }
-    const freq = Math.min(680, 240 + averageSpeed * 0.7 + activeOrbsCount * 35);
-    const targetGain = Math.min(0.2, 0.035 * activeOrbsCount + (averageSpeed / 350) * 0.07);
-    this.geminiOsc.frequency.setTargetAtTime(freq, this.ctx.currentTime, 0.08);
-    this.geminiGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.08);
-  }
-
-  // --- Background Music: Hypnotic Calm 80s Xevious-style Sequencer ---
-  public startBgm(): void {
-    if (this.bgmRunning) return;
-    this.bgmRunning = true;
-    this.bgmStep = 0;
-
-    // Classic Xevious hypnotic bassline: calm, stately tempo
-    const bassline = [110, 110, 164.8, 110, 130.8, 110, 146.8, 98];
-
-    this.bgmInterval = window.setInterval(() => {
-      if (!this.enabled || !this.ctx || !this.bgmGain) return;
-      const now = this.ctx.currentTime;
-
-      // Bass note (authentic triangle wave)
-      const freq = bassline[this.bgmStep % bassline.length];
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, now);
-
-      gain.gain.setValueAtTime(0.26, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.17);
-
-      osc.connect(gain);
-      gain.connect(this.bgmGain);
-
-      osc.start(now);
-      osc.stop(now + 0.18);
-
-      this.bgmStep++;
-    }, 185); // Stately 81 BPM for authentic 1983 retro arcade feel
-  }
-
-  public stopBgm(): void {
-    if (this.bgmInterval !== null) {
-      clearInterval(this.bgmInterval);
-      this.bgmInterval = null;
-    }
-    this.bgmRunning = false;
   }
 }
