@@ -62,9 +62,10 @@ export type EnemyType =
   | 'CURSOR_PROBE' 
   | 'GROK_RAIDER' 
   | 'COPILOT_GLIDER'
-  // Stage 3 (Anthropic Alignment)
-  | 'CLAUDE_FABLE' 
-  | 'CLAUDE_MYTHOS' 
+  // Stage 3 (Anthropic Alignment: Fable > Opus > Sonnet > Haiku)
+  | 'CLAUDE_HAIKU' 
+  | 'CLAUDE_SONNET' 
+  | 'CLAUDE_OPUS' 
   | 'PERPLEXITY_SPINNER'
   // Stage 4 (OpenAI GPT-6 Fleet)
   | 'GPT6_LUNA' 
@@ -122,7 +123,7 @@ export interface WeakPoint {
 export type BossType = 
   | 'STAGE1_DEEPSEEK_KIMI'   // DeepSeek V4.1 & Kimi Moonshot Core
   | 'STAGE2_GROK_CURSOR'     // Grok 4.7 & Cursor Dual Dreadnought
-  | 'STAGE3_CLAUDE_OPUS'     // Claude Opus 5.5 Octagon
+  | 'STAGE3_CLAUDE_FABLE'    // Claude Fable Apex Octagon Fortress
   | 'STAGE4_GPT6_ASTRA';     // GPT-6 Astra "Andor Genesis"
 
 export interface BossEntity {

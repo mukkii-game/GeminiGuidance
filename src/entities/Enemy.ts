@@ -34,10 +34,12 @@ export class EnemyManager {
         width = 28; height = 28; hp = 3; points = 350; color = '#ffffff'; break;
       case 'COPILOT_GLIDER':
         width = 26; height = 26; hp = 1; points = 130; color = '#3b82f6'; break;
-      case 'CLAUDE_FABLE':
-        width = 30; height = 30; hp = 3; points = 300; color = '#d97706'; break;
-      case 'CLAUDE_MYTHOS':
-        width = 32; height = 32; hp = 4; points = 400; color = '#b45309'; break;
+      case 'CLAUDE_HAIKU':
+        width = 22; height = 22; hp = 1; points = 150; color = '#fed7aa'; break;
+      case 'CLAUDE_SONNET':
+        width = 28; height = 28; hp = 3; points = 350; color = '#f97316'; break;
+      case 'CLAUDE_OPUS':
+        width = 38; height = 38; hp = 8; points = 800; color = '#ea580c'; break;
       case 'PERPLEXITY_SPINNER':
         width = 26; height = 26; hp = 2; points = 200; color = '#14b8a6'; break;
       case 'GPT6_TERRA':

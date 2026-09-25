@@ -128,26 +128,27 @@ export class StageManager {
       addGround(180, 'BARROW', 80);
       addGround(280, 'SOL_CITADEL', 140);
 
-      // Wave 1: Claude Fable & Perplexity spinners
-      addStream(40, 'PERPLEXITY_SPINNER', 'SWOOP_DIVE', 5, 120);
-      addStream(120, 'CLAUDE_FABLE', 'S_CURVE_LEFT', 5, 250);
-      addStream(200, 'PERPLEXITY_SPINNER', 'PINCER_RIGHT', 5, 310);
+      // Wave 1: Claude Haiku agile scouts & Perplexity spinners
+      addStream(40, 'CLAUDE_HAIKU', 'S_CURVE_LEFT', 6, 80);
+      addStream(110, 'PERPLEXITY_SPINNER', 'SWOOP_DIVE', 5, 250);
+      addStream(180, 'CLAUDE_HAIKU', 'S_CURVE_RIGHT', 6, 290);
 
-      // Mid-Boss: Claude Mythos elite vanguard
-      events.push({ tick: 280, type: 'ENEMY', enemyType: 'CLAUDE_MYTHOS', pattern: 'ZIG_ZAG', x: 180, y: -20 });
-      events.push({ tick: 310, type: 'ENEMY', enemyType: 'CLAUDE_FABLE', pattern: 'SWOOP_DIVE', x: 100, y: -20 });
-      events.push({ tick: 310, type: 'ENEMY', enemyType: 'CLAUDE_FABLE', pattern: 'SWOOP_DIVE', x: 260, y: -20 });
+      // Mid-Boss: Claude Opus Heavy Dreadnought & Sonnet Escorts
+      events.push({ tick: 270, type: 'ENEMY', enemyType: 'CLAUDE_OPUS', pattern: 'ZIG_ZAG', x: 180, y: -30 });
+      events.push({ tick: 300, type: 'ENEMY', enemyType: 'CLAUDE_SONNET', pattern: 'SWOOP_DIVE', x: 90, y: -20 });
+      events.push({ tick: 300, type: 'ENEMY', enemyType: 'CLAUDE_SONNET', pattern: 'SWOOP_DIVE', x: 270, y: -20 });
 
       addGround(390, 'SERVER_RACK', 220);
       addGround(470, 'SOL_CITADEL', 290);
 
-      // Wave 2: High density alignment swarm
-      addStream(480, 'PERPLEXITY_SPINNER', 'S_CURVE_RIGHT', 6, 290);
-      addStream(540, 'CLAUDE_FABLE', 'SWOOP_DIVE', 6, 150);
+      // Wave 2: Claude Sonnet formation sweep & Haiku fast pincer
+      addStream(480, 'CLAUDE_SONNET', 'PINCER_LEFT', 5, 40);
+      addStream(490, 'CLAUDE_SONNET', 'PINCER_RIGHT', 5, 320);
+      addStream(550, 'CLAUDE_HAIKU', 'SWOOP_DIVE', 6, 180);
 
-      // Boss Alert & Spawn
+      // Boss Alert & Spawn: Claude Fable Apex Fortress!
       events.push({ tick: 650, type: 'ALERT' });
-      events.push({ tick: 690, type: 'BOSS', bossType: 'STAGE3_CLAUDE_OPUS' });
+      events.push({ tick: 690, type: 'BOSS', bossType: 'STAGE3_CLAUDE_FABLE' });
 
     } else {
       // --- STAGE 4: OpenAI GPT-6 Megastructure (Astra > Sol > Terra > Luna) ---

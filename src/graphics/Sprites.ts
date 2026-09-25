@@ -48,7 +48,10 @@ export class SpriteSheet {
     this.createGrokRaider();
     this.createCursorProbe();
     this.createCopilotGlider();
-    this.createClaudeOctagon();
+    this.createClaudeHaiku();
+    this.createClaudeSonnet();
+    this.createClaudeOpus();
+    this.createClaudeFable();
     this.createMiniClone();
 
     // 5. Ground Targets
@@ -501,27 +504,99 @@ export class SpriteSheet {
     this.cache.set('COPILOT_GLIDER', c);
   }
 
-  // Claude Octagon: Anthropic warm terracotta sunburst
-  private createClaudeOctagon(): void {
-    const [c, ctx] = this.createCanvas(32, 32);
-    ctx.fillStyle = '#d97706';
+  // Claude Haiku: Nimble winged scout
+  private createClaudeHaiku(): void {
+    const [c, ctx] = this.createCanvas(22, 22);
+    ctx.fillStyle = '#fed7aa';
     ctx.beginPath();
-    for (let i = 0; i < 8; i++) {
-      const angle = (i * Math.PI) / 4;
-      const x = 16 + Math.cos(angle) * 13;
-      const y = 16 + Math.sin(angle) * 13;
+    ctx.moveTo(11, 2); ctx.lineTo(20, 18); ctx.lineTo(11, 14); ctx.lineTo(2, 18);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#ea580c';
+    ctx.fillRect(9, 7, 4, 5);
+    this.cache.set('CLAUDE_HAIKU', c);
+  }
+
+  // Claude Sonnet: Hexagonal balanced battle cruiser
+  private createClaudeSonnet(): void {
+    const [c, ctx] = this.createCanvas(28, 28);
+    ctx.fillStyle = '#f97316';
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const angle = (i * Math.PI) / 3;
+      const x = 14 + Math.cos(angle) * 11;
+      const y = 14 + Math.sin(angle) * 11;
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
     ctx.closePath();
     ctx.fill();
 
-    ctx.fillStyle = '#fef3c7';
+    ctx.fillStyle = '#ffedd5';
     ctx.beginPath();
-    ctx.arc(16, 16, 6, 0, Math.PI * 2);
+    ctx.arc(14, 14, 5, 0, Math.PI * 2);
+    ctx.fill();
+    this.cache.set('CLAUDE_SONNET', c);
+  }
+
+  // Claude Opus: Heavy 8-pointed octagonal dreadnought
+  private createClaudeOpus(): void {
+    const [c, ctx] = this.createCanvas(38, 38);
+    ctx.fillStyle = '#c2410c';
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const angle = (i * Math.PI) / 4;
+      const x = 19 + Math.cos(angle) * 16;
+      const y = 19 + Math.sin(angle) * 16;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
     ctx.fill();
 
-    this.cache.set('CLAUDE_OCTAGON', c);
+    ctx.strokeStyle = '#fdba74';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(19, 19, 10, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(17, 17, 4, 4);
+    this.cache.set('CLAUDE_OPUS', c);
+  }
+
+  // Claude Fable: Apex Radiant Sunburst Insignia (Flagship Top Tier)
+  private createClaudeFable(): void {
+    const [c, ctx] = this.createCanvas(48, 48);
+    // Outer golden aura
+    ctx.fillStyle = '#d97706';
+    ctx.beginPath();
+    for (let i = 0; i < 12; i++) {
+      const angle = (i * Math.PI) / 6;
+      const r = i % 2 === 0 ? 22 : 15;
+      const x = 24 + Math.cos(angle) * r;
+      const y = 24 + Math.sin(angle) * r;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // Terracotta inner sunburst
+    ctx.fillStyle = '#ea580c';
+    ctx.beginPath();
+    ctx.arc(24, 24, 13, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Pure white diamond apex core
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(24, 17); ctx.lineTo(31, 24); ctx.lineTo(24, 31); ctx.lineTo(17, 24);
+    ctx.closePath();
+    ctx.fill();
+
+    this.cache.set('CLAUDE_FABLE', c);
   }
 
   // Mini-clone projectile / bullet

@@ -228,11 +228,7 @@ export class ArcadeRenderer {
   private renderEnemies(enemies: EnemyEntity[]): void {
     const ctx = this.ctx;
     for (const e of enemies) {
-      let spriteKey = e.type as string;
-      if (e.type === 'CLAUDE_FABLE' || e.type === 'CLAUDE_MYTHOS') {
-        spriteKey = 'CLAUDE_OCTAGON';
-      }
-
+      const spriteKey = e.type as string;
       const sprite = this.sprites.get(spriteKey) || this.sprites.get('MINI_CLONE');
       if (sprite) {
         ctx.save();
@@ -312,8 +308,8 @@ export class ArcadeRenderer {
       ctx.fillStyle = '#ef4444';
       ctx.fillRect(-12, 25, 24, 8 + Math.random() * 8);
 
-    } else if (boss.type === 'STAGE3_CLAUDE_OPUS') {
-      // Stage 3: Claude Opus 5.5 Octagon Fortress
+    } else if (boss.type === 'STAGE3_CLAUDE_FABLE') {
+      // Stage 3: Claude Fable Apex Octagon Fortress
       // Outer Rotating Alignment Ring
       ctx.save();
       ctx.rotate(boss.timer * 0.02);
@@ -322,10 +318,23 @@ export class ArcadeRenderer {
       ctx.strokeRect(-55, -55, 110, 110);
       ctx.restore();
 
-      // Massive Central Opus Octagon
-      const clSprite = this.sprites.get('CLAUDE_OCTAGON');
-      if (clSprite) {
-        ctx.drawImage(clSprite, -45, -45, 90, 90);
+      // Flanking Sonnet Wings
+      const sonnetSprite = this.sprites.get('CLAUDE_SONNET');
+      if (sonnetSprite) {
+        ctx.drawImage(sonnetSprite, -58, -32, 28, 28);
+        ctx.drawImage(sonnetSprite, 30, -32, 28, 28);
+      }
+
+      // Heavy Opus Inner Defense
+      const opusSprite = this.sprites.get('CLAUDE_OPUS');
+      if (opusSprite) {
+        ctx.drawImage(opusSprite, -19, 16, 38, 38);
+      }
+
+      // Massive Central Fable Apex Core (Top Tier!)
+      const fableSprite = this.sprites.get('CLAUDE_FABLE');
+      if (fableSprite) {
+        ctx.drawImage(fableSprite, -24, -24, 48, 48);
       }
 
     } else {

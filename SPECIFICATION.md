@@ -29,12 +29,17 @@ OpenAIの最新GPT-6ファミリー（威力順: **Astra > Sol > Terra > Luna**�
   🛡️ GPT-6 Terra  : 重装甲・地上制圧・重突撃 ➔ 重装甲エリート迎撃部隊＆地上要塞
   ⚡ GPT-6 Luna   : 超高速・高頻度・大量展開 ➔ 高速S字急降下ザコ大連隊
 
+【Anthropic Claude ヒエラルキー】
+  👑 Claude Fable  : 頂点・最高峰フラグシップ知能 ➔ Stage 3 最終要塞「Apex Octagon Fortress」中央核
+  ⚔️ Claude Opus   : 重装甲・深層推論 ➔ Stage 3 中ボス（大型重装甲ドレッドノート）＆内郭防衛リング
+  🛡️ Claude Sonnet : 均衡型・主力戦闘巡洋艦 ➔ Stage 3 外郭護衛編隊＆要塞防衛翼
+  ⚡ Claude Haiku  : 超高速・軽量斥候スウォーム ➔ 高速S字急降下ザコ連隊
+
 【新興勢力 & パートナータッグ】
   🌙 Kimi (Moonshot) : 2.8兆パラメータ・超長文脈の月光球体コア（Stage 1 ボス連合）
   💻 Cursor          : Grok 4.7の強力な相棒！コードブラケット防御陣を展開する護衛迎撃機（Stage 2）
   🐋 DeepSeek V4.1   : コスト破壊の超高速フランク連隊（Stage 1）
   ⚡ Grok 4.7        : 超攻撃型アフターバーナー突撃ドレッドノート（Stage 2 ボス）
-  🏛️ Claude Opus 5.5 : 世界最強峰の推論精度を誇る多層八角形要塞（Stage 3 ボス）
 ```
 
 ---
@@ -55,12 +60,13 @@ OpenAIの最新GPT-6ファミリー（威力順: **Astra > Sol > Terra > Luna**�
 - **BOSS**: **Grok 4.7 & Cursor Dual Dreadnought**
   - Grokの猛烈なアフターバーナー体当たりを、Cursorの菱形エナジーシールドが鉄壁サポート！CursorシールドをGeminiで砕いてからGrokのエンジンコアを狙え！
 
-### Stage 3: 【Anthropic アライメント要塞】（Claude Opus 5.5）
+### Stage 3: 【Anthropic アライメント要塞】（Claude Fable Apex）
 - **背景**: 幾何学的なテラコッタ色と金のハイテク要塞、光ファイバーの運河。
-- **出現敵**: Claude Fable 5.1 & Mythos 5.1 精鋭ガード、Perplexity スピナー。
+- **出現敵**: Claude Haiku 快速斥候、Claude Sonnet 巡洋編隊、中ボス Claude Opus 重巡洋艦、Perplexity スピナー。
 - **地上物**: 反応炉、ソル・シタデル（地上照準を重ねると地面からせり上がる尖塔）。
-- **BOSS**: **Claude Opus 5.5 Octagon**
-  - 世界最強峰の知能を誇るアンソロピック太陽紋章型の巨大多層八角形要塞。多重防御リングを展開。
+- **BOSS**: **Claude Fable Apex Octagon Fortress**
+  - Anthropicの頂点・最高峰知能を誇る太陽紋章型の超巨大多層八角形要塞。
+  - Sonnet護衛翼とOpus内郭防衛リングを展開。Geminiスイングで外殻を突破し、中央のFable Apex Coreを直撃せよ！
 
 ### Stage 4: 【OpenAI フロンティア母艦】（GPT-6 Megastructure）
 - **背景**: 宇宙空間に浮かぶ超巨大データセンター要塞の甲板、無限に流れるトークンストリーム。

@@ -35,16 +35,16 @@ export class BossManager {
         );
         break;
 
-      case 'STAGE3_CLAUDE_OPUS':
-        name = 'CLAUDE OPUS 5.5 OCTAGON FORTRESS';
+      case 'STAGE3_CLAUDE_FABLE':
+        name = 'CLAUDE FABLE : APEX OCTAGON FORTRESS';
         width = 160;
         height = 110;
-        hp = 150;
+        hp = 160;
         weakPoints.push(
-          { id: 'wp_ring1', xOffset: -45, yOffset: -20, radius: 15, hp: 20, maxHp: 20, active: true, label: 'FABLE' },
-          { id: 'wp_ring2', xOffset: 45, yOffset: -20, radius: 15, hp: 20, maxHp: 20, active: true, label: 'MYTHOS' },
-          { id: 'wp_ring3', xOffset: 0, yOffset: 35, radius: 16, hp: 25, maxHp: 25, active: true, label: 'ALIGNMENT' },
-          { id: 'wp_opus_core', xOffset: 0, yOffset: 0, radius: 24, hp: 85, maxHp: 85, active: true, label: 'OPUS 5.5' }
+          { id: 'wp_sonnet_l', xOffset: -45, yOffset: -20, radius: 15, hp: 25, maxHp: 25, active: true, label: 'SONNET' },
+          { id: 'wp_sonnet_r', xOffset: 45, yOffset: -20, radius: 15, hp: 25, maxHp: 25, active: true, label: 'SONNET' },
+          { id: 'wp_opus_ring', xOffset: 0, yOffset: 35, radius: 18, hp: 35, maxHp: 35, active: true, label: 'OPUS' },
+          { id: 'wp_fable_core', xOffset: 0, yOffset: 0, radius: 26, hp: 95, maxHp: 95, active: true, label: 'FABLE APEX' }
         );
         break;
 
