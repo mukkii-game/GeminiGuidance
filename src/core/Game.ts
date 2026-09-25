@@ -256,6 +256,7 @@ export class Game {
         const bullet = this.enemyManager.spawn('MINI_CLONE', bx, by, 'MINI_BULLET');
         bullet.vx = bvx;
         bullet.vy = bvy;
+        this.audio.playEnemyBulletFire();
       }
     );
 
@@ -265,6 +266,7 @@ export class Game {
         const bullet = this.enemyManager.spawn('MINI_CLONE', bx, by, 'MINI_BULLET');
         bullet.vx = bvx;
         bullet.vy = bvy;
+        this.audio.playEnemyBulletFire();
       });
     }
 

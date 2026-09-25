@@ -1,6 +1,7 @@
 /**
  * High-definition Retro Arcade Sprite Generator
- * Generates authentic, officially recognizable GenAI logos and 1983 arcade sprites.
+ * 100% Genuine 1983 Arcade Pixel Art for Player Craft (Solvalou) & Ground Targets
+ * 100% Official Vector Logos for Generative AI Enemy Factions (Strictly No Arrangement / アレンジ禁止)
  */
 export class SpriteSheet {
   private cache: Map<string, HTMLCanvasElement> = new Map();
@@ -23,7 +24,7 @@ export class SpriteSheet {
   }
 
   private generateAllSprites(): void {
-    // 1. Solvalou Player Ship (Center, Tilt Left, Tilt Right)
+    // 1. Solvalou Player Ship (Authentic 1983 Arcade Pixel Art Matrix)
     this.createPlayerShip('PLAYER_CENTER', 0);
     this.createPlayerShip('PLAYER_LEFT', -1);
     this.createPlayerShip('PLAYER_RIGHT', 1);
@@ -32,106 +33,138 @@ export class SpriteSheet {
     this.createGroundSight();
     this.createBlasterBomb();
 
-    // 3. Gemini Orbs (Official 4-point concave sparkle)
-    this.createGeminiOrb('GEMINI_LV1', 1);
-    this.createGeminiOrb('GEMINI_LV2', 2);
-    this.createGeminiOrb('GEMINI_LV3', 3);
-
-    // 4. Official GenAI Logos
-    this.createGPT6Luna();
-    this.createGPT6Terra();
-    this.createGPT6Sol();
-    this.createDeepSeekFlash();
-    this.createKimiMoon();
-    this.createQwenCube();
-    this.createMistralFlame();
-    this.createGrokRaider();
-    this.createCursorProbe();
-    this.createCopilotGlider();
-    this.createPerplexitySpinner();
-
-    // Anthropic Claude Lineup (Fable > Opus > Sonnet > Haiku)
-    this.createClaudeHaiku();
-    this.createClaudeSonnet();
-    this.createClaudeOpus();
-    this.createClaudeFable();
-
+    // 3. Mini-Clone Sparoid (Xevious pure glowing white diamond bullet)
     this.createMiniClone();
 
-    // 5. Ground Targets
+    // 4. Ground Targets (Arcade Pixel Art)
     this.createBarrowRadar();
     this.createSolCitadel();
     this.createServerRack();
     this.createAIChip();
+
+    // 5. Google Gemini Orbs (Official 4-point concave sparkle)
+    this.createGeminiOrb('GEMINI_LV1', 1);
+    this.createGeminiOrb('GEMINI_LV2', 2);
+    this.createGeminiOrb('GEMINI_LV3', 3);
+
+    // 6. Official GenAI Enemy Logos (Strictly Official, No Creative Arrangement)
+    this.loadOfficialLogos();
   }
 
-  // --- 1. Solvalou Player Ship ---
+  // --- 1. Solvalou Player Ship: Authentic 1983 Arcade Pixel Art (ドット絵) ---
   private createPlayerShip(key: string, tilt: number): void {
     const [c, ctx] = this.createCanvas(32, 32);
-    ctx.save();
-    ctx.translate(16, 16);
-    if (tilt !== 0) {
-      ctx.transform(1, 0, tilt * 0.18, 1, 0, 0);
+
+    const PALETTE: Record<string, string> = {
+      '.': 'transparent',
+      '#': '#0f172a', // Dark crisp arcade outline
+      'W': '#ffffff', // Pure white highlight
+      'H': '#e2e8f0', // Silver white primary armor
+      'S': '#94a3b8', // Steel gray mid-tone
+      'D': '#475569', // Gunmetal dark shadow
+      'C': '#06b6d4', // Cyan cockpit canopy
+      'B': '#0369a1', // Deep blue canopy frame
+      'R': '#ef4444', // Red wingtip accent
+      'T': '#f97316', // Thruster flame
+    };
+
+    const SOLVALOU_CENTER = [
+      "..........####..........",
+      ".........#HHWW#.........",
+      "........#HHWWSS#........",
+      "........#HHWWSS#........",
+      ".......#HHWWWSSD#.......",
+      ".......#HCCCCBSSD#......",
+      "......#HHCCCCBSSSD#.....",
+      "......#HCCCCCCBSSD#.....",
+      ".....#HHCCCCCCBSSSD#....",
+      ".....#HHCCCCCCBSSSD#....",
+      "....#HHHCCCCCCBSSSSD#...",
+      "....#HHHHBBBBBBSSSSD#...",
+      "...#HHHHHSSSSSSSSSSD#...",
+      "..#HHHHHHSSSSSSSSSSSD#..",
+      ".#RHHHHHHSSSSSSSSSSSDDR#",
+      "#RRHHHHHHSSSSSSSSSSSDDRR",
+      "#RRHHHHHHSSSSSSSSSSSDDRR",
+      "#####HHHHSSSSSSDDDD#####",
+      "....#HHSS#....#SSDD#....",
+      "....#HHSS#....#SSDD#....",
+      "....#HHSS#....#SSDD#....",
+      ".....#TT#......#TT#.....",
+      ".....#TT#......#TT#.....",
+      "......##........##......"
+    ];
+
+    const SOLVALOU_LEFT = [
+      "...........###..........",
+      "..........#HWW#.........",
+      ".........#HHWWS#........",
+      ".........#HHWWS#........",
+      "........#HHWWSSD#.......",
+      "........#HCCCBSSD#......",
+      ".......#HHCCCBSSSD#.....",
+      ".......#HCCCCBSSSD#.....",
+      "......#HHCCCCBSSSSD#....",
+      "......#HHCCCCBSSSSD#....",
+      ".....#HHHCCCCBSSSSSD#...",
+      ".....#HHHBBBBBSSSSSD#...",
+      "....#HHHHSSSSSSSSSSD#...",
+      "...#HHHHHSSSSSSSSSSSD#..",
+      "..#RHHHHHSSSSSSSSSSDDR#.",
+      ".#RRHHHHHSSSSSSSSSSDDRR#",
+      "#RRRHHHHHSSSSSSSSSSDDRR#",
+      "#####HHHHSSSSSSDDD######",
+      "....#HHSS#....#SSDD#....",
+      "....#HHSS#....#SSDD#....",
+      "....#HHSS#.....#SDD#....",
+      ".....#TT#.......#T#.....",
+      ".....#TT#.......#T#.....",
+      "......##.........#......"
+    ];
+
+    const SOLVALOU_RIGHT = [
+      "..........###...........",
+      ".........#WWH#..........",
+      "........#SWWHH#.........",
+      "........#SWWHH#.........",
+      ".......#DSSWWHH#........",
+      "......#DSSBCCCH#........",
+      ".....#DSSSBCCHH#........",
+      ".....#DSSSBCCHH#........",
+      "....#DSSSSBCCCCH#.......",
+      "....#DSSSSBCCCCH#.......",
+      "...#DSSSSSBCCCCHHH#.....",
+      "...#DSSSSSBBBBBHHH#.....",
+      "...#DSSSSSSSSSSHHHH#....",
+      "..#DSSSSSSSSSSSHHHHH#...",
+      ".#RDDSSSSSSSSSSHHHHHR#..",
+      "#RRDDSSSSSSSSSSHHHHHRR#.",
+      "#RRDDSSSSSSSSSSHHHHHRRR#",
+      "######DDDSSSSSSHHHH#####",
+      "....#DDSS#....#SSHH#....",
+      "....#DDSS#....#SSHH#....",
+      "....#DDS#.....#SSHH#....",
+      ".....#T#.......#TT#.....",
+      ".....#T#.......#TT#.....",
+      "......#.........##......"
+    ];
+
+    const matrix = tilt === -1 ? SOLVALOU_LEFT : tilt === 1 ? SOLVALOU_RIGHT : SOLVALOU_CENTER;
+    const offsetX = 4;
+    const offsetY = 4;
+
+    for (let r = 0; r < matrix.length; r++) {
+      const row = matrix[r];
+      for (let col = 0; col < row.length; col++) {
+        const char = row[col];
+        const color = PALETTE[char];
+        if (color && color !== 'transparent') {
+          ctx.fillStyle = color;
+          ctx.fillRect(offsetX + col, offsetY + r, 1, 1);
+        }
+      }
     }
 
-    // Shadow / Bottom Hull
-    ctx.fillStyle = '#1c2836';
-    ctx.beginPath();
-    ctx.moveTo(0, -14);
-    ctx.lineTo(13, 10);
-    ctx.lineTo(8, 13);
-    ctx.lineTo(0, 9);
-    ctx.lineTo(-8, 13);
-    ctx.lineTo(-13, 10);
-    ctx.closePath();
-    ctx.fill();
-
-    // Main Silver Wedge Hull
-    ctx.fillStyle = '#8fa3b8';
-    ctx.beginPath();
-    ctx.moveTo(0, -13);
-    ctx.lineTo(11, 8);
-    ctx.lineTo(6, 11);
-    ctx.lineTo(0, 8);
-    ctx.lineTo(-6, 11);
-    ctx.lineTo(-11, 8);
-    ctx.closePath();
-    ctx.fill();
-
-    // Upper Highlight (Left bevel lighting)
-    ctx.fillStyle = '#e2ecf5';
-    ctx.beginPath();
-    ctx.moveTo(0, -13);
-    ctx.lineTo(0, 8);
-    ctx.lineTo(-6, 11);
-    ctx.lineTo(-11, 8);
-    ctx.closePath();
-    ctx.fill();
-
-    // Pure White Spine
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(-1, -12, 2, 18);
-
-    // Blue Cockpit Canopy
-    ctx.fillStyle = '#00e5ff';
-    ctx.beginPath();
-    ctx.moveTo(0, -6);
-    ctx.lineTo(3, 1);
-    ctx.lineTo(0, 4);
-    ctx.lineTo(-3, 1);
-    ctx.closePath();
-    ctx.fill();
-
-    // Canopy Glint
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(-1, -4, 2, 3);
-
-    // Dual Thrusters
-    ctx.fillStyle = '#ff7700';
-    ctx.fillRect(-5, 9, 3, 3);
-    ctx.fillRect(2, 9, 3, 3);
-
-    ctx.restore();
     this.cache.set(key, c);
   }
 
@@ -176,577 +209,227 @@ export class SpriteSheet {
     this.cache.set('BLASTER_BOMB', c);
   }
 
-  // --- 3. Gemini Logos: The Official 4-Point Concave Sparkle ---
-  private createGeminiOrb(key: string, level: number): void {
-    const size = level === 1 ? 32 : level === 2 ? 46 : 64;
-    const [c, ctx] = this.createCanvas(size, size);
-    const half = size / 2;
-
-    // Glowing Outer Halo
-    const grad = ctx.createRadialGradient(half, half, 2, half, half, half);
-    if (level === 1) {
-      grad.addColorStop(0, 'rgba(100, 180, 255, 0.95)');
-      grad.addColorStop(0.5, 'rgba(160, 90, 255, 0.55)');
-      grad.addColorStop(1, 'rgba(10, 20, 90, 0)');
-    } else if (level === 2) {
-      grad.addColorStop(0, 'rgba(150, 230, 255, 0.98)');
-      grad.addColorStop(0.4, 'rgba(210, 120, 255, 0.75)');
-      grad.addColorStop(1, 'rgba(30, 0, 110, 0)');
-    } else {
-      // Lv 3 Mega Celestial Spark
-      grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
-      grad.addColorStop(0.3, 'rgba(80, 220, 255, 0.95)');
-      grad.addColorStop(0.7, 'rgba(240, 80, 255, 0.85)');
-      grad.addColorStop(1, 'rgba(60, 0, 130, 0)');
-    }
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, size, size);
-
-    // Exact Mathematical Google Gemini 4-Point Concave Shape
-    ctx.save();
-    ctx.translate(half, half);
-    ctx.beginPath();
-    const R = half * 0.88;
-    ctx.moveTo(0, -R);
-    ctx.quadraticCurveTo(0, 0, R, 0);
-    ctx.quadraticCurveTo(0, 0, 0, R);
-    ctx.quadraticCurveTo(0, 0, -R, 0);
-    ctx.quadraticCurveTo(0, 0, 0, -R);
-    ctx.closePath();
-
-    // Official Google Gemini 4-Stop Gradient (Cyan, Blue, Purple, Magenta)
-    const geminiGrad = ctx.createLinearGradient(-R, -R, R, R);
-    geminiGrad.addColorStop(0, '#00d2ff');   // Cyan
-    geminiGrad.addColorStop(0.35, '#1a73e8'); // Deep Google Blue
-    geminiGrad.addColorStop(0.7, '#9333ea');  // Vivid Purple
-    geminiGrad.addColorStop(1, '#e11d48');   // Magenta Pink
-    ctx.fillStyle = geminiGrad;
-    ctx.fill();
-
-    // Radiant Beveled Core
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(0, 0, half * 0.22, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.restore();
-    this.cache.set(key, c);
-  }
-
-  // --- 4. Official GenAI Enemy Logos ---
-
-  // Helper: Draws the exact official OpenAI 6-Fold Spiral Rosette
-  private drawOpenAIRosette(ctx: CanvasRenderingContext2D, cx: number, cy: number, radius: number, color: string): void {
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = Math.max(2, radius * 0.22);
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    for (let i = 0; i < 6; i++) {
-      ctx.save();
-      ctx.rotate((i * Math.PI) / 3);
-      ctx.beginPath();
-      // Curved petal arc starting tangentially and looping in
-      ctx.arc(radius * 0.45, -radius * 0.15, radius * 0.5, -Math.PI * 0.4, Math.PI * 0.55);
-      ctx.stroke();
-      ctx.restore();
-    }
-    ctx.restore();
-  }
-
-  // GPT-6 Luna: Sleek crescent craft featuring the OpenAI Rosette
-  private createGPT6Luna(): void {
-    const [c, ctx] = this.createCanvas(28, 28);
-    // Dark outer crescent hull
-    ctx.fillStyle = '#0f172a';
-    ctx.beginPath();
-    ctx.arc(14, 14, 12, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#38bdf8';
-    ctx.beginPath();
-    ctx.arc(14, 14, 11, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#0f172a';
-    ctx.beginPath();
-    ctx.arc(11, 12, 9, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Official OpenAI Rosette inside
-    this.drawOpenAIRosette(ctx, 16, 14, 7, '#ffffff');
-
-    this.cache.set('GPT6_LUNA', c);
-  }
-
-  // GPT-6 Terra: Heavy slate armored fortress with golden OpenAI emblem
-  private createGPT6Terra(): void {
-    const [c, ctx] = this.createCanvas(36, 36);
-    // Octagonal heavy armor
-    ctx.fillStyle = '#334155';
-    ctx.beginPath();
-    ctx.moveTo(11, 2); ctx.lineTo(25, 2);
-    ctx.lineTo(34, 11); ctx.lineTo(34, 25);
-    ctx.lineTo(25, 34); ctx.lineTo(11, 34);
-    ctx.lineTo(2, 25); ctx.lineTo(2, 11);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.strokeStyle = '#f59e0b';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Official OpenAI emblem in the center
-    this.drawOpenAIRosette(ctx, 18, 18, 10, '#f59e0b');
-
-    this.cache.set('GPT6_TERRA', c);
-  }
-
-  // GPT-6 Sol: Massive flagship with radiant corona and prominent OpenAI Rosette
-  private createGPT6Sol(): void {
-    const [c, ctx] = this.createCanvas(48, 48);
-    // Solar Corona
-    ctx.fillStyle = '#fbbf24';
-    ctx.beginPath();
-    ctx.arc(24, 24, 22, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Armored inner ring
-    ctx.fillStyle = '#0f172a';
-    ctx.beginPath();
-    ctx.arc(24, 24, 17, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Official OpenAI Rosette at the core
-    this.drawOpenAIRosette(ctx, 24, 24, 12, '#38bdf8');
-
-    // Blinding white center
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(24, 24, 3, 0, Math.PI * 2);
-    ctx.fill();
-
-    this.cache.set('GPT6_SOL', c);
-  }
-
-  // DeepSeek: The Official DeepSeek Blue Whale Mascot!
-  private createDeepSeekFlash(): void {
-    const [c, ctx] = this.createCanvas(30, 30);
-    // DeepSeek Navy Blue Whale Body
-    ctx.fillStyle = '#0284c7';
-    ctx.beginPath();
-    ctx.moveTo(6, 14);
-    ctx.bezierCurveTo(6, 6, 22, 6, 26, 14);
-    ctx.bezierCurveTo(28, 18, 22, 22, 12, 22);
-    ctx.bezierCurveTo(8, 22, 6, 18, 6, 14);
-    ctx.fill();
-
-    // Whale Tail Fluke
-    ctx.beginPath();
-    ctx.moveTo(7, 14);
-    ctx.lineTo(1, 8);
-    ctx.lineTo(3, 14);
-    ctx.lineTo(1, 20);
-    ctx.closePath();
-    ctx.fill();
-
-    // White Belly
-    ctx.fillStyle = '#e0f2fe';
-    ctx.beginPath();
-    ctx.ellipse(16, 18, 8, 4, 0, 0, Math.PI);
-    ctx.fill();
-
-    // Whale Pectoral Fin
-    ctx.fillStyle = '#0369a1';
-    ctx.beginPath();
-    ctx.ellipse(14, 16, 4, 2, Math.PI / 4, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Friendly White Eye
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(21, 11, 2.5, 2.5);
-
-    this.cache.set('DEEPSEEK_FLASH', c);
-  }
-
-  // Kimi: Official Moonshot AI Glowing Lunar Sphere & "K" Motif
-  private createKimiMoon(): void {
-    const [c, ctx] = this.createCanvas(28, 28);
-    // Indigo Moon
-    ctx.fillStyle = '#4f46e5';
-    ctx.beginPath();
-    ctx.arc(14, 14, 12, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Glowing violet aura
-    ctx.strokeStyle = '#c7d2fe';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    // Moonshot 'K' geometric emblem
-    ctx.fillStyle = '#ffffff';
-    // Vertical stem of K
-    ctx.fillRect(9, 7, 3, 14);
-    // Diagonal arms of K
-    ctx.beginPath();
-    ctx.moveTo(12, 14); ctx.lineTo(19, 7); ctx.lineTo(19, 10); ctx.lineTo(14, 14);
-    ctx.moveTo(12, 14); ctx.lineTo(19, 21); ctx.lineTo(19, 18); ctx.lineTo(14, 14);
-    ctx.fill();
-
-    this.cache.set('KIMI_MOON', c);
-  }
-
-  // Qwen: Official Alibaba Qwen Faceted Crystal Prism
-  private createQwenCube(): void {
-    const [c, ctx] = this.createCanvas(26, 26);
-    // Top prism facet
-    ctx.fillStyle = '#a855f7';
-    ctx.beginPath();
-    ctx.moveTo(13, 2); ctx.lineTo(23, 7); ctx.lineTo(13, 12); ctx.lineTo(3, 7);
-    ctx.closePath();
-    ctx.fill();
-
-    // Left facet
-    ctx.fillStyle = '#7e22ce';
-    ctx.beginPath();
-    ctx.moveTo(3, 7); ctx.lineTo(13, 12); ctx.lineTo(13, 23); ctx.lineTo(3, 18);
-    ctx.closePath();
-    ctx.fill();
-
-    // Right facet
-    ctx.fillStyle = '#c084fc';
-    ctx.beginPath();
-    ctx.moveTo(23, 7); ctx.lineTo(13, 12); ctx.lineTo(13, 23); ctx.lineTo(23, 18);
-    ctx.closePath();
-    ctx.fill();
-
-    this.cache.set('QWEN_CUBE', c);
-  }
-
-  // Mistral: The Official Mistral AI Stepped Pixel M Logo!
-  private createMistralFlame(): void {
-    const [c, ctx] = this.createCanvas(26, 26);
-    // Official Mistral 'M' pixel stair blocks in vibrant sunset orange
-    ctx.fillStyle = '#ea580c';
-    // Tier 1 (top corners)
-    ctx.fillRect(5, 5, 4, 3);
-    ctx.fillRect(17, 5, 4, 3);
-
-    // Tier 2
-    ctx.fillRect(5, 8, 7, 3);
-    ctx.fillRect(14, 8, 7, 3);
-
-    // Tier 3 (center peak)
-    ctx.fillRect(5, 11, 16, 3);
-
-    // Tier 4 (lower middle split)
-    ctx.fillRect(5, 14, 5, 3);
-    ctx.fillRect(16, 14, 5, 3);
-
-    // Tier 5 (base pillars)
-    ctx.fillRect(5, 17, 4, 4);
-    ctx.fillRect(17, 17, 4, 4);
-
-    // Warm yellow inner highlight
-    ctx.fillStyle = '#fde047';
-    ctx.fillRect(11, 11, 4, 3);
-
-    this.cache.set('MISTRAL_FLAME', c);
-  }
-
-  // Grok: The Official xAI Grok Minimalist Thick Slash-X Logo
-  private createGrokRaider(): void {
-    const [c, ctx] = this.createCanvas(30, 30);
-    // Dark square background
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(2, 2, 26, 26);
-    ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(2, 2, 26, 26);
-
-    // Official xAI thick diagonal slash
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(6, 6); ctx.lineTo(24, 24);
-    ctx.stroke();
-
-    // Geometric opposing curved line
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.moveTo(22, 6); ctx.lineTo(16, 14); ctx.lineTo(8, 24);
-    ctx.stroke();
-
-    // Red engine light
-    ctx.fillStyle = '#ef4444';
-    ctx.fillRect(13, 24, 4, 3);
-
-    this.cache.set('GROK_RAIDER', c);
-  }
-
-  // Cursor: The Official Cursor IDE 3D Isometric Cube with Glowing Cyan Arrow
-  private createCursorProbe(): void {
-    const [c, ctx] = this.createCanvas(26, 26);
-    // Dark Charcoal 3D Cube
-    // Top Face
-    ctx.fillStyle = '#1e293b';
-    ctx.beginPath();
-    ctx.moveTo(13, 3); ctx.lineTo(22, 8); ctx.lineTo(13, 13); ctx.lineTo(4, 8);
-    ctx.closePath();
-    ctx.fill();
-
-    // Left Face
-    ctx.fillStyle = '#0f172a';
-    ctx.beginPath();
-    ctx.moveTo(4, 8); ctx.lineTo(13, 13); ctx.lineTo(13, 23); ctx.lineTo(4, 18);
-    ctx.closePath();
-    ctx.fill();
-
-    // Right Face
-    ctx.fillStyle = '#334155';
-    ctx.beginPath();
-    ctx.moveTo(22, 8); ctx.lineTo(13, 13); ctx.lineTo(13, 23); ctx.lineTo(22, 18);
-    ctx.closePath();
-    ctx.fill();
-
-    // The Official Glowing Cyan Chevron Cursor Arrow pointing up-right
-    ctx.fillStyle = '#00f2fe';
-    ctx.beginPath();
-    ctx.moveTo(11, 10); ctx.lineTo(18, 7); ctx.lineTo(17, 14); ctx.lineTo(14, 12);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(13, 9, 3, 3);
-
-    this.cache.set('CURSOR_PROBE', c);
-  }
-
-  // GitHub Copilot: The Official Copilot Robot Face with Visor
-  private createCopilotGlider(): void {
-    const [c, ctx] = this.createCanvas(28, 28);
-    // Copilot Purple / Blue gradient head
-    ctx.fillStyle = '#4338ca';
-    ctx.beginPath();
-    ctx.arc(14, 14, 11, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Dual antenna ears
-    ctx.fillStyle = '#38bdf8';
-    ctx.fillRect(2, 11, 3, 6);
-    ctx.fillRect(23, 11, 3, 6);
-
-    // Curved black visor
-    ctx.fillStyle = '#0f172a';
-    ctx.beginPath();
-    ctx.roundRect(7, 10, 14, 8, 4);
-    ctx.fill();
-
-    // Glowing cyan eye strip
-    ctx.fillStyle = '#38bdf8';
-    ctx.fillRect(9, 13, 10, 2);
-
-    this.cache.set('COPILOT_GLIDER', c);
-  }
-
-  // Perplexity: The Official Interconnected Woven Loop Logo
-  private createPerplexitySpinner(): void {
-    const [c, ctx] = this.createCanvas(26, 26);
-    ctx.strokeStyle = '#0d9488';
-    ctx.lineWidth = 2.5;
-
-    // Six interlocking loops
-    for (let i = 0; i < 3; i++) {
-      ctx.save();
-      ctx.translate(13, 13);
-      ctx.rotate((i * Math.PI) / 3);
-      ctx.strokeRect(-9, -3, 18, 6);
-      ctx.restore();
-    }
-
-    ctx.fillStyle = '#2dd4bf';
-    ctx.beginPath();
-    ctx.arc(13, 13, 3, 0, Math.PI * 2);
-    ctx.fill();
-
-    this.cache.set('PERPLEXITY_SPINNER', c);
-  }
-
-  // --- Anthropic Claude Official Terracotta Sunburst Lineup ---
-
-  // Helper: Draws the official Anthropic 14-spoke Terracotta Sunburst
-  private drawAnthropicSunburst(
-    ctx: CanvasRenderingContext2D,
-    cx: number,
-    cy: number,
-    spokes: number,
-    innerR: number,
-    outerR: number,
-    color: string,
-    centerColor: string
-  ): void {
-    ctx.save();
-    ctx.translate(cx, cy);
-
-    ctx.fillStyle = color;
-    for (let i = 0; i < spokes; i++) {
-      ctx.save();
-      ctx.rotate((i * Math.PI * 2) / spokes);
-      // Radiating rounded rectangular ray
-      ctx.fillRect(-1.5, innerR, 3, outerR - innerR);
-      ctx.restore();
-    }
-
-    // Central Core
-    ctx.fillStyle = centerColor;
-    ctx.beginPath();
-    ctx.arc(0, 0, innerR + 1, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.restore();
-  }
-
-  // Claude Haiku: Nimble 8-spoke light terracotta sunburst
-  private createClaudeHaiku(): void {
-    const [c, ctx] = this.createCanvas(24, 24);
-    this.drawAnthropicSunburst(ctx, 12, 12, 8, 3, 10, '#ea580c', '#fed7aa');
-    this.cache.set('CLAUDE_HAIKU', c);
-  }
-
-  // Claude Sonnet: Balanced 12-spoke terracotta battle cruiser
-  private createClaudeSonnet(): void {
-    const [c, ctx] = this.createCanvas(28, 28);
-    this.drawAnthropicSunburst(ctx, 14, 14, 12, 4, 12, '#ea580c', '#fef08a');
-    this.cache.set('CLAUDE_SONNET', c);
-  }
-
-  // Claude Opus: Heavy 14-spoke terracotta dreadnought with outer shield
-  private createClaudeOpus(): void {
-    const [c, ctx] = this.createCanvas(38, 38);
-    // Outer shield ring
-    ctx.strokeStyle = '#c2410c';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(19, 19, 17, 0, Math.PI * 2);
-    ctx.stroke();
-
-    this.drawAnthropicSunburst(ctx, 19, 19, 14, 5, 15, '#c2410c', '#ffedd5');
-    this.cache.set('CLAUDE_OPUS', c);
-  }
-
-  // Claude Fable: Apex 16-Spoke Golden Terracotta Solar Crown (Flagship Top Tier!)
-  private createClaudeFable(): void {
-    const [c, ctx] = this.createCanvas(48, 48);
-    // Radiant Golden Halo
-    ctx.fillStyle = '#f59e0b';
-    ctx.beginPath();
-    ctx.arc(24, 24, 23, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Terracotta Sunburst Body
-    this.drawAnthropicSunburst(ctx, 24, 24, 16, 6, 20, '#b45309', '#ffffff');
-
-    // Brilliant White Diamond Core
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.moveTo(24, 18); ctx.lineTo(30, 24); ctx.lineTo(24, 30); ctx.lineTo(18, 24);
-    ctx.closePath();
-    ctx.fill();
-
-    this.cache.set('CLAUDE_FABLE', c);
-  }
-
-  // Mini-clone projectile
+  // --- 3. Mini-Clone Sparoid Bullet (Xevious Authentic Pure White Glowing Diamond) ---
   private createMiniClone(): void {
-    const [c, ctx] = this.createCanvas(10, 10);
-    ctx.fillStyle = '#ef4444';
-    ctx.fillRect(3, 1, 4, 8);
-    ctx.fillRect(1, 3, 8, 4);
+    const [c, ctx] = this.createCanvas(12, 12);
+
+    // Pure white glowing diamond
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(4, 4, 2, 2);
+    ctx.beginPath();
+    ctx.moveTo(6, 1);
+    ctx.lineTo(11, 6);
+    ctx.lineTo(6, 11);
+    ctx.lineTo(1, 6);
+    ctx.closePath();
+    ctx.fill();
+
+    // Brilliant white sparkling core
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(4, 4, 4, 4);
+
+    // Crisp silver border
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
     this.cache.set('MINI_CLONE', c);
   }
 
-  // --- 5. Ground Targets ---
+  // --- 4. Ground Targets (Arcade Pixel Art) ---
   private createBarrowRadar(): void {
     const [c, ctx] = this.createCanvas(32, 32);
-    ctx.fillStyle = '#475569';
+    // Gray octagon bunker
+    ctx.fillStyle = '#334155';
     ctx.beginPath();
-    ctx.arc(16, 18, 12, 0, Math.PI * 2);
+    ctx.moveTo(10, 4); ctx.lineTo(22, 4);
+    ctx.lineTo(28, 10); ctx.lineTo(28, 22);
+    ctx.lineTo(22, 28); ctx.lineTo(10, 28);
+    ctx.lineTo(4, 22); ctx.lineTo(4, 10);
+    ctx.closePath();
     ctx.fill();
+
+    ctx.fillStyle = '#64748b';
+    ctx.fillRect(8, 8, 16, 16);
 
     ctx.fillStyle = '#94a3b8';
-    ctx.beginPath();
-    ctx.arc(16, 16, 9, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillRect(10, 10, 12, 12);
 
-    ctx.strokeStyle = '#ef4444';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(16, 16); ctx.lineTo(23, 11);
-    ctx.stroke();
+    // Blinking red central core
+    ctx.fillStyle = '#ef4444';
+    ctx.fillRect(13, 13, 6, 6);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(15, 15, 2, 2);
 
-    this.cache.set('BARROW', c);
+    this.cache.set('BARROW_RADAR', c);
   }
 
   private createSolCitadel(): void {
-    const [c, ctx] = this.createCanvas(32, 32);
-    ctx.fillStyle = '#78350f';
-    ctx.fillRect(4, 4, 24, 24);
+    const [c, ctx] = this.createCanvas(32, 44);
+    // Silver spire monolith
+    ctx.fillStyle = '#475569';
+    ctx.fillRect(8, 2, 16, 40);
 
-    ctx.fillStyle = '#b45309';
-    ctx.fillRect(7, 7, 18, 18);
+    ctx.fillStyle = '#cbd5e1';
+    ctx.fillRect(10, 4, 12, 36);
 
-    ctx.fillStyle = '#d97706';
-    ctx.fillRect(10, 10, 12, 12);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(12, 6, 4, 32);
 
-    ctx.fillStyle = '#fef08a';
-    ctx.fillRect(13, 13, 6, 6);
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillRect(14, 18, 4, 8);
 
     this.cache.set('SOL_CITADEL', c);
   }
 
   private createServerRack(): void {
-    const [c, ctx] = this.createCanvas(28, 28);
-    ctx.fillStyle = '#1e293b';
-    ctx.fillRect(3, 2, 22, 24);
-
+    const [c, ctx] = this.createCanvas(28, 32);
     ctx.fillStyle = '#0f172a';
-    for (let y = 5; y < 24; y += 4) {
-      ctx.fillRect(5, y, 18, 3);
-    }
+    ctx.fillRect(2, 2, 24, 28);
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(2, 2, 24, 28);
 
     ctx.fillStyle = '#22c55e';
-    ctx.fillRect(6, 6, 2, 1);
-    ctx.fillRect(6, 10, 2, 1);
-    ctx.fillStyle = '#3b82f6';
-    ctx.fillRect(6, 14, 2, 1);
-    ctx.fillRect(6, 18, 2, 1);
+    ctx.fillRect(5, 6, 3, 3);
+    ctx.fillRect(5, 12, 3, 3);
+    ctx.fillRect(5, 18, 3, 3);
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillRect(10, 6, 13, 2);
+    ctx.fillRect(10, 12, 13, 2);
+    ctx.fillRect(10, 18, 13, 2);
 
     this.cache.set('SERVER_RACK', c);
   }
 
   private createAIChip(): void {
     const [c, ctx] = this.createCanvas(28, 28);
-    ctx.fillStyle = '#14532d';
-    ctx.fillRect(3, 3, 22, 22);
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(5, 5, 18, 18);
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(5, 5, 18, 18);
 
-    ctx.fillStyle = '#eab308';
-    for (let p = 5; p <= 21; p += 3) {
-      ctx.fillRect(p, 1, 2, 2);
-      ctx.fillRect(p, 25, 2, 2);
-      ctx.fillRect(1, p, 2, 2);
-      ctx.fillRect(25, p, 2, 2);
+    // Gold connector pins
+    ctx.fillStyle = '#fbbf24';
+    for (let i = 0; i < 4; i++) {
+      ctx.fillRect(7 + i * 4, 2, 2, 3);
+      ctx.fillRect(7 + i * 4, 23, 2, 3);
+      ctx.fillRect(2, 7 + i * 4, 3, 2);
+      ctx.fillRect(23, 7 + i * 4, 3, 2);
     }
 
-    ctx.fillStyle = '#0f172a';
-    ctx.fillRect(8, 8, 12, 12);
-
     ctx.fillStyle = '#38bdf8';
-    ctx.fillRect(11, 11, 6, 6);
+    ctx.fillRect(10, 10, 8, 8);
 
     this.cache.set('AI_CHIP', c);
+  }
+
+  // --- 5. Gemini Orbs (Official 4-Point Concave Sparkle) ---
+  private createGeminiOrb(key: string, level: number): void {
+    const size = level === 1 ? 32 : level === 2 ? 46 : 64;
+    const [c, ctx] = this.createCanvas(size, size);
+    this.cache.set(key, c);
+
+    const pad = level === 1 ? 3 : level === 2 ? 4 : 5;
+    const innerSize = size - pad * 2;
+
+    const img = new Image();
+    img.src = './assets/logos/gemini.svg';
+    img.onload = () => {
+      ctx.clearRect(0, 0, size, size);
+
+      // Celestial radial halo
+      const half = size / 2;
+      const grad = ctx.createRadialGradient(half, half, 2, half, half, half);
+      if (level === 1) {
+        grad.addColorStop(0, 'rgba(0, 210, 255, 0.45)');
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      } else if (level === 2) {
+        grad.addColorStop(0, 'rgba(168, 85, 247, 0.65)');
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      } else {
+        grad.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
+        grad.addColorStop(0.5, 'rgba(236, 72, 153, 0.7)');
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      }
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, size, size);
+
+      ctx.drawImage(img, pad, pad, innerSize, innerSize);
+    };
+
+    // Instant mathematical fallback
+    const half = size / 2;
+    ctx.save();
+    ctx.translate(half, half);
+    ctx.beginPath();
+    const R = half * 0.82;
+    ctx.moveTo(0, -R);
+    ctx.quadraticCurveTo(0, 0, R, 0);
+    ctx.quadraticCurveTo(0, 0, 0, R);
+    ctx.quadraticCurveTo(0, 0, -R, 0);
+    ctx.quadraticCurveTo(0, 0, 0, -R);
+    ctx.closePath();
+    ctx.fillStyle = level === 1 ? '#00d2ff' : level === 2 ? '#a855f7' : '#ec4899';
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // --- 6. Official GenAI Enemy Logos (Strictly Official, No Creative Arrangement) ---
+  private loadOfficialLogos(): void {
+    // OpenAI Rosette Official Paths
+    const OPENAI_PATH = "M9.205 8.658v-2.26c0-.19.072-.333.238-.428l4.543-2.616c.619-.357 1.356-.523 2.117-.523 2.854 0 4.662 2.212 4.662 4.566 0 .167 0 .357-.024.547l-4.71-2.759a.797.797 0 00-.856 0l-5.97 3.473zm10.609 8.8V12.06c0-.333-.143-.57-.429-.737l-5.97-3.473 1.95-1.118a.433.433 0 01.476 0l4.543 2.617c1.309.76 2.189 2.378 2.189 3.948 0 1.808-1.07 3.473-2.76 4.163zM7.802 12.703l-1.95-1.142c-.167-.095-.239-.238-.239-.428V5.899c0-2.545 1.95-4.472 4.591-4.472 1 0 1.927.333 2.712.928L8.23 5.067c-.285.166-.428.404-.428.737v6.898zM12 15.128l-2.795-1.57v-3.33L12 8.658l2.795 1.57v3.33L12 15.128zm1.796 7.23c-1 0-1.927-.332-2.712-.927l4.686-2.712c.285-.166.428-.404.428-.737v-6.898l1.974 1.142c.167.095.238.238.238.428v5.233c0 2.545-1.974 4.472-4.614 4.472zm-5.637-5.303l-4.544-2.617c-1.308-.761-2.188-2.378-2.188-3.948A4.482 4.482 0 014.21 6.327v5.423c0 .333.143.571.428.738l5.947 3.449-1.95 1.118a.432.432 0 01-.476 0zm-.262 3.9c-2.688 0-4.662-2.021-4.662-4.519 0-.19.024-.38.047-.57l4.686 2.71c.286.167.571.167.856 0l5.97-3.448v2.26c0 .19-.07.333-.237.428l-4.543 2.616c-.619.357-1.356.523-2.117.523zm5.899 2.83a5.947 5.947 0 005.827-4.756C22.287 18.339 24 15.84 24 13.296c0-1.665-.713-3.282-1.998-4.448.119-.5.19-.999.19-1.498 0-3.401-2.759-5.947-5.946-5.947-.642 0-1.26.095-1.88.31A5.962 5.962 0 0010.205 0a5.947 5.947 0 00-5.827 4.757C1.713 5.447 0 7.945 0 10.49c0 1.666.713 3.283 1.998 4.448-.119.5-.19 1-.19 1.499 0 3.401 2.759 5.946 5.946 5.946.642 0 1.26-.095 1.88-.309a5.96 5.96 0 004.162 1.713z";
+
+    // Claude Sunburst Official Path
+    const CLAUDE_PATH = "M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z";
+
+    // Grok Slash-X Official Path
+    const GROK_PATH = "M6.469 8.776L16.512 23h-4.464L2.005 8.776H6.47zm-.004 7.9l2.233 3.164L6.467 23H2l4.465-6.324zM22 2.582V23h-3.659V7.764L22 2.582zM22 1l-9.952 14.095-2.233-3.163L17.533 1H22z";
+
+    // 1. OpenAI Hierarchy
+    this.registerSvgSprite('GPT6_LUNA', 24, 24, './assets/logos/openai_luna.svg', OPENAI_PATH, '#10a37f');
+    this.registerSvgSprite('GPT6_TERRA', 34, 34, './assets/logos/openai_terra.svg', OPENAI_PATH, '#38bdf8');
+    this.registerSvgSprite('GPT6_SOL', 44, 44, './assets/logos/openai_sol.svg', OPENAI_PATH, '#fbbf24');
+    this.registerSvgSprite('GPT6_ASTRA', 48, 48, './assets/logos/openai_astra.svg', OPENAI_PATH, '#ffffff');
+
+    // 2. Anthropic Claude Hierarchy (Fable > Opus > Sonnet > Haiku)
+    this.registerSvgSprite('CLAUDE_HAIKU', 22, 22, './assets/logos/claude_haiku.svg', CLAUDE_PATH, '#fca5a5');
+    this.registerSvgSprite('CLAUDE_SONNET', 28, 28, './assets/logos/claude_sonnet.svg', CLAUDE_PATH, '#D97757');
+    this.registerSvgSprite('CLAUDE_OPUS', 38, 38, './assets/logos/claude_opus.svg', CLAUDE_PATH, '#ea580c');
+    this.registerSvgSprite('CLAUDE_FABLE', 48, 48, './assets/logos/claude_fable.svg', CLAUDE_PATH, '#fbbf24');
+
+    // 3. Other Major AI Players
+    this.registerSvgSprite('DEEPSEEK_FLASH', 28, 24, './assets/logos/deepseek.svg');
+    this.registerSvgSprite('GROK_RAIDER', 28, 28, './assets/logos/grok.svg', GROK_PATH, '#f8fafc');
+    this.registerSvgSprite('CURSOR_PROBE', 26, 26, './assets/logos/cursor.svg');
+    this.registerSvgSprite('MISTRAL_FLAME', 24, 24, './assets/logos/mistral.svg');
+    this.registerSvgSprite('KIMI_MOON', 26, 26, './assets/logos/kimi.svg');
+    this.registerSvgSprite('COPILOT_GLIDER', 26, 26, './assets/logos/copilot.svg');
+    this.registerSvgSprite('PERPLEXITY_SPINNER', 26, 26, './assets/logos/perplexity.svg');
+    this.registerSvgSprite('QWEN_CUBE', 26, 26, './assets/logos/qwen.svg');
+  }
+
+  private registerSvgSprite(key: string, w: number, h: number, svgPath: string, fallbackPath?: string, fallbackColor?: string): void {
+    const [c, ctx] = this.createCanvas(w, h);
+    this.cache.set(key, c);
+
+    // Immediate fallback using standard Path2D
+    if (fallbackPath) {
+      ctx.save();
+      ctx.fillStyle = fallbackColor || '#ffffff';
+      ctx.scale(w / 24, h / 24);
+      ctx.fill(new Path2D(fallbackPath));
+      ctx.restore();
+    }
+
+    // Load authentic vector SVG directly from downloaded asset
+    const img = new Image();
+    img.src = svgPath;
+    img.onload = () => {
+      ctx.clearRect(0, 0, w, h);
+      const pad = 1;
+      ctx.drawImage(img, pad, pad, w - pad * 2, h - pad * 2);
+    };
   }
 }

@@ -47,7 +47,7 @@ export class EnemyManager {
       case 'GPT6_SOL':
         width = 44; height = 44; hp = 12; points = 1200; color = '#fbbf24'; break;
       case 'MINI_CLONE':
-        width = 10; height = 10; hp = 1; points = 20; color = '#ef4444'; break;
+        width = 10; height = 10; hp = 1; points = 20; color = '#ffffff'; break;
     }
 
     if (customHp !== undefined) hp = customHp;

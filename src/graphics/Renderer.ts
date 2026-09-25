@@ -254,8 +254,10 @@ export class ArcadeRenderer {
         ctx.save();
         ctx.translate(e.x, e.y);
 
-        // Subtle rotation matching velocity
-        if (Math.abs(e.vx) > 0.3) {
+        // Rotating authentic white Sparoid bullet or bank tilt for crafts
+        if (e.type === 'MINI_CLONE') {
+          ctx.rotate(e.age * 0.22);
+        } else if (Math.abs(e.vx) > 0.3) {
           ctx.rotate(e.vx * 0.08);
         }
 
@@ -381,18 +383,23 @@ export class ArcadeRenderer {
       if (terraSprite) ctx.drawImage(terraSprite, 52, -42, 28, 28);
       if (solSprite) ctx.drawImage(solSprite, -18, 24, 36, 36);
 
-      // Pulsating ASTRA Central Core
-      const corePulse = 22 + Math.sin(boss.timer * 0.1) * 3;
-      ctx.fillStyle = '#ffffff';
+      // Pulsating ASTRA Central Core (Featuring official Astra OpenAI knot)
+      const corePulse = 24 + Math.sin(boss.timer * 0.1) * 3;
+      ctx.fillStyle = '#0f172a';
       ctx.beginPath();
-      ctx.arc(0, 0, corePulse, 0, Math.PI * 2);
+      ctx.arc(0, 0, corePulse + 4, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.strokeStyle = '#a855f7';
-      ctx.lineWidth = 4;
+      ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.arc(0, 0, corePulse + 4, 0, Math.PI * 2);
       ctx.stroke();
+
+      const astraSprite = this.sprites.get('GPT6_ASTRA');
+      if (astraSprite) {
+        ctx.drawImage(astraSprite, -24, -24, 48, 48);
+      }
     }
 
     // Weak Point Reticles & HP
