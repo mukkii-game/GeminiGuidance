@@ -11,6 +11,7 @@ import { GeminiOrbManager } from '../entities/GeminiOrb';
 import { EnemyManager } from '../entities/Enemy';
 import { GroundTargetManager } from '../entities/GroundTarget';
 import { BossManager } from '../entities/Boss';
+import { BreakoutManager } from '../entities/BreakoutManager';
 import { StageManager } from '../stages/StageData';
 import { TerrainEngine } from '../graphics/Terrain';
 import { SpriteSheet } from '../graphics/Sprites';
@@ -37,7 +38,11 @@ export class Game {
   private enemyManager: EnemyManager;
   private groundManager: GroundTargetManager;
   private bossManager: BossManager;
+  private breakoutManager: BreakoutManager;
   private stageManager: StageManager;
+
+  private stage1InvadersSpawned: boolean = false;
+  private stage1BossTriggered: boolean = false;
 
   private geminiItems: GeminiDropItem[] = [];
   private enemyBullets: EnemyBullet[] = [];
@@ -65,6 +70,7 @@ export class Game {
     this.enemyManager = new EnemyManager();
     this.groundManager = new GroundTargetManager();
     this.bossManager = new BossManager();
+    this.breakoutManager = new BreakoutManager();
     this.stageManager = new StageManager();
 
     this.setupAudioAndCrtControls();
@@ -113,12 +119,15 @@ export class Game {
     this.enemyManager.clear();
     this.groundManager.clear();
     this.bossManager.clear();
+    this.breakoutManager.clear();
     this.geminiItems = [];
     this.enemyBullets = [];
     this.particles = [];
     this.explosions = [];
     this.floatingTexts = [];
     this.elonIntroTimer = 0;
+    this.stage1InvadersSpawned = false;
+    this.stage1BossTriggered = false;
 
     this.terrain.setStage(1);
     this.stageManager.loadStage(1);
@@ -126,8 +135,8 @@ export class Game {
     // Initial starter Gemini orb
     this.geminiManager.spawn(this.player.state.x, this.player.state.y - 70);
 
-    // Speak stage 1 title
-    this.voice.speak(this.stageManager.getStageTitle(1));
+    // Speak stage 1 title (No 一面 prefix)
+    this.voice.playStageTitle(1);
   }
 
   private advanceStage(): void {
@@ -144,8 +153,11 @@ export class Game {
     this.enemyManager.clear();
     this.groundManager.clear();
     this.bossManager.clear();
+    this.breakoutManager.clear();
     this.geminiItems = [];
     this.enemyBullets = [];
+    this.stage1InvadersSpawned = false;
+    this.stage1BossTriggered = false;
 
     this.terrain.setStage(this.stage);
     this.stageManager.loadStage(this.stage);
@@ -160,11 +172,11 @@ export class Game {
     if (this.stage === 2) {
       this.elonIntroTimer = 220;
       setTimeout(() => {
-        this.voice.speak('わしは、うちゅうのていおう、イーロン。', 0.92, 0.82);
+        this.voice.playElonIntro();
       }, 400);
     } else {
       this.elonIntroTimer = 0;
-      this.voice.speak(this.stageManager.getStageTitle(this.stage));
+      this.voice.playStageTitle(this.stage);
     }
   }
 
@@ -370,19 +382,63 @@ export class Game {
       } else if (ev.type === 'GROUND' && ev.groundType) {
         const targetWorldY = -scrollY - 40;
         this.groundManager.spawn(ev.groundType, ev.x ?? 180, targetWorldY);
+      } else if (ev.type === 'INVADER_GRID') {
+        this.enemyManager.spawnInvaderGrid(this.canvas.width);
+        this.stage1InvadersSpawned = true;
+        this.addFloatingText(this.canvas.width / 2, 160, 'SPACE INVADERS DETECTED!', '#38bdf8');
+      } else if (ev.type === 'UFO') {
+        this.enemyManager.spawnDeepSeekUfo(this.canvas.width, Math.random() > 0.5);
+        this.addFloatingText(this.canvas.width / 2, 45, 'DEEPSEEK UFO DETECTED!', '#4D6BFE');
+      } else if (ev.type === 'BREAKOUT_WALL') {
+        this.breakoutManager.setupStage2Wall(this.canvas.width);
+        this.addFloatingText(this.canvas.width / 2, 110, 'BLOCK BREAKER! PUNCH THROUGH!', '#fde047');
       } else if (ev.type === 'ALERT') {
         this.audio.playBossAlert();
-        this.audio.playBossBgm();
+        this.audio.playBossBgm(this.stage);
         this.addFloatingText(this.canvas.width / 2, 140, 'WARNING: BOSS APPROACHING', '#ef4444');
       } else if (ev.type === 'BOSS' && ev.bossType) {
-        const boss = this.bossManager.spawn(ev.bossType, this.canvas.width);
-        this.voice.speak(boss.dialogueQuote);
+        this.bossManager.spawn(ev.bossType, this.canvas.width);
+        this.voice.playBossVoice(this.stage);
+      }
+    }
+
+    // Auto-trigger Stage 1 Boss as soon as all Space Invaders are eliminated!
+    if (this.stage === 1 && this.stage1InvadersSpawned && !this.stage1BossTriggered) {
+      const activeInvaders = this.enemyManager.enemies.filter(e => e.pattern === 'INVADER');
+      if (activeInvaders.length === 0) {
+        this.stage1BossTriggered = true;
+        this.audio.playBossAlert();
+        this.audio.playBossBgm(1); // High octane rock battle theme!
+        this.bossManager.spawn('STAGE1_DEEPSEEK_KIMI', this.canvas.width);
+        this.voice.playBossVoice(1);
+        this.addFloatingText(this.canvas.width / 2, 140, 'INVADERS WIPED! BOSS ATTACK', '#ef4444');
       }
     }
   }
 
   // --- Collision Detections ---
   private handleCollisions(): void {
+    // 0. Breakout Blocks Collision (Stage 2)
+    if (this.stage === 2 && this.breakoutManager.blocks.length > 0) {
+      for (const orb of this.geminiManager.orbs) {
+        const res = this.breakoutManager.checkGeminiCollision(orb);
+        if (res.hit && res.block) {
+          if (res.broken) {
+            this.audio.playBlockBreak();
+            this.addExplosion(res.hitX, res.hitY, 14, false);
+            this.player.addScore(res.points);
+            this.addFloatingText(res.hitX, res.hitY - 10, `+${res.points}`, '#fde047');
+            if (Math.random() < 0.15) {
+              this.spawnGeminiDropItem(res.hitX, res.hitY);
+            }
+          } else {
+            this.audio.playBlockHit();
+            this.addExplosion(res.hitX, res.hitY, 8, false);
+          }
+        }
+      }
+    }
+
     // 1. Gemini Orbs vs Enemy Bullets (たまはジェミニでけせる！ジェミニは止まらない！)
     for (const orb of this.geminiManager.orbs) {
       for (let bi = this.enemyBullets.length - 1; bi >= 0; bi--) {
@@ -648,6 +704,7 @@ export class Game {
       this.enemyManager.enemies,
       visibleGround,
       this.bossManager.currentBoss,
+      this.breakoutManager.blocks,
       this.particles,
       this.explosions,
       this.floatingTexts,

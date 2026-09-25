@@ -91,8 +91,20 @@ export class SoundEngine {
     this.switchBgm(bgmType, trackUrl, 0.16); // Gentle background volume
   }
 
-  public playBossBgm(): void {
-    this.switchBgm('BOSS', './sounds/maou_boss_8bit29.mp3', 0.18);
+  public playBossBgm(stage: number = 1): void {
+    // Epic high-octane rock/metal tracks from 魔王魂 (ネオロック81 狙撃手の葛藤 / ネオロック83 厳戒態勢)
+    const trackUrl = stage === 2 ? './sounds/maou_neorock83.mp3' : './sounds/maou_neorock81.mp3';
+    this.switchBgm('BOSS', trackUrl, 0.24);
+  }
+
+  /** Breakout block bounce/impact */
+  public playBlockHit(): void {
+    this.playBuffer('cursor', 0.8, 1.5, 30);
+  }
+
+  /** Breakout block shattered */
+  public playBlockBreak(): void {
+    this.playBuffer('armor_hit', 0.85, 1.3, 30);
   }
 
   private switchBgm(type: 'STAGE_A' | 'STAGE_B' | 'BOSS', url: string, volume: number): void {

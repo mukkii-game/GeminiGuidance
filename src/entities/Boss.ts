@@ -15,8 +15,8 @@ export class BossManager {
 
     switch (type) {
       case 'STAGE1_DEEPSEEK_KIMI':
-        stageTitle = '一面：チャイナ・シンドローム';
-        dialogueQuote = '雷雲旋風拳！(サンダークラウド・フォーメーション！)';
+        stageTitle = 'チャイナ・シンドローム';
+        dialogueQuote = '雷雲旋風拳！ サンダークラウド……フォーメーション！';
         name = 'DEEPSEEK, KIMI & QWEN : THUNDER CLOUD FORMATION';
         width = 140;
         height = 80;
@@ -30,8 +30,8 @@ export class BossManager {
         break;
 
       case 'STAGE2_GROK_CURSOR':
-        stageTitle = '２面：イーロンズ・ゲート';
-        dialogueQuote = 'スペースX(エックス）！';
+        stageTitle = 'イーロンズ・ゲート';
+        dialogueQuote = 'スペース・エックス！';
         name = 'GROK 4.7 : SPACEX HEAVY STARSHIP FLEET';
         width = 160;
         height = 80;
@@ -45,7 +45,7 @@ export class BossManager {
         break;
 
       case 'STAGE3_CLAUDE_FABLE':
-        stageTitle = '３面：ザ・ファブル';
+        stageTitle = 'ザ・ファブル';
         dialogueQuote = 'ファブル—— お前らが勝手にそう呼んでるだけだ—— 俺は、ただコーディングするだけの——プロだ！';
         name = 'CLAUDE FABLE : APEX CODE PRO';
         width = 160;
@@ -61,7 +61,7 @@ export class BossManager {
         break;
 
       case 'STAGE4_GPT6_ASTRA':
-        stageTitle = '４面：魔法使いチャッピー';
+        stageTitle = '魔法使いチャッピー';
         dialogueQuote = 'アブラマハリクマハリタカブラ！';
         name = 'GPT-6 ASTRA : WIZARD CHAPPY';
         width = 200;
@@ -158,20 +158,20 @@ export class BossManager {
         b.weakPoints[2].yOffset = 20;
 
         if (cycle === 145 && onBossShout) {
-          onBossShout('サンダークラウド・フォーメーション！');
+          onBossShout('雷雲旋風拳！ サンダークラウド……フォーメーション！');
         }
       }
 
-    // --- STAGE 2: Elon's Gate (スペースX！) ---
+    // --- STAGE 2: Elon's Gate (スペース・エックス！) ---
     } else if (b.type === 'STAGE2_GROK_CURSOR') {
       // Grok sits majestically at the top
       b.x = canvasWidth / 2 + Math.sin(b.timer * 0.012) * 35;
       b.y = b.targetY + Math.cos(b.timer * 0.015) * 8;
 
-      // Periodically shout "スペースX！" and launch rocket fleet from bottom!
+      // Periodically shout "スペース・エックス！" and launch rocket fleet from bottom!
       if (b.timer % 240 === 60) {
         if (onBossShout) {
-          onBossShout('スペースX！');
+          onBossShout('スペース・エックス！');
         }
         b.quoteTimer = 160;
         if (onSpawnRocketFleet) {

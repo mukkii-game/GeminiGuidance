@@ -83,7 +83,9 @@ export type MovementPattern =
   | 'ZOSHI_REACTIVE_SWOOP'
   | 'GALAGA_LOOP'
   | 'SPAROID_CRUISE'
-  | 'ROCKET_ASCENT';
+  | 'ROCKET_ASCENT'
+  | 'INVADER'
+  | 'UFO_FLYBY';
 
 export interface EnemyEntity {
   id: string;
@@ -191,4 +193,17 @@ export interface FloatingText {
   color: string;
   timer: number;
   duration: number;
+}
+
+export interface BreakoutBlock {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  hp: number;
+  maxHp: number;
+  color: string;
+  points: number;
+  active: boolean;
 }

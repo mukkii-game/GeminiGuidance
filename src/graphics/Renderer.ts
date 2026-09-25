@@ -6,6 +6,7 @@ import {
   EnemyEntity,
   GroundEntity,
   BossEntity,
+  BreakoutBlock,
   ParticleEffect,
   ExplosionEffect,
   FloatingText,
@@ -55,6 +56,7 @@ export class ArcadeRenderer {
     enemies: EnemyEntity[],
     groundTargets: Array<{ entity: GroundEntity; screenY: number }>,
     boss: BossEntity | null,
+    blocks: BreakoutBlock[],
     particles: ParticleEffect[],
     explosions: ExplosionEffect[],
     floatingTexts: FloatingText[],
@@ -69,6 +71,11 @@ export class ArcadeRenderer {
 
     // 2. Draw Ground Bases (Nvidia, Meta, HuggingFace, Stability AI octagons)
     this.renderGroundTargets(groundTargets);
+
+    // 2.5 Draw Breakout Blocks (Stage 2)
+    if (blocks && blocks.length > 0) {
+      this.renderBreakoutBlocks(blocks);
+    }
 
     // 3. Draw Boss (if active)
     if (boss && !boss.defeated) {
@@ -137,6 +144,37 @@ export class ArcadeRenderer {
         ctx.drawImage(sprite, -sprite.width / 2, -sprite.height / 2);
         ctx.restore();
       }
+    }
+  }
+
+  // --- Stage 2 Breakout Blocks (Arkanoid Wall) ---
+  private renderBreakoutBlocks(blocks: BreakoutBlock[]): void {
+    const ctx = this.ctx;
+    for (const b of blocks) {
+      if (!b.active) continue;
+
+      const x = b.x - b.width / 2;
+      const y = b.y - b.height / 2;
+      const w = b.width;
+      const h = b.height;
+
+      // Base brick color
+      ctx.fillStyle = b.color;
+      ctx.fillRect(x, y, w, h);
+
+      // Top & Left 3D bevel highlight
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.fillRect(x, y, w, 2);
+      ctx.fillRect(x, y, 2, h);
+
+      // Bottom & Right 3D bevel shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+      ctx.fillRect(x, y + h - 2, w, 2);
+      ctx.fillRect(x + w - 2, y, 2, h);
+
+      // Horizontal glossy sheen
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.fillRect(x + 3, y + 3, w - 6, 2);
     }
   }
 
@@ -581,10 +619,10 @@ export class ArcadeRenderer {
     const w = this.canvas.width;
 
     const titles: Record<number, string> = {
-      1: '一面：チャイナ・シンドローム',
-      2: '２面：イーロンズ・ゲート',
-      3: '３面：ザ・ファブル',
-      4: '４面：魔法使いチャッピー',
+      1: 'STAGE 1: チャイナ・シンドローム',
+      2: 'STAGE 2: イーロンズ・ゲート',
+      3: 'STAGE 3: ザ・ファブル',
+      4: 'STAGE 4: 魔法使いチャッピー',
     };
 
     const title = titles[stage] || `STAGE ${stage}`;
@@ -765,15 +803,15 @@ export class ArcadeRenderer {
       // 4. Instructions / Rules (Reflecting Latest Mechanics)
       ctx.font = '10px "DotGothic16", monospace';
       ctx.fillStyle = '#22c55e';
-      ctx.fillText('★ ジェミニは自機に当たっても安全！', w / 2, 272);
-      ctx.fillStyle = '#e2e8f0';
-      ctx.fillText('編隊を倒すとGeminiロゴが出現！ゆっくり落下', w / 2, 290);
+      ctx.fillText('★ １面: インベーダー！ M字ロゴ軍団＆クジラUFO出現', w / 2, 272);
       ctx.fillStyle = '#38bdf8';
-      ctx.fillText('自機で取れば【追加】/ ジェミニで叩けば【強化】！', w / 2, 308);
+      ctx.fillText('★ ２面: ブロック崩し！ 穴を開けて奥の帝王を猛攻！', w / 2, 290);
       ctx.fillStyle = '#fef08a';
-      ctx.fillText('倒せない敵は跳ね返り、倒した時はそのまま貫通！', w / 2, 326);
+      ctx.fillText('敵を倒せなかった時は跳ね返り、倒した時はそのまま貫通！', w / 2, 308);
       ctx.fillStyle = '#ec4899';
-      ctx.fillText('敵の白弾はジェミニで消滅！ジェミニは止まらない！', w / 2, 344);
+      ctx.fillText('敵の白弾はジェミニで消滅！編隊全滅でジェミニ出現！', w / 2, 326);
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillText('自機で取れば【追加】/ ジェミニで叩けば【強化】！', w / 2, 344);
 
       // Separator Line
       ctx.strokeStyle = '#1e293b';
