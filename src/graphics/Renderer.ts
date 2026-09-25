@@ -18,6 +18,8 @@ export class ArcadeRenderer {
   private ctx: CanvasRenderingContext2D;
   private sprites: SpriteSheet;
   private terrain: TerrainEngine;
+  private titleLogoImg: HTMLImageElement;
+  private titleLogoLoaded: boolean = false;
 
   constructor(canvas: HTMLCanvasElement, sprites: SpriteSheet, terrain: TerrainEngine) {
     this.canvas = canvas;
@@ -25,6 +27,12 @@ export class ArcadeRenderer {
     this.ctx.imageSmoothingEnabled = false;
     this.sprites = sprites;
     this.terrain = terrain;
+
+    this.titleLogoImg = new Image();
+    this.titleLogoImg.src = './assets/title_logo.jpg';
+    this.titleLogoImg.onload = () => {
+      this.titleLogoLoaded = true;
+    };
   }
 
   public render(
@@ -163,6 +171,18 @@ export class ArcadeRenderer {
   // --- Gemini Orbs & Tether Chains (ジェミニ誘導) ---
   private renderGeminiOrbs(orbs: GeminiOrb[], playerX: number, playerY: number): void {
     const ctx = this.ctx;
+
+    // Celestial Orbit Guide (Like the Moon's orbital path around Earth)
+    if (orbs.length > 0) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.18)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 6]);
+      ctx.beginPath();
+      ctx.arc(playerX, playerY, 52, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     for (const orb of orbs) {
       // 1. Radiant Energy Tether (Connecting Solvalou to the Gemini Orb)
@@ -522,38 +542,93 @@ export class ArcadeRenderer {
 
     if (state === 'TITLE') {
       // Arcade Title Screen (Attract Mode)
-      ctx.fillStyle = 'rgba(4, 7, 12, 0.75)';
+      ctx.fillStyle = 'rgba(4, 7, 12, 0.88)';
       ctx.fillRect(0, 0, w, h);
 
-      // Title
-      ctx.font = '16px "Press Start 2P", monospace';
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#38bdf8';
-      ctx.fillText('GEMINI', w / 2, h * 0.28);
-      ctx.fillStyle = '#c084fc';
-      ctx.fillText('GUIDANCE', w / 2, h * 0.35);
+      // 1. Marquee Banner Image from Nano Banana
+      if (this.titleLogoLoaded && this.titleLogoImg.complete) {
+        const logoW = 320;
+        const logoH = 178;
+        const logoX = (w - logoW) / 2;
+        const logoY = 14;
 
-      // Japanese Subtitle
-      ctx.font = '12px "DotGothic16", monospace';
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText('ジェミニ誘導 - 1983 RETRO STG', w / 2, h * 0.42);
+        // Glowing border frame
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(logoX - 1, logoY - 1, logoW + 2, logoH + 2);
 
-      // Start Prompt (Blinking)
-      if (Math.floor(stageTick / 25) % 2 === 0) {
-        ctx.font = '9px "Press Start 2P", monospace';
-        ctx.fillStyle = '#fef08a';
-        ctx.fillText('TOUCH / CLICK TO START', w / 2, h * 0.58);
+        ctx.drawImage(this.titleLogoImg, logoX, logoY, logoW, logoH);
+      } else {
+        // Fallback title text if image is loading
+        ctx.font = '16px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillText('GEMINI', w / 2, 70);
+        ctx.fillStyle = '#c084fc';
+        ctx.fillText('GUIDANCE', w / 2, 95);
+        ctx.font = '16px "DotGothic16", monospace';
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillText('【 ジェミニ誘導 】', w / 2, 130);
       }
 
-      // Attract info & credits
-      ctx.font = '7px "Press Start 2P", monospace';
+      // 2. Subtitle / Version
+      ctx.textAlign = 'center';
+      ctx.font = '14px "DotGothic16", monospace';
+      ctx.fillStyle = '#67e8f9';
+      ctx.fillText('【 ジェミニ誘導 】', w / 2, 208);
+      ctx.font = '8px "Press Start 2P", monospace';
       ctx.fillStyle = '#94a3b8';
-      ctx.fillText('NO AIR BULLETS! BOMB GROUND', w / 2, h * 0.68);
-      ctx.fillText('TO RELEASE GEMINI ORBS', w / 2, h * 0.73);
-      ctx.fillText('SLING & MERGE ORBS TO WIN!', w / 2, h * 0.78);
+      ctx.fillText('- 1983 NAMCO STYLE STG -', w / 2, 224);
 
+      // 3. Start Prompt (Blinking)
+      if (Math.floor(stageTick / 22) % 2 === 0) {
+        ctx.font = '10px "Press Start 2P", monospace';
+        ctx.fillStyle = '#fde047';
+        ctx.fillText('TOUCH / CLICK TO START', w / 2, 252);
+      } else {
+        ctx.font = '10px "Press Start 2P", monospace';
+        ctx.fillStyle = '#854d0e';
+        ctx.fillText('INSERT COIN / START', w / 2, 252);
+      }
+
+      // 4. Instructions / Rules
+      ctx.font = '11px "DotGothic16", monospace';
+      ctx.fillStyle = '#f87171';
+      ctx.fillText('▼ 自機に対空ショットはありません！', w / 2, 280);
+      ctx.fillStyle = '#e2e8f0';
+      ctx.fillText('地上の生成AIコアを爆撃してジェミニを解放', w / 2, 300);
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillText('ジェミニは月のように自機周囲を公転！', w / 2, 320);
+      ctx.fillStyle = '#fef08a';
+      ctx.fillText('自機を振ってスイング攻撃＆合体で巨大化！', w / 2, 340);
+
+      // Separator Line
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(20, 362);
+      ctx.lineTo(w - 20, 362);
+      ctx.stroke();
+
+      // 5. Asset Attribution (Required by User)
+      ctx.font = '10px "DotGothic16", monospace';
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillText('【 アセット・素材提供クレジット 】', w / 2, 380);
+
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillText('■ 効果音: 効果音ラボ (soundeffect-lab.info)', w / 2, 402);
+      ctx.fillText('■ メインロゴ: NANO BANANA (ImageFX / Imagen)', w / 2, 422);
+      ctx.fillText('■ 敵対勢力: GenAI Official Logos (2026)', w / 2, 442);
+
+      // Controls guide
+      ctx.fillStyle = '#64748b';
+      ctx.fillText('📱 1本指ドラッグで移動・旋回 / 照準で自動投下', w / 2, 472);
+      ctx.fillText('💻 PC: マウス/WASD移動 [Space]ブラスター投下', w / 2, 492);
+
+      // Copyright
+      ctx.font = '8px "Press Start 2P", monospace';
       ctx.fillStyle = '#ef4444';
-      ctx.fillText('(C) 2026 MUKKII ARCADE SYSTEM', w / 2, h * 0.90);
+      ctx.fillText('(C) 2026 MUKKII ARCADE SYSTEM', w / 2, 522);
 
     } else if (state === 'STAGE_CLEAR') {
       ctx.font = '14px "Press Start 2P", monospace';

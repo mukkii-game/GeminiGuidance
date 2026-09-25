@@ -46,7 +46,7 @@ export class Player {
     const prevX = this.state.x;
     const prevY = this.state.y;
 
-    const lerpFactor = 0.35;
+    const lerpFactor = 0.24;
     this.state.x += (targetX - this.state.x) * lerpFactor;
     this.state.y += (targetY - this.state.y) * lerpFactor;
 
@@ -104,7 +104,7 @@ export class Player {
   private updateBombs(): void {
     for (let i = this.bombs.length - 1; i >= 0; i--) {
       const b = this.bombs[i];
-      b.progress += 0.055; // Bomb air flight time ~18 frames
+      b.progress += 0.038; // Deliberate parabolic bomb drop
       if (b.progress >= 1.0) {
         b.progress = 1.0;
         b.exploded = true;

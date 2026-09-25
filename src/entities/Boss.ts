@@ -91,21 +91,21 @@ export class BossManager {
 
     // Entrance flight
     if (b.y < b.targetY) {
-      b.y += 1.2;
+      b.y += 0.55;
     } else {
       // Hover oscillation & tactical maneuvers
-      b.x = canvasWidth / 2 + Math.sin(b.timer * 0.03) * 60;
-      b.y = b.targetY + Math.cos(b.timer * 0.04) * 15;
+      b.x = canvasWidth / 2 + Math.sin(b.timer * 0.015) * 55;
+      b.y = b.targetY + Math.cos(b.timer * 0.02) * 12;
 
       // Boss projectile fire: emits small mini-clone drones destructible by Gemini
-      if (onSpawnBullet && b.timer % 70 === 0) {
+      if (onSpawnBullet && b.timer % 95 === 0) {
         // Fire mini-clones from active weak points
         for (const wp of b.weakPoints) {
           if (wp.active) {
             const bx = b.x + wp.xOffset;
             const by = b.y + wp.yOffset;
-            const spread = (Math.random() - 0.5) * 1.5;
-            onSpawnBullet(bx, by, spread, 2.2);
+            const spread = (Math.random() - 0.5) * 1.0;
+            onSpawnBullet(bx, by, spread, 1.1);
           }
         }
       }

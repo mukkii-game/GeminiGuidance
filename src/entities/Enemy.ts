@@ -58,7 +58,7 @@ export class EnemyManager {
       x,
       y,
       vx: 0,
-      vy: 2.0,
+      vy: 0.9,
       width,
       height,
       hp,
@@ -68,7 +68,7 @@ export class EnemyManager {
       points,
       color,
       angle: 0,
-      shootCooldown: 90 + Math.floor(Math.random() * 60),
+      shootCooldown: 120 + Math.floor(Math.random() * 80),
     };
 
     this.enemies.push(enemy);
@@ -92,15 +92,15 @@ export class EnemyManager {
       e.x += e.vx;
       e.y += e.vy;
 
-      // Enemy mini-clone projectile firing (low frequency, destructible by Gemini)
+      // Enemy mini-clone projectile firing (calm speed, destructible by Gemini)
       if (e.type !== 'MINI_CLONE' && onSpawnBullet) {
         e.shootCooldown--;
         if (e.shootCooldown <= 0 && e.y > 40 && e.y < canvasHeight - 120) {
-          e.shootCooldown = 140 + Math.floor(Math.random() * 80);
+          e.shootCooldown = 180 + Math.floor(Math.random() * 90);
           const bdx = playerX - e.x;
           const bdy = playerY - e.y;
           const bdist = Math.hypot(bdx, bdy) || 1;
-          const bspeed = 2.2;
+          const bspeed = 1.1; // Slow, readable bullet
           onSpawnBullet(e.x, e.y, (bdx / bdist) * bspeed, (bdy / bdist) * bspeed);
         }
       }
@@ -117,66 +117,63 @@ export class EnemyManager {
 
     switch (e.pattern) {
       case 'S_CURVE_LEFT': {
-        e.vx = Math.sin(t * 0.06) * 3.2;
-        e.vy = 2.4;
+        e.vx = Math.sin(t * 0.035) * 1.5;
+        e.vy = 0.95;
         break;
       }
       case 'S_CURVE_RIGHT': {
-        e.vx = -Math.sin(t * 0.06) * 3.2;
-        e.vy = 2.4;
+        e.vx = -Math.sin(t * 0.035) * 1.5;
+        e.vy = 0.95;
         break;
       }
       case 'SWOOP_DIVE': {
-        if (t < 40) {
-          e.vy = 3.5;
-          e.vx = Math.sin(t * 0.1) * 2;
-        } else if (t < 80) {
-          // Swoop loop
-          const angle = (t - 40) * 0.08;
-          e.vx = Math.cos(angle) * 4;
-          e.vy = Math.sin(angle) * 3.5;
+        if (t < 50) {
+          e.vy = 1.1;
+          e.vx = Math.sin(t * 0.05) * 1.1;
+        } else if (t < 110) {
+          const angle = (t - 50) * 0.05;
+          e.vx = Math.cos(angle) * 1.8;
+          e.vy = Math.sin(angle) * 1.2;
         } else {
-          e.vy = 2.8;
-          e.vx = (playerX - e.x) * 0.02;
+          e.vy = 0.9;
+          e.vx = (playerX - e.x) * 0.01;
         }
         break;
       }
       case 'PINCER_LEFT': {
-        e.vx = 2.8;
-        e.vy = 1.8 + Math.sin(t * 0.08) * 1.5;
+        e.vx = 1.3;
+        e.vy = 0.75 + Math.sin(t * 0.04) * 0.5;
         break;
       }
       case 'PINCER_RIGHT': {
-        e.vx = -2.8;
-        e.vy = 1.8 + Math.sin(t * 0.08) * 1.5;
+        e.vx = -1.3;
+        e.vy = 0.75 + Math.sin(t * 0.04) * 0.5;
         break;
       }
       case 'ZIG_ZAG': {
-        const period = 35;
-        e.vx = (Math.floor(t / period) % 2 === 0 ? 3.0 : -3.0);
-        e.vy = 2.0;
+        const period = 55;
+        e.vx = (Math.floor(t / period) % 2 === 0 ? 1.4 : -1.4);
+        e.vy = 0.85;
         break;
       }
       case 'TARGET_RAM': {
-        // Grok aggressive rush
-        if (t === 30) {
+        if (t === 40) {
           const dx = playerX - e.x;
           const dy = playerY - e.y;
           const dist = Math.hypot(dx, dy) || 1;
-          e.vx = (dx / dist) * 5.0;
-          e.vy = (dy / dist) * 5.0;
-        } else if (t < 30) {
-          e.vy = 1.5;
+          e.vx = (dx / dist) * 2.5;
+          e.vy = (dy / dist) * 2.5;
+        } else if (t < 40) {
+          e.vy = 0.7;
           e.vx = 0;
         }
         break;
       }
       case 'MINI_BULLET': {
-        // Continues with existing vx, vy
         break;
       }
       default: {
-        e.vy = 2.2;
+        e.vy = 0.9;
         break;
       }
     }

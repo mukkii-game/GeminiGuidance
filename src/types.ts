@@ -48,6 +48,8 @@ export interface GeminiOrb {
   level: number; // 1, 2, 3 (MAX)
   radius: number;
   damage: number;
+  orbitAngle: number;
+  orbitDist: number;
   trail: Array<{ x: number; y: number; alpha: number }>;
   fuseTimer: number; // for sparkling fusion effect
 }
