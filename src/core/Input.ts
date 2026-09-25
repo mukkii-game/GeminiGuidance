@@ -6,7 +6,6 @@ export class InputManager {
     y: 440,
     active: false,
     isTouch: false,
-    bombPressed: false,
     crtTogglePressed: false,
     audioTogglePressed: false,
   };
@@ -36,13 +35,8 @@ export class InputManager {
 
     this.canvas.addEventListener('mousedown', (e) => {
       if (e.button === 0) {
-        this.state.bombPressed = true;
         this.state.active = true;
       }
-    });
-
-    window.addEventListener('mouseup', () => {
-      this.state.bombPressed = false;
     });
 
     // Touch Events: Relative Delta Dragging (Ergonomic 1-finger control)
@@ -80,21 +74,11 @@ export class InputManager {
         this.lastTouchY = currentY;
       }
     }, { passive: false });
-
-    this.canvas.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      if (e.touches.length === 0) {
-        this.state.bombPressed = false;
-      }
-    }, { passive: false });
   }
 
   private setupKeyboard(): void {
     window.addEventListener('keydown', (e) => {
       this.keysDown.add(e.code);
-      if (e.code === 'Space' || e.code === 'KeyZ' || e.code === 'KeyJ') {
-        this.state.bombPressed = true;
-      }
       if (e.code === 'KeyC') {
         this.state.crtTogglePressed = true;
       }
@@ -105,9 +89,6 @@ export class InputManager {
 
     window.addEventListener('keyup', (e) => {
       this.keysDown.delete(e.code);
-      if (e.code === 'Space' || e.code === 'KeyZ' || e.code === 'KeyJ') {
-        this.state.bombPressed = false;
-      }
     });
   }
 
@@ -128,13 +109,13 @@ export class InputManager {
   }
 
   public consumeCrtToggle(): boolean {
-    const val = this.state.crtTogglePressed;
+    const val = !!this.state.crtTogglePressed;
     this.state.crtTogglePressed = false;
     return val;
   }
 
   public consumeAudioToggle(): boolean {
-    const val = this.state.audioTogglePressed;
+    const val = !!this.state.audioTogglePressed;
     this.state.audioTogglePressed = false;
     return val;
   }

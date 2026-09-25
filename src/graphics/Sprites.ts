@@ -36,18 +36,22 @@ export class SpriteSheet {
     // 3. Mini-Clone Sparoid (Xevious pure glowing white diamond bullet)
     this.createMiniClone();
 
-    // 4. Ground Targets (Arcade Pixel Art)
-    this.createBarrowRadar();
+    // 4. Ground Targets (Official AI Logos embedded in Xevious Bunker Fortresses)
+    this.createGroundLogoBase('NVIDIA_BASE', './assets/logos/nvidia.svg', '#76b900');
+    this.createGroundLogoBase('META_BASE', './assets/logos/meta.svg', '#0081fb');
+    this.createGroundLogoBase('HUGGINGFACE_BASE', './assets/logos/huggingface.svg', '#ffd21e');
+    this.createGroundLogoBase('STABILITY_BASE', './assets/logos/stability.svg', '#a855f7');
     this.createSolCitadel();
-    this.createServerRack();
-    this.createAIChip();
 
     // 5. Google Gemini Orbs (Official 4-point concave sparkle)
     this.createGeminiOrb('GEMINI_LV1', 1);
     this.createGeminiOrb('GEMINI_LV2', 2);
     this.createGeminiOrb('GEMINI_LV3', 3);
 
-    // 6. Official GenAI Enemy Logos (Strictly Official, No Creative Arrangement)
+    // 6. SpaceX Starship Rocket
+    this.createSpaceXRocket();
+
+    // 7. Official GenAI Enemy Logos (Strictly Official, No Creative Arrangement)
     this.loadOfficialLogos();
   }
 
@@ -235,32 +239,46 @@ export class SpriteSheet {
     this.cache.set('MINI_CLONE', c);
   }
 
-  // --- 4. Ground Targets (Arcade Pixel Art) ---
-  private createBarrowRadar(): void {
-    const [c, ctx] = this.createCanvas(32, 32);
-    // Gray octagon bunker
-    ctx.fillStyle = '#334155';
+  // --- 4. Ground Targets: Official GenAI Logos embedded in Xevious Octagon Bunkers ---
+  private createGroundLogoBase(key: string, svgPath: string, accentColor: string): void {
+    const size = 36;
+    const [c, ctx] = this.createCanvas(size, size);
+    this.cache.set(key, c);
+
+    // 1. Xevious Stone Octagon Bunker Foundation
+    ctx.fillStyle = '#1e293b';
     ctx.beginPath();
-    ctx.moveTo(10, 4); ctx.lineTo(22, 4);
-    ctx.lineTo(28, 10); ctx.lineTo(28, 22);
-    ctx.lineTo(22, 28); ctx.lineTo(10, 28);
-    ctx.lineTo(4, 22); ctx.lineTo(4, 10);
+    ctx.moveTo(11, 2); ctx.lineTo(25, 2);
+    ctx.lineTo(34, 11); ctx.lineTo(34, 25);
+    ctx.lineTo(25, 34); ctx.lineTo(11, 34);
+    ctx.lineTo(2, 25); ctx.lineTo(2, 11);
     ctx.closePath();
     ctx.fill();
 
-    ctx.fillStyle = '#64748b';
-    ctx.fillRect(8, 8, 16, 16);
+    ctx.fillStyle = '#334155';
+    ctx.beginPath();
+    ctx.moveTo(12, 4); ctx.lineTo(24, 4);
+    ctx.lineTo(32, 12); ctx.lineTo(32, 24);
+    ctx.lineTo(24, 32); ctx.lineTo(12, 32);
+    ctx.lineTo(4, 24); ctx.lineTo(4, 12);
+    ctx.closePath();
+    ctx.fill();
 
-    ctx.fillStyle = '#94a3b8';
-    ctx.fillRect(10, 10, 12, 12);
+    // Accent rim ring
+    ctx.strokeStyle = accentColor;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
 
-    // Blinking red central core
-    ctx.fillStyle = '#ef4444';
-    ctx.fillRect(13, 13, 6, 6);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(15, 15, 2, 2);
+    // Inner dark platform
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(8, 8, 20, 20);
 
-    this.cache.set('BARROW_RADAR', c);
+    // Draw the official GenAI logo on top of the bunker
+    const img = new Image();
+    img.src = svgPath;
+    img.onload = () => {
+      ctx.drawImage(img, 9, 9, 18, 18);
+    };
   }
 
   private createSolCitadel(): void {
@@ -281,48 +299,58 @@ export class SpriteSheet {
     this.cache.set('SOL_CITADEL', c);
   }
 
-  private createServerRack(): void {
-    const [c, ctx] = this.createCanvas(28, 32);
+  // --- 4.5. SpaceX Heavy Rocket ---
+  private createSpaceXRocket(): void {
+    const [c, ctx] = this.createCanvas(24, 76);
+    // Rocket fairing nose cone
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(12, 2);
+    ctx.lineTo(19, 16);
+    ctx.lineTo(5, 16);
+    ctx.closePath();
+    ctx.fill();
+
+    // Main fuselage cylinder
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(5, 16, 14, 46);
+
+    // Black interstage band
     ctx.fillStyle = '#0f172a';
-    ctx.fillRect(2, 2, 24, 28);
-    ctx.strokeStyle = '#38bdf8';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(2, 2, 24, 28);
+    ctx.fillRect(5, 34, 14, 5);
 
-    ctx.fillStyle = '#22c55e';
-    ctx.fillRect(5, 6, 3, 3);
-    ctx.fillRect(5, 12, 3, 3);
-    ctx.fillRect(5, 18, 3, 3);
+    // Grid fins
+    ctx.fillStyle = '#334155';
+    ctx.fillRect(1, 20, 4, 6);
+    ctx.fillRect(19, 20, 4, 6);
 
-    ctx.fillStyle = '#38bdf8';
-    ctx.fillRect(10, 6, 13, 2);
-    ctx.fillRect(10, 12, 13, 2);
-    ctx.fillRect(10, 18, 13, 2);
-
-    this.cache.set('SERVER_RACK', c);
-  }
-
-  private createAIChip(): void {
-    const [c, ctx] = this.createCanvas(28, 28);
+    // Base landing legs / fins
     ctx.fillStyle = '#1e293b';
-    ctx.fillRect(5, 5, 18, 18);
-    ctx.strokeStyle = '#f59e0b';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(5, 5, 18, 18);
+    ctx.fillRect(3, 54, 4, 10);
+    ctx.fillRect(17, 54, 4, 10);
 
-    // Gold connector pins
-    ctx.fillStyle = '#fbbf24';
-    for (let i = 0; i < 4; i++) {
-      ctx.fillRect(7 + i * 4, 2, 2, 3);
-      ctx.fillRect(7 + i * 4, 23, 2, 3);
-      ctx.fillRect(2, 7 + i * 4, 3, 2);
-      ctx.fillRect(23, 7 + i * 4, 3, 2);
-    }
+    // Rocket engine bells
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(7, 62, 10, 4);
 
-    ctx.fillStyle = '#38bdf8';
-    ctx.fillRect(10, 10, 8, 8);
+    // Thrust flame
+    ctx.fillStyle = '#f97316';
+    ctx.beginPath();
+    ctx.moveTo(8, 66);
+    ctx.lineTo(12, 75);
+    ctx.lineTo(16, 66);
+    ctx.closePath();
+    ctx.fill();
 
-    this.cache.set('AI_CHIP', c);
+    ctx.fillStyle = '#fef08a';
+    ctx.beginPath();
+    ctx.moveTo(9, 66);
+    ctx.lineTo(12, 72);
+    ctx.lineTo(15, 66);
+    ctx.closePath();
+    ctx.fill();
+
+    this.cache.set('SPACEX_ROCKET', c);
   }
 
   // --- 5. Gemini Orbs (Official 4-Point Concave Sparkle) ---

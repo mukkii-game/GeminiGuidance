@@ -6,11 +6,10 @@ export interface SpawnEvent {
   enemyType?: EnemyType;
   groundType?: GroundType;
   bossType?: BossType;
+  formationId?: string;
   x?: number;
   y?: number;
   pattern?: MovementPattern;
-  count?: number;
-  spacing?: number;
 }
 
 export class StageManager {
@@ -23,6 +22,16 @@ export class StageManager {
 
   constructor() {
     this.loadStage(1);
+  }
+
+  public getStageTitle(stage: number): string {
+    switch (stage) {
+      case 1: return '一面：チャイナ・シンドローム';
+      case 2: return '２面：イーロンズ・ゲート';
+      case 3: return '３面：ザ・ファブル';
+      case 4: return '４面：魔法使いチャッピー';
+      default: return `STAGE ${stage}`;
+    }
   }
 
   public loadStage(stage: number): void {
@@ -41,143 +50,143 @@ export class StageManager {
 
   private generateStageEvents(stage: number): SpawnEvent[] {
     const events: SpawnEvent[] = [];
+    let waveCounter = 0;
 
-    // Helper to spawn ground targets
+    // Helper to spawn ground bases (Namco Xevious octagon bunkers)
     const addGround = (tick: number, gtype: GroundType, x: number) => {
       events.push({ tick, type: 'GROUND', groundType: gtype, x });
     };
 
-    // Helper to spawn stream of enemies
-    const addStream = (startTick: number, etype: EnemyType, pattern: MovementPattern, count: number, startX: number) => {
-      for (let i = 0; i < count; i++) {
+    // Helper to spawn sparse, tactical enemy formations (Max 2-3 per wave, spaced across screen)
+    // Each wave has a unique formationId so destroying all members spawns a Gemini logo drop!
+    const addWave = (tick: number, etype: EnemyType, pattern: MovementPattern, positions: number[]) => {
+      const formationId = `wave_s${stage}_${++waveCounter}`;
+      positions.forEach((x, idx) => {
         events.push({
-          tick: startTick + i * 16,
+          tick: tick + idx * 30, // 30 frames apart so they never overlap
           type: 'ENEMY',
           enemyType: etype,
           pattern,
-          x: startX,
-          y: -20,
+          formationId,
+          x,
+          y: -30,
         });
-      }
+      });
     };
 
     if (stage === 1) {
-      // --- STAGE 1: China LLM & Open Source Frontier ---
-      // Ground targets: Server racks & Radar domes
-      addGround(20, 'BARROW', 90);
-      addGround(60, 'SERVER_RACK', 260);
-      addGround(140, 'AI_CHIP', 180);
-      addGround(220, 'SOL_CITADEL', 120); // Hidden citadel!
-      addGround(320, 'BARROW', 280);
+      // --- STAGE 1: チャイナ・シンドローム ---
+      addGround(30, 'NVIDIA_BASE', 90);
+      addGround(90, 'HUGGINGFACE_BASE', 270);
+      addGround(170, 'META_BASE', 180);
+      addGround(260, 'SOL_CITADEL', 120);
+      addGround(360, 'NVIDIA_BASE', 280);
 
-      // Wave 1: DeepSeek V4.1-Flash S-curves & Mistral Flame
-      addStream(40, 'DEEPSEEK_FLASH', 'S_CURVE_LEFT', 6, 80);
-      addStream(110, 'MISTRAL_FLAME', 'ZIG_ZAG', 5, 260);
-      addStream(180, 'DEEPSEEK_FLASH', 'S_CURVE_RIGHT', 6, 280);
+      // Wave 1: DeepSeek Toroid swoops (retreating loop)
+      addWave(40, 'DEEPSEEK_FLASH', 'TOROID_SWOOP', [70, 290]);
 
-      // Mid-Boss Phase: Kimi Moon Core Escort
-      events.push({ tick: 270, type: 'ENEMY', enemyType: 'KIMI_MOON', pattern: 'SWOOP_DIVE', x: 180, y: -20 });
-      events.push({ tick: 285, type: 'ENEMY', enemyType: 'QWEN_CUBE', pattern: 'PINCER_LEFT', x: 40, y: -20 });
-      events.push({ tick: 285, type: 'ENEMY', enemyType: 'QWEN_CUBE', pattern: 'PINCER_RIGHT', x: 320, y: -20 });
+      // Wave 2: Mistral Torkan reactive dash (tracks player X then dashes)
+      addWave(140, 'MISTRAL_FLAME', 'TORKAN_TRACK_DASH', [120, 240]);
 
-      // Ground targets during mid-stage
-      addGround(380, 'SERVER_RACK', 100);
-      addGround(440, 'SOL_CITADEL', 240);
-      addGround(520, 'AI_CHIP', 160);
+      // Wave 3: Qwen Cube Galaga loop
+      addWave(240, 'QWEN_CUBE', 'GALAGA_LOOP', [80, 280]);
 
-      // Wave 2: Fast cross pincer
-      addStream(480, 'DEEPSEEK_FLASH', 'PINCER_LEFT', 5, 30);
-      addStream(490, 'DEEPSEEK_FLASH', 'PINCER_RIGHT', 5, 330);
-      addStream(570, 'MISTRAL_FLAME', 'SWOOP_DIVE', 6, 180);
+      // Wave 4: Kimi Moon Zoshi reactive intercept
+      addWave(340, 'KIMI_MOON', 'ZOSHI_REACTIVE_SWOOP', [60, 300]);
 
-      // Boss Alert & Spawn
+      addGround(440, 'META_BASE', 100);
+      addGround(500, 'SOL_CITADEL', 240);
+      addGround(560, 'STABILITY_BASE', 180);
+
+      // Wave 5: Coordinated DeepSeek & Mistral pincer
+      addWave(480, 'DEEPSEEK_FLASH', 'TORKAN_TRACK_DASH', [90, 270]);
+      addWave(570, 'MISTRAL_FLAME', 'TOROID_SWOOP', [180]);
+
+      // Boss Alert & Spawn: China Syndrome (サンダークラウド・フォーメーション！)
       events.push({ tick: 660, type: 'ALERT' });
       events.push({ tick: 700, type: 'BOSS', bossType: 'STAGE1_DEEPSEEK_KIMI' });
 
     } else if (stage === 2) {
-      // --- STAGE 2: xAI & Dev Forge (Grok & Cursor) ---
-      addGround(30, 'BARROW', 180);
-      addGround(90, 'AI_CHIP', 70);
-      addGround(160, 'SOL_CITADEL', 290);
-      addGround(260, 'BARROW', 130);
+      // --- STAGE 2: イーロンズ・ゲート ---
+      // (Ticks 0-220: Stage intro with Polygon Elon Hologram Transmission)
+      addGround(230, 'META_BASE', 180);
+      addGround(290, 'NVIDIA_BASE', 80);
+      addGround(370, 'SOL_CITADEL', 290);
+      addGround(450, 'STABILITY_BASE', 140);
 
-      // Wave 1: Cursor Probe { } brackets and Copilot gliders
-      addStream(40, 'CURSOR_PROBE', 'S_CURVE_RIGHT', 5, 280);
-      addStream(120, 'COPILOT_GLIDER', 'SWOOP_DIVE', 6, 100);
-      addStream(200, 'CURSOR_PROBE', 'PINCER_LEFT', 5, 40);
+      // Wave 1: Cursor Probes reactive intercept
+      addWave(240, 'CURSOR_PROBE', 'ZOSHI_REACTIVE_SWOOP', [70, 290]);
 
-      // Mid-Boss: Grok Raider strike team
-      events.push({ tick: 280, type: 'ENEMY', enemyType: 'GROK_RAIDER', pattern: 'TARGET_RAM', x: 140, y: -20 });
-      events.push({ tick: 300, type: 'ENEMY', enemyType: 'GROK_RAIDER', pattern: 'TARGET_RAM', x: 220, y: -20 });
+      // Wave 2: Copilot Glider Galaga loops
+      addWave(340, 'COPILOT_GLIDER', 'GALAGA_LOOP', [110, 250]);
 
-      addGround(380, 'SERVER_RACK', 180);
-      addGround(450, 'SOL_CITADEL', 80);
+      // Wave 3: Grok Raiders Torkan dash
+      addWave(440, 'GROK_RAIDER', 'TORKAN_TRACK_DASH', [180]);
 
-      // Wave 2: Aggressive mixed dive
-      addStream(460, 'COPILOT_GLIDER', 'S_CURVE_LEFT', 6, 90);
-      addStream(520, 'CURSOR_PROBE', 'SWOOP_DIVE', 6, 260);
+      addGround(530, 'HUGGINGFACE_BASE', 180);
+      addGround(610, 'SOL_CITADEL', 90);
 
-      // Boss Alert & Spawn
-      events.push({ tick: 640, type: 'ALERT' });
-      events.push({ tick: 680, type: 'BOSS', bossType: 'STAGE2_GROK_CURSOR' });
+      // Wave 4: Cursor & Copilot mixed reactive sweep
+      addWave(540, 'CURSOR_PROBE', 'TOROID_SWOOP', [80, 280]);
+      addWave(630, 'COPILOT_GLIDER', 'TORKAN_TRACK_DASH', [140, 220]);
+
+      // Boss Alert & Spawn: Elon's Gate (Grok & SpaceX rockets!)
+      events.push({ tick: 740, type: 'ALERT' });
+      events.push({ tick: 780, type: 'BOSS', bossType: 'STAGE2_GROK_CURSOR' });
 
     } else if (stage === 3) {
-      // --- STAGE 3: Anthropic Alignment Citadel ---
+      // --- STAGE 3: ザ・ファブル ---
       addGround(30, 'SOL_CITADEL', 180);
-      addGround(100, 'AI_CHIP', 280);
-      addGround(180, 'BARROW', 80);
-      addGround(280, 'SOL_CITADEL', 140);
+      addGround(110, 'NVIDIA_BASE', 280);
+      addGround(190, 'META_BASE', 80);
+      addGround(290, 'SOL_CITADEL', 140);
 
-      // Wave 1: Claude Haiku agile scouts & Perplexity spinners
-      addStream(40, 'CLAUDE_HAIKU', 'S_CURVE_LEFT', 6, 80);
-      addStream(110, 'PERPLEXITY_SPINNER', 'SWOOP_DIVE', 5, 250);
-      addStream(180, 'CLAUDE_HAIKU', 'S_CURVE_RIGHT', 6, 290);
+      // Wave 1: Claude Haiku agile Toroid swoops
+      addWave(40, 'CLAUDE_HAIKU', 'TOROID_SWOOP', [70, 290]);
 
-      // Mid-Boss: Claude Opus Heavy Dreadnought & Sonnet Escorts
-      events.push({ tick: 270, type: 'ENEMY', enemyType: 'CLAUDE_OPUS', pattern: 'ZIG_ZAG', x: 180, y: -30 });
-      events.push({ tick: 300, type: 'ENEMY', enemyType: 'CLAUDE_SONNET', pattern: 'SWOOP_DIVE', x: 90, y: -20 });
-      events.push({ tick: 300, type: 'ENEMY', enemyType: 'CLAUDE_SONNET', pattern: 'SWOOP_DIVE', x: 270, y: -20 });
+      // Wave 2: Perplexity Spinners Galaga loops
+      addWave(140, 'PERPLEXITY_SPINNER', 'GALAGA_LOOP', [100, 260]);
 
-      addGround(390, 'SERVER_RACK', 220);
-      addGround(470, 'SOL_CITADEL', 290);
+      // Wave 3: Claude Sonnet reactive tracking dive
+      addWave(250, 'CLAUDE_SONNET', 'TORKAN_TRACK_DASH', [180]);
 
-      // Wave 2: Claude Sonnet formation sweep & Haiku fast pincer
-      addStream(480, 'CLAUDE_SONNET', 'PINCER_LEFT', 5, 40);
-      addStream(490, 'CLAUDE_SONNET', 'PINCER_RIGHT', 5, 320);
-      addStream(550, 'CLAUDE_HAIKU', 'SWOOP_DIVE', 6, 180);
+      addGround(400, 'HUGGINGFACE_BASE', 220);
+      addGround(480, 'SOL_CITADEL', 290);
 
-      // Boss Alert & Spawn: Claude Fable Apex Fortress!
+      // Wave 4: Claude Opus heavy cruiser & Haiku escorts
+      addWave(460, 'CLAUDE_OPUS', 'SPAROID_CRUISE', [180]);
+      addWave(530, 'CLAUDE_HAIKU', 'ZOSHI_REACTIVE_SWOOP', [60, 300]);
+
+      // Boss Alert & Spawn: The Fable (プロだ！)
       events.push({ tick: 650, type: 'ALERT' });
       events.push({ tick: 690, type: 'BOSS', bossType: 'STAGE3_CLAUDE_FABLE' });
 
     } else {
-      // --- STAGE 4: OpenAI GPT-6 Megastructure (Astra > Sol > Terra > Luna) ---
-      addGround(30, 'AI_CHIP', 180);
-      addGround(80, 'SERVER_RACK', 90);
-      addGround(160, 'SOL_CITADEL', 270);
-      addGround(240, 'AI_CHIP', 120);
+      // --- STAGE 4: 魔法使いチャッピー (OpenAI GPT-6 Fleet) ---
+      addGround(30, 'NVIDIA_BASE', 180);
+      addGround(90, 'META_BASE', 90);
+      addGround(170, 'SOL_CITADEL', 270);
+      addGround(250, 'STABILITY_BASE', 120);
 
-      // Wave 1: GPT-6 Luna high-speed crescent streams
-      addStream(30, 'GPT6_LUNA', 'S_CURVE_LEFT', 8, 70);
-      addStream(90, 'GPT6_LUNA', 'S_CURVE_RIGHT', 8, 290);
-      addStream(160, 'GPT6_LUNA', 'SWOOP_DIVE', 8, 180);
+      // Wave 1: GPT-6 Luna Toroid swoops
+      addWave(30, 'GPT6_LUNA', 'TOROID_SWOOP', [80, 280]);
 
-      // Mid-Boss: GPT-6 Terra heavy dreadnoughts + Sol Cruiser
-      events.push({ tick: 250, type: 'ENEMY', enemyType: 'GPT6_TERRA', pattern: 'ZIG_ZAG', x: 110, y: -30 });
-      events.push({ tick: 260, type: 'ENEMY', enemyType: 'GPT6_TERRA', pattern: 'ZIG_ZAG', x: 250, y: -30 });
-      events.push({ tick: 310, type: 'ENEMY', enemyType: 'GPT6_SOL', pattern: 'SWOOP_DIVE', x: 180, y: -40 });
+      // Wave 2: GPT-6 Luna Torkan track-dash
+      addWave(130, 'GPT6_LUNA', 'TORKAN_TRACK_DASH', [110, 250]);
+
+      // Wave 3: GPT-6 Terra heavy cruiser
+      addWave(240, 'GPT6_TERRA', 'SPAROID_CRUISE', [180]);
 
       addGround(380, 'SOL_CITADEL', 180);
-      addGround(450, 'SERVER_RACK', 280);
+      addGround(460, 'HUGGINGFACE_BASE', 280);
 
-      // Wave 2: Luna swarms with Terra escorts
-      addStream(460, 'GPT6_LUNA', 'PINCER_LEFT', 6, 40);
-      addStream(470, 'GPT6_LUNA', 'PINCER_RIGHT', 6, 320);
-      events.push({ tick: 530, type: 'ENEMY', enemyType: 'GPT6_TERRA', pattern: 'TARGET_RAM', x: 180, y: -30 });
+      // Wave 4: GPT-6 Sol & Luna escorts
+      addWave(450, 'GPT6_SOL', 'TORKAN_TRACK_DASH', [180]);
+      addWave(520, 'GPT6_LUNA', 'ZOSHI_REACTIVE_SWOOP', [70, 290]);
 
-      // Final Boss Alert & Spawn: GPT-6 Astra Andor Genesis
-      events.push({ tick: 660, type: 'ALERT' });
-      events.push({ tick: 700, type: 'BOSS', bossType: 'STAGE4_GPT6_ASTRA' });
+      // Final Boss Alert & Spawn: 魔法使いチャッピー (アブラマハリクマハリタカブラ！)
+      events.push({ tick: 650, type: 'ALERT' });
+      events.push({ tick: 690, type: 'BOSS', bossType: 'STAGE4_GPT6_ASTRA' });
     }
 
     return events;

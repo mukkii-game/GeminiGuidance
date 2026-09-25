@@ -3,6 +3,8 @@ import {
   ParticleEffect,
   ExplosionEffect,
   FloatingText,
+  GeminiDropItem,
+  EnemyBullet,
 } from '../types';
 import { Player } from '../entities/Player';
 import { GeminiOrbManager } from '../entities/GeminiOrb';
@@ -15,6 +17,7 @@ import { SpriteSheet } from '../graphics/Sprites';
 import { ArcadeRenderer } from '../graphics/Renderer';
 import { SoundEngine } from './Audio';
 import { InputManager } from './Input';
+import { VoiceManager } from './Voice';
 
 export class Game {
   public state: GameState = 'TITLE';
@@ -24,6 +27,7 @@ export class Game {
   private canvas: HTMLCanvasElement;
   private input: InputManager;
   private audio: SoundEngine;
+  private voice: VoiceManager;
   private sprites: SpriteSheet;
   private terrain: TerrainEngine;
   private renderer: ArcadeRenderer;
@@ -35,10 +39,15 @@ export class Game {
   private bossManager: BossManager;
   private stageManager: StageManager;
 
+  private geminiItems: GeminiDropItem[] = [];
+  private enemyBullets: EnemyBullet[] = [];
   private particles: ParticleEffect[] = [];
   private explosions: ExplosionEffect[] = [];
   private floatingTexts: FloatingText[] = [];
 
+  private itemCounter: number = 0;
+  private bulletCounter: number = 0;
+  private elonIntroTimer: number = 0;
   private stageClearTimer: number = 0;
   private playerRespawnTimer: number = 0;
 
@@ -46,6 +55,7 @@ export class Game {
     this.canvas = canvas;
     this.input = new InputManager(canvas);
     this.audio = new SoundEngine();
+    this.voice = new VoiceManager();
     this.sprites = new SpriteSheet();
     this.terrain = new TerrainEngine(canvas.width, canvas.height);
     this.renderer = new ArcadeRenderer(canvas, this.sprites, this.terrain);
@@ -89,9 +99,11 @@ export class Game {
 
   private startNewGame(): void {
     this.audio.resume();
+    this.audio.playStartFanfare();
     this.audio.startBgm();
 
     this.stage = 1;
+    this.stageTick = 0;
     this.state = 'PLAYING';
     this.player.reset(this.canvas.width / 2, this.canvas.height - 90);
     this.player.state.score = 0;
@@ -101,36 +113,58 @@ export class Game {
     this.enemyManager.clear();
     this.groundManager.clear();
     this.bossManager.clear();
+    this.geminiItems = [];
+    this.enemyBullets = [];
     this.particles = [];
     this.explosions = [];
     this.floatingTexts = [];
+    this.elonIntroTimer = 0;
 
     this.terrain.setStage(1);
     this.stageManager.loadStage(1);
 
-    // Initial starter Gemini orb so the player can immediately experience the flail!
-    this.geminiManager.spawn(this.player.state.x, this.player.state.y - 60);
+    // Initial starter Gemini orb
+    this.geminiManager.spawn(this.player.state.x, this.player.state.y - 70);
+
+    // Speak stage 1 title
+    this.voice.speak(this.stageManager.getStageTitle(1));
   }
 
   private advanceStage(): void {
     this.stage++;
     if (this.stage > 4) {
       this.state = 'GAME_CLEAR';
+      this.audio.stopBgm();
       return;
     }
 
     this.state = 'PLAYING';
+    this.stageTick = 0;
     this.stageClearTimer = 0;
     this.enemyManager.clear();
     this.groundManager.clear();
     this.bossManager.clear();
+    this.geminiItems = [];
+    this.enemyBullets = [];
 
     this.terrain.setStage(this.stage);
     this.stageManager.loadStage(this.stage);
+    this.audio.playStageBgm(this.stage);
 
-    // Keep active orbs into the next stage as a reward for building them up!
+    // Keep active orbs as power progression
     if (this.geminiManager.orbs.length === 0) {
-      this.geminiManager.spawn(this.player.state.x, this.player.state.y - 60);
+      this.geminiManager.spawn(this.player.state.x, this.player.state.y - 70);
+    }
+
+    // Stage 2 special: Emperor Elon polygon intro
+    if (this.stage === 2) {
+      this.elonIntroTimer = 220;
+      setTimeout(() => {
+        this.voice.speak('わしは、うちゅうのていおう、イーロン。', 0.92, 0.82);
+      }, 400);
+    } else {
+      this.elonIntroTimer = 0;
+      this.voice.speak(this.stageManager.getStageTitle(this.stage));
     }
   }
 
@@ -155,19 +189,9 @@ export class Game {
     }
 
     // State Dispatch
-    if (this.state === 'TITLE') {
-      if (this.input.state.active || this.input.state.bombPressed) {
+    if (this.state === 'TITLE' || this.state === 'GAME_OVER' || this.state === 'GAME_CLEAR') {
+      if (this.input.state.active) {
         this.input.state.active = false;
-        this.input.state.bombPressed = false;
-        this.startNewGame();
-      }
-      return;
-    }
-
-    if (this.state === 'GAME_OVER' || this.state === 'GAME_CLEAR') {
-      if (this.input.state.active || this.input.state.bombPressed) {
-        this.input.state.active = false;
-        this.input.state.bombPressed = false;
         this.startNewGame();
       }
       return;
@@ -188,6 +212,11 @@ export class Game {
     // --- PLAYING STATE ---
     this.terrain.update(dtFactor);
 
+    // Stage 2 Elon intro countdown
+    if (this.elonIntroTimer > 0) {
+      this.elonIntroTimer--;
+    }
+
     // Keyboard support
     this.input.updateKeyboardMovement();
 
@@ -201,9 +230,8 @@ export class Game {
         this.playerRespawnTimer = 0;
         if (this.player.state.lives > 0) {
           this.player.reset(this.canvas.width / 2, this.canvas.height - 90);
-          // Spawn backup Gemini orb on respawn
           if (this.geminiManager.orbs.length === 0) {
-            this.geminiManager.spawn(this.player.state.x, this.player.state.y - 60);
+            this.geminiManager.spawn(this.player.state.x, this.player.state.y - 70);
           }
         } else {
           this.state = 'GAME_OVER';
@@ -213,12 +241,6 @@ export class Game {
       }
     }
 
-    // Auto-Bombing when ground target is inside sight (Ergonomic 1-finger mobile play)
-    this.handleGroundBombing();
-
-    // Check exploded bombs
-    this.handleBombExplosions();
-
     // Update Gemini Orbs (ジェミニ誘導 & 合体)
     this.geminiManager.update(
       this.player.state.x,
@@ -226,7 +248,7 @@ export class Game {
       (level, x, y) => {
         // Fusion Callback
         this.audio.playGeminiMerge(level);
-        this.addExplosion(x, y, 22 * level, false);
+        this.addExplosion(x, y, 24 * level, false);
         this.addFloatingText(x, y - 20, level === 3 ? 'MEGA FUSION! Lv.3' : 'FUSION! Lv.2', '#ec4899');
         this.player.addScore(level === 3 ? 5000 : 2000);
       }
@@ -241,89 +263,98 @@ export class Game {
       this.canvas.height,
       this.player.state.x,
       this.player.state.y,
-      (bx, by, bvx, bvy) => {
-        const bullet = this.enemyManager.spawn('MINI_CLONE', bx, by, 'MINI_BULLET');
-        bullet.vx = bvx;
-        bullet.vy = bvy;
-        this.audio.playEnemyBulletFire();
-      }
+      (bx, by, bvx, bvy) => this.spawnBullet(bx, by, bvx, bvy)
     );
 
     // Update Boss
     if (this.bossManager.currentBoss) {
-      this.bossManager.update(this.canvas.width, (bx, by, bvx, bvy) => {
-        const bullet = this.enemyManager.spawn('MINI_CLONE', bx, by, 'MINI_BULLET');
-        bullet.vx = bvx;
-        bullet.vy = bvy;
-        this.audio.playEnemyBulletFire();
-      });
+      this.bossManager.update(
+        this.canvas.width,
+        this.player.state.x,
+        this.player.state.y,
+        (bx, by, bvx, bvy) => this.spawnBullet(bx, by, bvx, bvy),
+        () => {
+          // Grok launches SpaceX Starship fleet from bottom!
+          this.enemyManager.spawn('SPACEX_ROCKET', 70, this.canvas.height + 60, 'ROCKET_ASCENT');
+          this.enemyManager.spawn('SPACEX_ROCKET', 180, this.canvas.height + 90, 'ROCKET_ASCENT');
+          this.enemyManager.spawn('SPACEX_ROCKET', 290, this.canvas.height + 60, 'ROCKET_ASCENT');
+          this.addFloatingText(this.canvas.width / 2, 240, 'SPACEX STARSHIPS LAUNCHED!', '#ef4444');
+        },
+        (quote) => {
+          this.voice.speak(quote);
+        }
+      );
     }
 
-    // Update Ground Targets
-    this.groundManager.update(this.terrain.getScrollY(), this.player.state.sightX, this.player.state.sightY);
+    // Update Floating Gemini Drop Items
+    this.updateGeminiItems();
 
-    // Collision Detections
+    // Update Enemy Bullets
+    this.updateEnemyBullets();
+
+    // Update Ground Targets scroll
+    this.groundManager.update(this.terrain.getScrollY(), 0, 0);
+
+    // Collision Detections (Gemini Orbital Kinetic Defense)
     this.handleCollisions();
 
     // Effects Update
     this.updateEffects();
   }
 
-  // --- Ground Bombing Logic ---
-  private handleGroundBombing(): void {
-    if (!this.player.canFireBomb()) return;
+  private spawnBullet(x: number, y: number, vx: number, vy: number): void {
+    this.enemyBullets.push({
+      id: `bullet_${++this.bulletCounter}`,
+      x,
+      y,
+      vx,
+      vy,
+      radius: 4.5,
+      age: 0,
+    });
+    this.audio.playEnemyBulletFire();
+  }
 
-    let shouldBomb = this.input.state.bombPressed;
+  private spawnGeminiDropItem(x: number, y: number): void {
+    this.geminiItems.push({
+      id: `item_${++this.itemCounter}`,
+      x,
+      y,
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: 0.48, // Slowly drifts down
+      timer: 0,
+      size: 16,
+    });
+  }
 
-    // Intelligent auto-lockon: if sight cursor is over any visible ground target
-    if (!shouldBomb) {
-      const visible = this.groundManager.getVisibleTargets(this.terrain.getScrollY(), this.canvas.height);
-      for (const { entity: g, screenY } of visible) {
-        if (!g.revealed && g.type === 'SOL_CITADEL') continue;
-        const dist = Math.hypot(this.player.state.sightX - g.x, this.player.state.sightY - screenY);
-        if (dist < 36) {
-          shouldBomb = true;
-          break;
-        }
-      }
-    }
+  private updateGeminiItems(): void {
+    for (let i = this.geminiItems.length - 1; i >= 0; i--) {
+      const it = this.geminiItems[i];
+      it.timer++;
+      it.y += it.vy;
+      it.x += it.vx + Math.sin(it.timer * 0.05) * 0.45;
 
-    if (shouldBomb) {
-      const bomb = this.player.launchBomb();
-      if (bomb) {
-        this.audio.playBlasterDrop();
+      // Keep within bounds
+      if (it.x < 20) it.x = 20;
+      if (it.x > this.canvas.width - 20) it.x = this.canvas.width - 20;
+
+      // Despawn if fallen below screen
+      if (it.y > this.canvas.height + 30) {
+        this.geminiItems.splice(i, 1);
       }
     }
   }
 
-  // --- Bomb Impact & Ground Target Hit ---
-  private handleBombExplosions(): void {
-    const explodedBombs = this.player.removeExplodedBombs();
-    const scrollY = this.terrain.getScrollY();
+  private updateEnemyBullets(): void {
+    for (let i = this.enemyBullets.length - 1; i >= 0; i--) {
+      const b = this.enemyBullets[i];
+      b.age++;
+      b.x += b.vx;
+      b.y += b.vy;
 
-    for (const b of explodedBombs) {
-      // Ground explosion effect
-      this.addExplosion(b.targetX, b.targetY, 18, true);
-      this.audio.playGroundExplosion();
-
-      const hitTarget = this.groundManager.checkBombHit(b.targetX, b.targetY, scrollY);
-      if (hitTarget) {
-        this.player.addScore(hitTarget.points);
-        this.addFloatingText(hitTarget.x, b.targetY - 14, `+${hitTarget.points}`, '#fde047');
-        this.addExplosion(hitTarget.x, b.targetY, 32, true);
-
-        // POP OUT GEMINI ORB! (The Core Xevious Parody Reward)
-        const orb = this.geminiManager.spawn(hitTarget.x, b.targetY, (Math.random() - 0.5) * 4, -4);
-        if (hitTarget.type === 'SOL_CITADEL') {
-          // Sol Citadel gives an automatic Lv.2 Gemini orb or dual orbs!
-          orb.level = 2;
-          orb.radius = 20;
-          orb.damage = 3;
-          this.geminiManager.spawn(hitTarget.x + 10, b.targetY, 3, -3);
-          this.addFloatingText(hitTarget.x, b.targetY - 30, 'SOL BONUS! GEMINI x2', '#ec4899');
-        } else {
-          this.addFloatingText(hitTarget.x, b.targetY - 26, 'GEMINI GET!', '#38bdf8');
-        }
+      // Despawn offscreen
+      if (b.x < -20 || b.x > this.canvas.width + 20 || b.y < -20 || b.y > this.canvas.height + 20) {
+        this.enemyBullets.splice(i, 1);
       }
     }
   }
@@ -335,78 +366,104 @@ export class Game {
 
     for (const ev of events) {
       if (ev.type === 'ENEMY' && ev.enemyType) {
-        this.enemyManager.spawn(ev.enemyType, ev.x ?? 180, ev.y ?? -20, ev.pattern);
+        this.enemyManager.spawn(ev.enemyType, ev.x ?? 180, ev.y ?? -20, ev.pattern, ev.formationId);
       } else if (ev.type === 'GROUND' && ev.groundType) {
-        // Place along world Y ahead of screen
         const targetWorldY = -scrollY - 40;
         this.groundManager.spawn(ev.groundType, ev.x ?? 180, targetWorldY);
       } else if (ev.type === 'ALERT') {
         this.audio.playBossAlert();
+        this.audio.playBossBgm();
         this.addFloatingText(this.canvas.width / 2, 140, 'WARNING: BOSS APPROACHING', '#ef4444');
       } else if (ev.type === 'BOSS' && ev.bossType) {
-        this.bossManager.spawn(ev.bossType, this.canvas.width);
+        const boss = this.bossManager.spawn(ev.bossType, this.canvas.width);
+        this.voice.speak(boss.dialogueQuote);
       }
     }
   }
 
-  // --- Collision Detections (Gemini Orbital Flail vs Airborne Foes) ---
+  // --- Collision Detections ---
   private handleCollisions(): void {
-    // 0. Lethal Gemini Guidance: Player vs Gemini Orb (接触すると自機撃破！)
-    if (this.player.state.alive && this.player.state.invulnerableTimer <= 0) {
-      for (const orb of this.geminiManager.orbs) {
-        if (!orb.hazardActive) continue;
-        const dist = Math.hypot(this.player.state.x - orb.x, this.player.state.y - orb.y);
-        if (dist < 10 + orb.radius * 0.72) {
-          const killed = this.player.hit();
-          if (killed) {
-            this.audio.playPlayerDeath();
-            this.addExplosion(this.player.state.x, this.player.state.y, 36, false);
-            this.addFloatingText(this.player.state.x, this.player.state.y - 20, 'GEMINI CRASH!', '#ef4444');
-            this.playerRespawnTimer = 0;
-            break;
-          }
+    // 1. Gemini Orbs vs Enemy Bullets (たまはジェミニでけせる！ジェミニは止まらない！)
+    for (const orb of this.geminiManager.orbs) {
+      for (let bi = this.enemyBullets.length - 1; bi >= 0; bi--) {
+        const b = this.enemyBullets[bi];
+        const dist = Math.hypot(orb.x - b.x, orb.y - b.y);
+
+        if (dist < orb.radius + b.radius) {
+          // Bullet erased instantly!
+          this.enemyBullets.splice(bi, 1);
+          this.audio.playBulletErased();
+          this.addExplosion(b.x, b.y, 8, false);
+          this.player.addScore(50);
+          // Gemini movement continues completely unhindered!
         }
       }
     }
 
-    // 1. Gemini Orbs vs Airborne Enemies
+    // 2. Gemini Orbs vs Airborne Enemies (貫通 vs 跳ね返り)
     for (const orb of this.geminiManager.orbs) {
       for (let i = this.enemyManager.enemies.length - 1; i >= 0; i--) {
         const e = this.enemyManager.enemies[i];
         const dist = Math.hypot(orb.x - e.x, orb.y - e.y);
 
         if (dist < orb.radius + e.width * 0.45) {
-          // HIT!
           e.hp -= orb.damage;
-          this.audio.playAirExplosion();
-          this.addExplosion(e.x, e.y, 16 + orb.level * 4, false);
 
-          // Kinetic recoil on the orb
-          const nx = (orb.x - e.x) / (dist || 1);
-          const ny = (orb.y - e.y) / (dist || 1);
-          orb.vx += nx * 2.0;
-          orb.vy += ny * 2.0;
+          if (e.hp > 0) {
+            // ENEMY SURVIVED: Gemini DOES NOT PIERCE! (跳ね返り recoil)
+            const nx = (orb.x - e.x) / (dist || 1);
+            const ny = (orb.y - e.y) / (dist || 1);
+            orb.vx = nx * 3.4;
+            orb.vy = ny * 3.4;
 
-          if (e.hp <= 0) {
+            this.audio.playGeminiBounce();
+            this.addExplosion(e.x, e.y, 14, false);
+
+          } else {
+            // ENEMY DESTROYED: Gemini PIERCES RIGHT THROUGH! (貫通する - no recoil)
+            this.audio.playAirExplosion();
+            this.addExplosion(e.x, e.y, 18 + orb.level * 4, false);
+
             const mult = orb.level === 3 ? 4 : orb.level === 2 ? 2 : 1;
             const pointsEarned = e.points * mult;
             this.player.addScore(pointsEarned);
             this.addFloatingText(e.x, e.y - 12, `+${pointsEarned}`, mult > 1 ? '#ec4899' : '#ffffff');
+
+            const formationId = e.formationId;
+            const deadX = e.x;
+            const deadY = e.y;
             this.enemyManager.enemies.splice(i, 1);
+
+            // Check if formation is completely wiped out
+            if (formationId) {
+              const remainingInFormation = this.enemyManager.enemies.some(en => en.formationId === formationId);
+              if (!remainingInFormation) {
+                // FORMATION WIPED! Drop floating Gemini logo item!
+                this.spawnGeminiDropItem(deadX, deadY);
+                this.addFloatingText(deadX, deadY - 24, 'FORMATION WIPE! GEMINI DROP', '#38bdf8');
+                this.player.addScore(1500);
+              }
+            }
           }
         }
       }
 
-      // 2. Gemini Orbs vs Boss
+      // 3. Gemini Orbs vs Boss
       if (this.bossManager.currentBoss) {
         const res = this.bossManager.hit(orb.damage, orb.x, orb.y);
         if (res.bossHit) {
-          this.audio.playAirExplosion();
+          // Boss survives hits, so Gemini bounces off
+          const b = this.bossManager.currentBoss;
+          const dist = Math.hypot(orb.x - b.x, orb.y - b.y) || 1;
+          orb.vx = ((orb.x - b.x) / dist) * 3.6;
+          orb.vy = ((orb.y - b.y) / dist) * 3.6;
+
+          this.audio.playGeminiBounce();
           this.addExplosion(orb.x, orb.y, 22, false);
           this.player.addScore(res.points);
 
           if (res.defeated) {
-            // Huge Boss Explosion Chain!
+            // Boss Defeat Chain
             for (let k = 0; k < 12; k++) {
               setTimeout(() => {
                 const rx = this.bossManager.currentBoss ? this.bossManager.currentBoss.x + (Math.random() - 0.5) * 120 : 180;
@@ -421,27 +478,90 @@ export class Game {
             setTimeout(() => {
               this.state = 'STAGE_CLEAR';
               this.stageClearTimer = 0;
+              this.audio.playStageClear();
             }, 1600);
           }
         }
       }
     }
 
-    // 3. Player vs Airborne Enemies / Mini-Clone Bullets
+    // 4. Player Ship vs Gemini Drop Items (自機で取ればもう一個のジェミニ追加！)
+    if (this.player.state.alive) {
+      for (let i = this.geminiItems.length - 1; i >= 0; i--) {
+        const it = this.geminiItems[i];
+        const dist = Math.hypot(this.player.state.x - it.x, this.player.state.y - it.y);
+
+        if (dist < 22 + it.size) {
+          // Player collected item: SPAWN NEW GEMINI ORB!
+          this.geminiManager.spawn(it.x, it.y);
+          this.audio.playItemCollect();
+          this.addFloatingText(it.x, it.y - 18, '+1 GEMINI GET!', '#38bdf8');
+          this.player.addScore(2000);
+          this.geminiItems.splice(i, 1);
+        }
+      }
+    }
+
+    // 5. Existing Gemini Orbs vs Gemini Drop Items (持ってるジェミニに当てれば強化！)
+    for (let i = this.geminiItems.length - 1; i >= 0; i--) {
+      const it = this.geminiItems[i];
+      let struck = false;
+
+      for (const orb of this.geminiManager.orbs) {
+        const dist = Math.hypot(orb.x - it.x, orb.y - it.y);
+        if (dist < orb.radius + it.size) {
+          // Gemini orb struck item: LEVEL UP THAT ORB!
+          this.geminiManager.levelUpOrb(orb);
+          this.audio.playGeminiLevelUp();
+          this.addExplosion(orb.x, orb.y, 28, false);
+          this.addFloatingText(orb.x, orb.y - 22, `GEMINI POWER UP! Lv.${orb.level}`, '#ec4899');
+          this.player.addScore(3000);
+          struck = true;
+          break;
+        }
+      }
+
+      if (struck) {
+        this.geminiItems.splice(i, 1);
+      }
+    }
+
+    // 6. Player Ship vs White Enemy Bullets
     if (this.player.state.alive && this.player.state.invulnerableTimer <= 0) {
-      for (const e of this.enemyManager.enemies) {
-        const dist = Math.hypot(this.player.state.x - e.x, this.player.state.y - e.y);
-        if (dist < 14 + e.width * 0.35) {
+      for (let bi = this.enemyBullets.length - 1; bi >= 0; bi--) {
+        const b = this.enemyBullets[bi];
+        const dist = Math.hypot(this.player.state.x - b.x, this.player.state.y - b.y);
+
+        if (dist < 10 + b.radius) {
+          this.enemyBullets.splice(bi, 1);
           const killed = this.player.hit();
           if (killed) {
             this.audio.playPlayerDeath();
-            this.addExplosion(this.player.state.x, this.player.state.y, 32, false);
+            this.addExplosion(this.player.state.x, this.player.state.y, 36, false);
             this.playerRespawnTimer = 0;
             break;
           }
         }
       }
     }
+
+    // 7. Player Ship vs Airborne Enemies
+    if (this.player.state.alive && this.player.state.invulnerableTimer <= 0) {
+      for (const e of this.enemyManager.enemies) {
+        const dist = Math.hypot(this.player.state.x - e.x, this.player.state.y - e.y);
+        if (dist < 12 + e.width * 0.35) {
+          const killed = this.player.hit();
+          if (killed) {
+            this.audio.playPlayerDeath();
+            this.addExplosion(this.player.state.x, this.player.state.y, 36, false);
+            this.playerRespawnTimer = 0;
+            break;
+          }
+        }
+      }
+    }
+
+    // NOTE: Player vs Gemini Orb is completely SAFE.
   }
 
   // --- Effects Management ---
@@ -456,8 +576,7 @@ export class Game {
       isGround,
     });
 
-    // Spawn sparks / debris
-    const count = isGround ? 8 : 14;
+    const count = 12;
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 1.0 + Math.random() * 3.5;
@@ -466,8 +585,8 @@ export class Game {
         y,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
-        size: isGround ? 3 : 2,
-        color: isGround ? '#f59e0b' : Math.random() > 0.4 ? '#ffffff' : '#38bdf8',
+        size: 2,
+        color: Math.random() > 0.4 ? '#ffffff' : '#38bdf8',
         alpha: 1.0,
         decay: 0.05 + Math.random() * 0.04,
       });
@@ -481,12 +600,11 @@ export class Game {
       text,
       color,
       timer: 0,
-      duration: 45,
+      duration: 48,
     });
   }
 
   private updateEffects(): void {
-    // Explosions
     for (let i = this.explosions.length - 1; i >= 0; i--) {
       this.explosions[i].timer++;
       if (this.explosions[i].timer >= this.explosions[i].duration) {
@@ -494,7 +612,6 @@ export class Game {
       }
     }
 
-    // Particles
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       p.x += p.vx;
@@ -505,7 +622,6 @@ export class Game {
       }
     }
 
-    // Floating Texts
     for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
       const t = this.floatingTexts[i];
       t.y -= 0.6;
@@ -526,8 +642,9 @@ export class Game {
     this.renderer.render(
       this.state,
       this.player.state,
-      this.player.bombs,
       this.geminiManager.orbs,
+      this.geminiItems,
+      this.enemyBullets,
       this.enemyManager.enemies,
       visibleGround,
       this.bossManager.currentBoss,
@@ -535,7 +652,8 @@ export class Game {
       this.explosions,
       this.floatingTexts,
       this.stage,
-      this.stageTick
+      this.stageTick,
+      this.elonIntroTimer
     );
   }
 }

@@ -5,9 +5,8 @@ export interface InputState {
   y: number;
   active: boolean;
   isTouch: boolean;
-  bombPressed: boolean;
-  crtTogglePressed: boolean;
-  audioTogglePressed: boolean;
+  crtTogglePressed?: boolean;
+  audioTogglePressed?: boolean;
 }
 
 export interface PlayerState {
@@ -16,10 +15,6 @@ export interface PlayerState {
   vx: number;
   vy: number;
   tilt: number; // -1 (left), 0 (center), 1 (right)
-  sightX: number;
-  sightY: number;
-  sightDistance: number;
-  bombCooldown: number;
   lives: number;
   score: number;
   highScore: number;
@@ -27,16 +22,24 @@ export interface PlayerState {
   alive: boolean;
 }
 
-export interface BlasterBomb {
+export interface GeminiDropItem {
   id: string;
-  startX: number;
-  startY: number;
   x: number;
   y: number;
-  targetX: number;
-  targetY: number;
-  progress: number; // 0 to 1
-  exploded: boolean;
+  vx: number;
+  vy: number;
+  timer: number;
+  size: number;
+}
+
+export interface EnemyBullet {
+  id: string;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
+  age: number;
 }
 
 export interface GeminiOrb {
@@ -48,12 +51,8 @@ export interface GeminiOrb {
   level: number; // 1, 2, 3 (MAX)
   radius: number;
   damage: number;
-  orbitAngle: number;
-  orbitDist: number;
   trail: Array<{ x: number; y: number; alpha: number }>;
-  fuseTimer: number; // for sparkling fusion effect
-  spawnTimer: number; // grace period when popping from ground target
-  hazardActive: boolean; // lethal on collision with player!
+  fuseTimer: number; // sparkling burst when leveled up
 }
 
 export type EnemyType = 
@@ -66,6 +65,7 @@ export type EnemyType =
   | 'CURSOR_PROBE' 
   | 'GROK_RAIDER' 
   | 'COPILOT_GLIDER'
+  | 'SPACEX_ROCKET'
   // Stage 3 (Anthropic Alignment: Fable > Opus > Sonnet > Haiku)
   | 'CLAUDE_HAIKU' 
   | 'CLAUDE_SONNET' 
@@ -74,24 +74,21 @@ export type EnemyType =
   // Stage 4 (OpenAI GPT-6 Fleet)
   | 'GPT6_LUNA' 
   | 'GPT6_TERRA' 
-  | 'GPT6_SOL'
-  // Shared
-  | 'MINI_CLONE';
+  | 'GPT6_SOL';
 
 export type MovementPattern = 
   | 'STRAIGHT_DOWN'
-  | 'S_CURVE_LEFT'
-  | 'S_CURVE_RIGHT'
-  | 'SWOOP_DIVE'
-  | 'PINCER_LEFT'
-  | 'PINCER_RIGHT'
-  | 'ZIG_ZAG'
-  | 'TARGET_RAM'
-  | 'MINI_BULLET';
+  | 'TOROID_SWOOP'
+  | 'TORKAN_TRACK_DASH'
+  | 'ZOSHI_REACTIVE_SWOOP'
+  | 'GALAGA_LOOP'
+  | 'SPAROID_CRUISE'
+  | 'ROCKET_ASCENT';
 
 export interface EnemyEntity {
   id: string;
   type: EnemyType;
+  formationId?: string; // used to detect when an entire formation is destroyed!
   x: number;
   y: number;
   vx: number;
@@ -108,20 +105,25 @@ export interface EnemyEntity {
   shootCooldown: number;
 }
 
-export type GroundType = 'BARROW' | 'SOL_CITADEL' | 'SERVER_RACK' | 'AI_CHIP';
+export type GroundType = 
+  | 'NVIDIA_BASE'
+  | 'META_BASE'
+  | 'HUGGINGFACE_BASE'
+  | 'STABILITY_BASE'
+  | 'SOL_CITADEL';
 
 export interface GroundEntity {
   id: string;
   type: GroundType;
-  worldY: number; // absolute Y position along the stage
   x: number;
+  worldY: number;
   width: number;
   height: number;
   hp: number;
   maxHp: number;
-  points: number;
-  revealed: boolean; // For hidden Sol citadels
+  revealed: boolean;
   destroyed: boolean;
+  points: number;
 }
 
 export interface WeakPoint {
@@ -144,6 +146,9 @@ export type BossType =
 export interface BossEntity {
   type: BossType;
   name: string;
+  stageTitle: string;
+  dialogueQuote: string;
+  quoteTimer: number;
   x: number;
   y: number;
   targetY: number;

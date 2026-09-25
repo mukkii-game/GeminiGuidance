@@ -1,21 +1,31 @@
 /**
- * Authentic Arcade Sound Engine
- * BGM: 魔王魂 (maou.audio) 8bit Battle Track
- * SFX: 効果音ラボ (soundeffect-lab.info) Curated STG Effects + Namco Blaster FM Synthesis
+ * Pure Audio Engine using genuine SFX from 効果音ラボ (soundeffect-lab.info)
+ * and genuine 8-bit BGM tracks from 魔王魂 (maou.audio).
+ * Strictly NO synthesized oscillators or generic AI sounds.
+ * 
+ * Features:
+ * - DynamicsCompressorNode to prevent audio clipping & distortion
+ * - Controlled moderate master and SFX gains (no loud blasting)
+ * - Anti-stack debouncing (prevents simultaneous duplicate triggers)
  */
 export class SoundEngine {
   private ctx: AudioContext | null = null;
+  private compressor: DynamicsCompressorNode | null = null;
   private masterGain: GainNode | null = null;
   private sfxGain: GainNode | null = null;
-  private bgmAudio: HTMLAudioElement | null = null;
-  public enabled: boolean = true;
-
-  // Audio Buffers for curated retro SFX
   private buffers: Map<string, AudioBuffer> = new Map();
   private loaded: boolean = false;
+  private enabled: boolean = true;
+
+  // Debounce tracking to prevent volume stacking
+  private lastPlayedTime: Map<string, number> = new Map();
+
+  // Background Music tracks (魔王魂)
+  private currentBgmAudio: HTMLAudioElement | null = null;
+  private currentBgmType: 'STAGE_A' | 'STAGE_B' | 'BOSS' | null = null;
 
   constructor() {
-    // Initialized on first user interaction
+    // Lazy AudioContext initialization on first user interaction
   }
 
   public init(): void {
@@ -23,16 +33,25 @@ export class SoundEngine {
     try {
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       this.ctx = new AudioCtx();
+
+      // Dynamics Compressor to tame peak spikes
+      this.compressor = this.ctx.createDynamicsCompressor();
+      this.compressor.threshold.setValueAtTime(-18, this.ctx.currentTime);
+      this.compressor.knee.setValueAtTime(12, this.ctx.currentTime);
+      this.compressor.ratio.setValueAtTime(8, this.ctx.currentTime);
+      this.compressor.attack.setValueAtTime(0.003, this.ctx.currentTime);
+      this.compressor.release.setValueAtTime(0.15, this.ctx.currentTime);
+      this.compressor.connect(this.ctx.destination);
+
       this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.setValueAtTime(0.85, this.ctx.currentTime);
-      this.masterGain.connect(this.ctx.destination);
+      this.masterGain.gain.setValueAtTime(0.35, this.ctx.currentTime); // Moderate, comfortable master volume
+      this.masterGain.connect(this.compressor);
 
       this.sfxGain = this.ctx.createGain();
-      this.sfxGain.gain.setValueAtTime(0.9, this.ctx.currentTime);
+      this.sfxGain.gain.setValueAtTime(0.35, this.ctx.currentTime);
       this.sfxGain.connect(this.masterGain);
 
       this.loadSoundAssets();
-      this.initBgm();
     } catch (e) {
       console.warn('AudioContext init failed', e);
     }
@@ -50,43 +69,60 @@ export class SoundEngine {
   public toggle(): boolean {
     this.enabled = !this.enabled;
     if (this.masterGain && this.ctx) {
-      this.masterGain.gain.setValueAtTime(this.enabled ? 0.85 : 0.0, this.ctx.currentTime);
+      this.masterGain.gain.setValueAtTime(this.enabled ? 0.35 : 0.0, this.ctx.currentTime);
     }
-    if (this.bgmAudio) {
+    if (this.currentBgmAudio) {
       if (this.enabled) {
-        this.bgmAudio.play().catch(() => {});
+        this.currentBgmAudio.play().catch(() => {});
       } else {
-        this.bgmAudio.pause();
+        this.currentBgmAudio.pause();
       }
     }
     return this.enabled;
   }
 
-  private initBgm(): void {
-    if (this.bgmAudio) return;
-    try {
-      this.bgmAudio = new Audio('./sounds/maou_bgm_8bit18.mp3');
-      this.bgmAudio.loop = true;
-      this.bgmAudio.volume = 0.32;
-    } catch (err) {
-      console.warn('Failed to initialize BGM audio', err);
-    }
+  public startBgm(): void {
+    this.playStageBgm(1);
   }
 
-  public startBgm(): void {
-    if (!this.enabled) return;
-    if (!this.bgmAudio) {
-      this.initBgm();
+  public playStageBgm(stage: number): void {
+    const bgmType: 'STAGE_A' | 'STAGE_B' = (stage % 2 === 1) ? 'STAGE_A' : 'STAGE_B';
+    const trackUrl = bgmType === 'STAGE_A' ? './sounds/maou_bgm_8bit18.mp3' : './sounds/maou_bgm_8bit28.mp3';
+    this.switchBgm(bgmType, trackUrl, 0.16); // Gentle background volume
+  }
+
+  public playBossBgm(): void {
+    this.switchBgm('BOSS', './sounds/maou_boss_8bit29.mp3', 0.18);
+  }
+
+  private switchBgm(type: 'STAGE_A' | 'STAGE_B' | 'BOSS', url: string, volume: number): void {
+    if (this.currentBgmType === type && this.currentBgmAudio && !this.currentBgmAudio.paused) {
+      return;
     }
-    if (this.bgmAudio) {
-      this.bgmAudio.play().catch(() => {});
+
+    if (this.currentBgmAudio) {
+      this.currentBgmAudio.pause();
+      this.currentBgmAudio.currentTime = 0;
+    }
+
+    this.currentBgmType = type;
+    try {
+      this.currentBgmAudio = new Audio(url);
+      this.currentBgmAudio.loop = true;
+      this.currentBgmAudio.volume = volume;
+      if (this.enabled) {
+        this.currentBgmAudio.play().catch(() => {});
+      }
+    } catch (err) {
+      console.warn('Failed to switch BGM audio', err);
     }
   }
 
   public stopBgm(): void {
-    if (this.bgmAudio) {
-      this.bgmAudio.pause();
-      this.bgmAudio.currentTime = 0;
+    if (this.currentBgmAudio) {
+      this.currentBgmAudio.pause();
+      this.currentBgmAudio.currentTime = 0;
+      this.currentBgmType = null;
     }
   }
 
@@ -94,20 +130,20 @@ export class SoundEngine {
     if (this.loaded || !this.ctx) return;
     this.loaded = true;
 
-    // Curated STG effects from 効果音ラボ
+    // Genuine sound effects from 効果音ラボ (soundeffect-lab.info)
     const soundFiles: Record<string, string> = {
-      bomb_crisp: './sounds/bomb1.mp3',             // チュドーン！ (Classic STG explosion)
-      bomb_big: './sounds/big_explosion1.mp3',      // ドカーン！ (Boss & player destruction)
-      beam_laser: './sounds/beamgun1.mp3',          // ビーム砲
-      bullet_fire: './sounds/beamgun2.mp3',         // 敵Sparoid発射音
-      hit_impact: './sounds/shot_struck1.mp3',      // 着弾・装甲ヒット音
-      gemini_merge: './sounds/power_up1.mp3',       // パワーアップ
-      gemini_whoosh: './sounds/speed_up1.mp3',      // スイング風切り音
-      boss_alert: './sounds/boss_alert.mp3',        // ボス出現時サイレン
-      stage_clear: './sounds/levelup1.mp3',         // レベルアップ
-      start_fanfare: './sounds/start_fanfare.mp3',  // 出撃ファンファーレ
-      decision: './sounds/decision1.mp3',           // 決定音
-      cursor: './sounds/cursor1.mp3',               // カーソル
+      bomb_drop: './sounds/bomb_drop.mp3',          // hyun1.mp3
+      bomb_crisp: './sounds/bomb1.mp3',             // bomb1.mp3 (チュドーン)
+      bomb_big: './sounds/big_explosion1.mp3',      // big_explosion1.mp3 (大爆発)
+      armor_hit: './sounds/armor_hit.mp3',          // machine-hit1.mp3 (装甲ヒット/跳弾)
+      bullet_fire: './sounds/beamgun2.mp3',         // beamgun2.mp3 (敵弾発射)
+      laser_beam: './sounds/beamgun1.mp3',          // beamgun1.mp3
+      whoosh: './sounds/whoosh.mp3',                // highspeed-movement1.mp3 (風切りスイング)
+      power_up: './sounds/power_up1.mp3',           // power_up1.mp3 (ジェミニ取得・追加)
+      level_up: './sounds/levelup1.mp3',            // levelup1.mp3 (ジェミニレベルアップ)
+      decision: './sounds/decision1.mp3',           // decision1.mp3 (開始)
+      cursor: './sounds/cursor1.mp3',               // cursor1.mp3 (弾消滅)
+      boss_alert: './sounds/boss_alert.mp3',        // boss_alert.mp3 (警報)
     };
 
     for (const [key, path] of Object.entries(soundFiles)) {
@@ -124,8 +160,15 @@ export class SoundEngine {
     }
   }
 
-  private playBuffer(name: string, volume: number = 1.0, rate: number = 1.0): boolean {
+  private playBuffer(name: string, volume: number = 1.0, rate: number = 1.0, debounceMs: number = 40): boolean {
     if (!this.enabled || !this.ctx || !this.sfxGain) return false;
+    const now = performance.now();
+    const last = this.lastPlayedTime.get(name) || 0;
+    if (now - last < debounceMs) {
+      return false; // Skip redundant stacked trigger
+    }
+    this.lastPlayedTime.set(name, now);
+
     const buf = this.buffers.get(name);
     if (!buf) return false;
 
@@ -144,103 +187,59 @@ export class SoundEngine {
 
   // --- Sound Effects ---
 
-  /**
-   * Signature 1983 Namco Blaster Bomb Drop Whistle
-   * Emulates the Namco 15xx WSG falling chirp: 1400Hz -> 220Hz with 40Hz FM vibrato.
-   */
-  public playBlasterDrop(): void {
-    if (!this.enabled || !this.ctx || !this.sfxGain) return;
-    const now = this.ctx.currentTime;
-
-    const osc = this.ctx.createOscillator();
-    const lfo = this.ctx.createOscillator();
-    const lfoGain = this.ctx.createGain();
-    const gain = this.ctx.createGain();
-
-    // FM vibrato
-    lfo.frequency.setValueAtTime(42, now);
-    lfoGain.gain.setValueAtTime(75, now);
-    lfo.connect(osc.frequency);
-
-    // Downward chirp sweep
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(1450, now);
-    osc.frequency.exponentialRampToValueAtTime(220, now + 0.30);
-
-    gain.gain.setValueAtTime(0.5, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.30);
-
-    osc.connect(gain);
-    gain.connect(this.sfxGain);
-
-    lfo.start(now);
-    osc.start(now);
-    lfo.stop(now + 0.31);
-    osc.stop(now + 0.31);
-  }
-
-  /** Ground target destruction impact (効果音ラボ 爆発1 チュドーン + Sub-bass thump) */
-  public playGroundExplosion(): void {
-    this.playBuffer('bomb_crisp', 1.0, 1.0);
-
-    if (this.ctx && this.sfxGain && this.enabled) {
-      const now = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(140, now);
-      osc.frequency.exponentialRampToValueAtTime(35, now + 0.25);
-      gain.gain.setValueAtTime(0.6, now);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
-      osc.connect(gain);
-      gain.connect(this.sfxGain);
-      osc.start(now);
-      osc.stop(now + 0.26);
-    }
-  }
-
-  /** Air enemy slice / destruction by Gemini orb (Punchy arcade shatter) */
+  /** Air enemy destruction impact */
   public playAirExplosion(): void {
-    this.playBuffer('bomb_crisp', 0.85, 1.3);
-    this.playBuffer('hit_impact', 0.95, 1.15);
+    this.playBuffer('bomb_crisp', 0.8, 1.2, 50);
+  }
+
+  /** Gemini strikes armored enemy and bounces off */
+  public playGeminiBounce(): void {
+    this.playBuffer('armor_hit', 0.85, 1.15, 60);
+  }
+
+  /** Bullet erased by Gemini orb */
+  public playBulletErased(): void {
+    this.playBuffer('cursor', 0.65, 1.6, 40);
   }
 
   /** Enemy Sparoid white bullet firing */
   public playEnemyBulletFire(): void {
-    this.playBuffer('bullet_fire', 0.35, 1.45);
+    this.playBuffer('bullet_fire', 0.45, 1.3, 80);
   }
 
-  /** Gemini swing whoosh */
-  public playGeminiWhoosh(): void {
-    this.playBuffer('gemini_whoosh', 0.45, 1.2);
+  /** Gemini item collected by player (adds +1 Gemini) */
+  public playItemCollect(): void {
+    this.playBuffer('power_up', 0.9, 1.0, 50);
   }
 
-  /** Gemini fusion fanfare (効果音ラボ パワーアップ + Arpeggio) */
+  /** Gemini item struck by Gemini orb (levels up Gemini) */
+  public playGeminiLevelUp(): void {
+    this.playBuffer('level_up', 0.95, 1.1, 50);
+  }
+
+  /** Gemini fusion fanfare */
   public playGeminiMerge(level: number): void {
-    const rate = 1.0 + (level - 1) * 0.15;
-    this.playBuffer('gemini_merge', 0.95, rate);
+    const rate = 1.0 + (level - 1) * 0.12;
+    this.playBuffer('power_up', 0.9, rate, 50);
   }
 
-  /** Boss alert siren (played once on boss approach) */
+  /** Boss alert siren */
   public playBossAlert(): void {
-    this.playBuffer('boss_alert', 0.85);
+    this.playBuffer('boss_alert', 0.85, 1.0, 500);
   }
 
   /** Game Start Fanfare */
   public playStartFanfare(): void {
-    this.playBuffer('decision', 0.85);
-    setTimeout(() => {
-      this.playBuffer('start_fanfare', 0.85);
-    }, 250);
+    this.playBuffer('decision', 0.85, 1.0, 100);
   }
 
   /** Stage Clear Jingle */
   public playStageClear(): void {
-    this.playBuffer('stage_clear', 0.9);
+    this.playBuffer('level_up', 0.85, 1.0, 100);
   }
 
   /** Player destruction */
   public playPlayerDeath(): void {
-    this.playBuffer('bomb_big', 1.0, 0.85);
+    this.playBuffer('bomb_big', 0.95, 0.95, 200);
   }
 }

@@ -69,6 +69,12 @@ const copyConfigs = [
 
   // Qwen Hexagon Flower
   { src: 'qwen-color.svg', dest: 'qwen.svg' },
+
+  // Ground Target AI Infrastructures (No generic chips or racks!)
+  { src: 'nvidia-color.svg', dest: 'nvidia.svg' },
+  { src: 'meta-color.svg', dest: 'meta.svg' },
+  { src: 'huggingface-color.svg', dest: 'huggingface.svg' },
+  { src: 'stability-color.svg', dest: 'stability.svg' },
 ];
 
 for (const cfg of copyConfigs) {

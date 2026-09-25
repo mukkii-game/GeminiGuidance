@@ -17,14 +17,16 @@ export class GroundTargetManager {
     const revealed = type !== 'SOL_CITADEL'; // Sol citadels start hidden
 
     switch (type) {
-      case 'BARROW':
-        width = 32; height = 32; hp = 1; points = 600; break;
+      case 'NVIDIA_BASE':
+        width = 36; height = 36; hp = 1; points = 600; break;
+      case 'META_BASE':
+        width = 36; height = 36; hp = 1; points = 500; break;
+      case 'HUGGINGFACE_BASE':
+        width = 36; height = 36; hp = 1; points = 400; break;
+      case 'STABILITY_BASE':
+        width = 36; height = 36; hp = 1; points = 500; break;
       case 'SOL_CITADEL':
-        width = 32; height = 32; hp = 2; points = 2000; break;
-      case 'SERVER_RACK':
-        width = 28; height = 28; hp = 1; points = 400; break;
-      case 'AI_CHIP':
-        width = 28; height = 28; hp = 1; points = 800; break;
+        width = 36; height = 44; hp = 2; points = 2000; break;
     }
 
     if (customHp !== undefined) hp = customHp;

@@ -1,12 +1,17 @@
 /**
- * Xevious-style Retro Vertical Scrolling Terrain Engine
- * Features pine forests, winding rivers, sand dunes, and Nazca Ground Drawings (with AI parody glyphs)
+ * Authentic 1983 Namco Xevious-style Vertical Scrolling Terrain Engine
+ * Features:
+ * - Stage 1: Dense Pine Forests, Winding Blue River with Sandbanks, Stone Bridges, and Earth Paths.
+ * - Stage 2: Expansive Rolling Sand Dunes, Desert Oasis, and Space Launchpads.
+ * - Stage 3: Woodland River Valley, Forest Groves, and Military Roadways.
+ * - Stage 4: Desert Airfield Fortresses, Paved Runways, and Pine Perimeter Groves.
+ * Strictly NO flying Nazca lines or cyber grids.
  */
 export class TerrainEngine {
   private width: number;
   private height: number;
   private scrollY: number = 0;
-  private scrollSpeed: number = 0.45;
+  private scrollSpeed: number = 0.50;
   private patternCanvas: HTMLCanvasElement;
   private patternCtx: CanvasRenderingContext2D;
 
@@ -16,7 +21,7 @@ export class TerrainEngine {
 
     this.patternCanvas = document.createElement('canvas');
     this.patternCanvas.width = width;
-    this.patternCanvas.height = height * 2; // seamless vertical wrapping loop
+    this.patternCanvas.height = height * 2; // Seamless wrap buffer
     this.patternCtx = this.patternCanvas.getContext('2d')!;
     this.patternCtx.imageSmoothingEnabled = false;
 
@@ -36,7 +41,7 @@ export class TerrainEngine {
     return this.scrollY;
   }
 
-  public render(ctx: CanvasRenderingContext2D, stage: number): void {
+  public render(ctx: CanvasRenderingContext2D, _stage: number): void {
     const yOffset = Math.floor(this.scrollY);
 
     // Draw wrapped seamless terrain
@@ -45,9 +50,6 @@ export class TerrainEngine {
       0, this.height - yOffset, this.width, this.height,
       0, 0, this.width, this.height
     );
-
-    // Draw stage-specific Nazca ground glyphs & landmarks
-    this.renderLandmarks(ctx, stage, yOffset);
   }
 
   private generateTerrainMap(stage: number): void {
@@ -55,261 +57,258 @@ export class TerrainEngine {
     const w = this.width;
     const h = this.height * 2;
 
+    ctx.clearRect(0, 0, w, h);
+
     if (stage === 1) {
-      // Stage 1: Dense Forest & River
-      // Base Grassland
-      ctx.fillStyle = '#1e3a1e';
+      // --- STAGE 1: Xevious Classic Forest & River (チャイナ・シンドローム) ---
+      // 1. Base Earth & Grassland
+      ctx.fillStyle = '#6b5839'; // Warm earth brown base
       ctx.fillRect(0, 0, w, h);
 
-      // Grass texture noise
-      for (let y = 0; y < h; y += 8) {
-        for (let x = 0; x < w; x += 8) {
-          if ((x ^ y) % 13 === 0) {
-            ctx.fillStyle = '#264826';
-            ctx.fillRect(x, y, 8, 8);
+      // Grassland patches
+      for (let y = 0; y < h; y += 16) {
+        for (let x = 0; x < w; x += 16) {
+          const noise = Math.sin(x * 0.04) * Math.cos(y * 0.04);
+          if (noise > -0.25) {
+            ctx.fillStyle = noise > 0.3 ? '#2e6b2e' : '#265926';
+            ctx.fillRect(x, y, 16, 16);
           }
         }
       }
 
-      // Winding River
-      ctx.fillStyle = '#0f4c81';
+      // 2. Earth Dirt Road winding vertically
+      ctx.strokeStyle = '#8c734b';
+      ctx.lineWidth = 20;
       ctx.beginPath();
       for (let y = 0; y <= h; y += 20) {
-        const riverX = w * 0.45 + Math.sin(y * 0.008) * 50 + Math.cos(y * 0.02) * 20;
-        if (y === 0) ctx.moveTo(riverX, y);
-        else ctx.lineTo(riverX, y);
+        const roadX = w * 0.22 + Math.sin(y * 0.012) * 24;
+        if (y === 0) ctx.moveTo(roadX, y);
+        else ctx.lineTo(roadX, y);
       }
-      ctx.lineWidth = 42;
+      ctx.stroke();
+
+      // 3. Winding Xevious Blue River
+      const getRiverX = (y: number) => w * 0.58 + Math.sin(y * 0.007) * 55 + Math.cos(y * 0.02) * 18;
+
+      // Sandy shores / banks along river
+      ctx.strokeStyle = '#d4be92';
+      ctx.lineWidth = 48;
       ctx.lineCap = 'round';
-      ctx.strokeStyle = '#0284c7';
+      ctx.beginPath();
+      for (let y = 0; y <= h; y += 20) {
+        const rx = getRiverX(y);
+        if (y === 0) ctx.moveTo(rx, y);
+        else ctx.lineTo(rx, y);
+      }
       ctx.stroke();
 
-      // River Banks & Highlights
+      // Deep River Core
+      ctx.strokeStyle = '#1d4ed8';
       ctx.lineWidth = 36;
-      ctx.strokeStyle = '#38bdf8';
+      ctx.beginPath();
+      for (let y = 0; y <= h; y += 20) {
+        const rx = getRiverX(y);
+        if (y === 0) ctx.moveTo(rx, y);
+        else ctx.lineTo(rx, y);
+      }
       ctx.stroke();
 
-      // Bridges
-      for (let bY = 200; bY < h; bY += 380) {
-        const riverX = w * 0.45 + Math.sin(bY * 0.008) * 50 + Math.cos(bY * 0.02) * 20;
+      // Azure river highlights
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 14;
+      ctx.beginPath();
+      for (let y = 0; y <= h; y += 20) {
+        const rx = getRiverX(y) - 6;
+        if (y === 0) ctx.moveTo(rx, y);
+        else ctx.lineTo(rx, y);
+      }
+      ctx.stroke();
+
+      // 4. Stone Bridges crossing the river
+      for (let by = 180; by < h; by += 340) {
+        const rx = getRiverX(by);
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(rx - 32, by - 12, 64, 24);
         ctx.fillStyle = '#64748b';
-        ctx.fillRect(riverX - 28, bY - 8, 56, 16);
-        ctx.fillStyle = '#94a3b8';
-        ctx.fillRect(riverX - 26, bY - 6, 52, 4);
+        ctx.fillRect(rx - 30, by - 10, 60, 20);
+        ctx.fillStyle = '#cbd5e1';
+        ctx.fillRect(rx - 28, by - 8, 56, 3);
+        ctx.fillRect(rx - 28, by + 5, 56, 3);
       }
 
-      // Pine Forest Clusters (Dense tree canopies with 80s 3D bevels)
-      for (let t = 0; t < 120; t++) {
-        const tx = (t * 71) % (w - 40) + 10;
-        const ty = (t * 97) % (h - 40) + 10;
-        // Don't draw trees inside the river
-        const riverX = w * 0.45 + Math.sin(ty * 0.008) * 50 + Math.cos(ty * 0.02) * 20;
-        if (Math.abs(tx - riverX) > 35) {
-          this.drawTreeCanopy(ctx, tx, ty);
+      // 5. Pine Tree Clusters (Classic Xevious rounded tree canopies)
+      for (let i = 0; i < 110; i++) {
+        const tx = (i * 73) % (w - 36) + 12;
+        const ty = (i * 97) % (h - 36) + 12;
+        const rx = getRiverX(ty);
+        if (Math.abs(tx - rx) > 42) {
+          this.drawXeviousTree(ctx, tx, ty);
         }
       }
 
     } else if (stage === 2) {
-      // Stage 2: Sand Dunes & Martian Red Wasteland
-      ctx.fillStyle = '#92400e';
+      // --- STAGE 2: Vast Desert & Elon's Launchpad (イーロンズ・ゲート) ---
+      // 1. Ochre Desert Base
+      ctx.fillStyle = '#b45309';
       ctx.fillRect(0, 0, w, h);
 
       // Sand Dune ridges
-      for (let y = 0; y < h; y += 40) {
-        ctx.fillStyle = '#b45309';
+      for (let y = 0; y < h; y += 45) {
+        ctx.fillStyle = '#d97706';
         ctx.beginPath();
         ctx.moveTo(0, y);
-        ctx.bezierCurveTo(w * 0.3, y + 25, w * 0.7, y - 25, w, y + 10);
-        ctx.lineTo(w, y + 25);
-        ctx.bezierCurveTo(w * 0.7, y - 5, w * 0.3, y + 45, 0, y + 25);
+        ctx.bezierCurveTo(w * 0.35, y + 28, w * 0.65, y - 24, w, y + 14);
+        ctx.lineTo(w, y + 26);
+        ctx.bezierCurveTo(w * 0.65, y - 10, w * 0.35, y + 42, 0, y + 26);
         ctx.closePath();
         ctx.fill();
       }
 
-      // Warm ripples
-      ctx.fillStyle = '#d97706';
-      for (let i = 0; i < 200; i++) {
-        const rx = (i * 47) % w;
-        const ry = (i * 89) % h;
-        ctx.fillRect(rx, ry, 6, 2);
+      // Wind ripple highlights
+      ctx.fillStyle = '#fbbf24';
+      for (let i = 0; i < 160; i++) {
+        const rx = (i * 43) % w;
+        const ry = (i * 83) % h;
+        ctx.fillRect(rx, ry, 12, 2);
+      }
+
+      // 2. Concrete Rocket Runway & Launch Strip
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(w * 0.36, 0, w * 0.28, h);
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(w * 0.38, 0, w * 0.24, h);
+
+      // Runway markings
+      ctx.fillStyle = '#f8fafc';
+      for (let y = 20; y < h; y += 60) {
+        ctx.fillRect(w * 0.49, y, 6, 26);
+      }
+
+      // Launch pads with flame blast trenches
+      for (let py = 150; py < h; py += 320) {
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(w * 0.28, py, 40, 40);
+        ctx.fillRect(w * 0.62, py, 40, 40);
+
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(w * 0.28, py, 40, 40);
+        ctx.strokeRect(w * 0.62, py, 40, 40);
       }
 
     } else if (stage === 3) {
-      // Stage 3: Anthropic Terracotta Tech Citadel
-      ctx.fillStyle = '#451a03';
+      // --- STAGE 3: Woodland River Valley (ザ・ファブル) ---
+      ctx.fillStyle = '#4a5d3e'; // Dense woodland earth
       ctx.fillRect(0, 0, w, h);
 
-      // Circuit grid lines & optical channels
-      ctx.strokeStyle = '#d97706';
-      ctx.lineWidth = 2;
-      for (let x = 20; x < w; x += 40) {
+      // Split double rivers
+      const river1 = (y: number) => w * 0.30 + Math.sin(y * 0.009) * 35;
+      const river2 = (y: number) => w * 0.72 + Math.cos(y * 0.009) * 35;
+
+      for (const getR of [river1, river2]) {
+        ctx.strokeStyle = '#c5b48e';
+        ctx.lineWidth = 36;
         ctx.beginPath();
-        ctx.moveTo(x, 0); ctx.lineTo(x, h);
+        for (let y = 0; y <= h; y += 20) {
+          const rx = getR(y);
+          if (y === 0) ctx.moveTo(rx, y);
+          else ctx.lineTo(rx, y);
+        }
         ctx.stroke();
-      }
-      for (let y = 30; y < h; y += 60) {
+
+        ctx.strokeStyle = '#1e40af';
+        ctx.lineWidth = 26;
         ctx.beginPath();
-        ctx.moveTo(0, y); ctx.lineTo(w, y);
+        for (let y = 0; y <= h; y += 20) {
+          const rx = getR(y);
+          if (y === 0) ctx.moveTo(rx, y);
+          else ctx.lineTo(rx, y);
+        }
         ctx.stroke();
       }
 
-      // Golden geometric nodes
-      ctx.fillStyle = '#fbbf24';
-      for (let x = 20; x < w; x += 40) {
-        for (let y = 30; y < h; y += 60) {
-          ctx.fillRect(x - 3, y - 3, 6, 6);
+      // Forest clumps
+      for (let i = 0; i < 90; i++) {
+        const tx = (i * 61) % (w - 30) + 10;
+        const ty = (i * 89) % (h - 30) + 10;
+        if (Math.abs(tx - river1(ty)) > 30 && Math.abs(tx - river2(ty)) > 30) {
+          this.drawXeviousTree(ctx, tx, ty);
         }
       }
 
     } else {
-      // Stage 4: GPT-6 Megastructure Mothership Hull
-      ctx.fillStyle = '#090d16';
+      // --- STAGE 4: Desert Airfield Fortress (魔法使いチャッピー) ---
+      // Sandy Desert Plains
+      ctx.fillStyle = '#a16207';
       ctx.fillRect(0, 0, w, h);
 
-      // Giant armor plating seams
-      ctx.strokeStyle = '#1e293b';
-      ctx.lineWidth = 3;
-      for (let y = 0; y < h; y += 90) {
+      // Desert sand dunes
+      for (let y = 0; y < h; y += 50) {
+        ctx.fillStyle = '#ca8a04';
         ctx.beginPath();
-        ctx.moveTo(0, y); ctx.lineTo(w, y);
-        ctx.stroke();
+        ctx.moveTo(0, y);
+        ctx.bezierCurveTo(w * 0.4, y + 20, w * 0.6, y - 20, w, y + 10);
+        ctx.lineTo(w, y + 18);
+        ctx.bezierCurveTo(w * 0.6, y - 10, w * 0.4, y + 30, 0, y + 18);
+        ctx.closePath();
+        ctx.fill();
       }
-      for (let x = 0; x < w; x += 60) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0); ctx.lineTo(x, h);
-        ctx.stroke();
+
+      // Airbase runways (Xevious Andor Genesis airfield)
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(w * 0.18, 0, 48, h);
+      ctx.fillRect(w * 0.68, 0, 48, h);
+
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(w * 0.20, 0, 44, h);
+      ctx.fillRect(w * 0.70, 0, 44, h);
+
+      // Runway dashed lines
+      ctx.fillStyle = '#fef08a';
+      for (let y = 10; y < h; y += 40) {
+        ctx.fillRect(w * 0.25, y, 4, 18);
+        ctx.fillRect(w * 0.75, y, 4, 18);
       }
 
-      // Glowing cyan data token pipelines
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(w * 0.25, 0); ctx.lineTo(w * 0.25, h);
-      ctx.moveTo(w * 0.75, 0); ctx.lineTo(w * 0.75, h);
-      ctx.stroke();
-    }
-  }
-
-  private drawTreeCanopy(ctx: CanvasRenderingContext2D, x: number, y: number): void {
-    // 80s Namco-style rounded tree canopy with bevel
-    ctx.fillStyle = '#064e3b'; // Shadow
-    ctx.fillRect(x - 1, y - 1, 16, 16);
-
-    ctx.fillStyle = '#047857'; // Base green
-    ctx.fillRect(x, y, 14, 14);
-
-    ctx.fillStyle = '#10b981'; // Top-left highlight
-    ctx.fillRect(x, y, 8, 8);
-
-    ctx.fillStyle = '#34d399'; // Glint dot
-    ctx.fillRect(x + 2, y + 2, 3, 3);
-  }
-
-  // Draw Nazca Ground Drawings and Parody Glyphs
-  private renderLandmarks(ctx: CanvasRenderingContext2D, stage: number, yOffset: number): void {
-    ctx.save();
-
-    if (stage === 1) {
-      // Stage 1: Ancient Nazca Hummingbird (Classic Xevious Style)
-      const glyphY = ((this.height * 1.5 - yOffset) % (this.height * 2) + this.height * 2) % (this.height * 2) - this.height * 0.5;
-      if (glyphY > -100 && glyphY < this.height + 100) {
-        this.drawNazcaBird(ctx, this.width * 0.78, glyphY);
-      }
-    } else if (stage === 2) {
-      // Stage 2: Nazca Monkey + xAI 'X' + Cursor '{ }' AI Parody Glyphs in Desert
-      const glyph1Y = ((this.height * 0.8 - yOffset) % (this.height * 2) + this.height * 2) % (this.height * 2) - this.height * 0.5;
-      const glyph2Y = ((this.height * 1.6 - yOffset) % (this.height * 2) + this.height * 2) % (this.height * 2) - this.height * 0.5;
-
-      if (glyph1Y > -100 && glyph1Y < this.height + 100) {
-        this.drawNazcaGrokAndCursor(ctx, this.width * 0.3, glyph1Y);
-      }
-      if (glyph2Y > -100 && glyph2Y < this.height + 100) {
-        this.drawNazcaNeuralNet(ctx, this.width * 0.65, glyph2Y);
-      }
-    }
-
-    ctx.restore();
-  }
-
-  // Classic Nazca Bird
-  private drawNazcaBird(ctx: CanvasRenderingContext2D, x: number, y: number): void {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.strokeStyle = '#fef08a';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    // Beak
-    ctx.moveTo(0, -30); ctx.lineTo(0, -10);
-    // Wings
-    ctx.lineTo(-25, 0); ctx.lineTo(0, 10); ctx.lineTo(25, 0); ctx.lineTo(0, -10);
-    // Tail
-    ctx.moveTo(0, 10); ctx.lineTo(0, 30);
-    ctx.lineTo(-12, 36); ctx.moveTo(0, 30); ctx.lineTo(12, 36);
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  // xAI 'X' and Cursor '{ }' etched into the desert
-  private drawNazcaGrokAndCursor(ctx: CanvasRenderingContext2D, x: number, y: number): void {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.strokeStyle = '#fef3c7';
-    ctx.lineWidth = 3;
-
-    // Huge Grok 'X'
-    ctx.beginPath();
-    ctx.moveTo(-20, -25); ctx.lineTo(20, 25);
-    ctx.moveTo(18, -25); ctx.lineTo(-18, 25);
-    ctx.stroke();
-
-    // Cursor brackets '{ }' flanking it
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    // Left {
-    ctx.moveTo(-28, -20); ctx.lineTo(-34, -10); ctx.lineTo(-38, 0); ctx.lineTo(-34, 10); ctx.lineTo(-28, 20);
-    // Right }
-    ctx.moveTo(28, -20); ctx.lineTo(34, -10); ctx.lineTo(38, 0); ctx.lineTo(34, 10); ctx.lineTo(28, 20);
-    ctx.stroke();
-
-    ctx.restore();
-  }
-
-  // Massive Neural Network Schematic etched in the sand
-  private drawNazcaNeuralNet(ctx: CanvasRenderingContext2D, x: number, y: number): void {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.strokeStyle = '#fde68a';
-    ctx.lineWidth = 1.5;
-
-    const layers = [
-      [-15, 0, 15],
-      [-25, -10, 10, 25],
-      [-15, 0, 15]
-    ];
-    const xs = [-25, 0, 25];
-
-    // Synapse Lines
-    for (let l = 0; l < 2; l++) {
-      for (const y1 of layers[l]) {
-        for (const y2 of layers[l + 1]) {
-          ctx.beginPath();
-          ctx.moveTo(xs[l], y1);
-          ctx.lineTo(xs[l + 1], y2);
-          ctx.stroke();
+      // Oasis tree groves along the perimeter
+      for (let i = 0; i < 50; i++) {
+        const tx = (i * 53) % (w - 24) + 8;
+        const ty = (i * 79) % (h - 24) + 8;
+        if (tx < w * 0.16 || (tx > w * 0.35 && tx < w * 0.65) || tx > w * 0.84) {
+          this.drawXeviousTree(ctx, tx, ty);
         }
       }
     }
+  }
 
-    // Nodes
-    ctx.fillStyle = '#fef08a';
-    for (let l = 0; l < 3; l++) {
-      for (const ny of layers[l]) {
-        ctx.beginPath();
-        ctx.arc(xs[l], ny, 2.5, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
+  // Authentic 1983 Namco Xevious Tree Canopy with Bevel and Drop-Shadow
+  private drawXeviousTree(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+    // 1. Southeast Drop-shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.beginPath();
+    ctx.arc(x + 10, y + 10, 9, 0, Math.PI * 2);
+    ctx.fill();
 
-    ctx.restore();
+    // 2. Base Dark Green foliage
+    ctx.fillStyle = '#14532d';
+    ctx.beginPath();
+    ctx.arc(x + 7, y + 7, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 3. Mid Forest Green
+    ctx.fillStyle = '#15803d';
+    ctx.beginPath();
+    ctx.arc(x + 6, y + 6, 7, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 4. Northwest Light Green Sunlit Highlight
+    ctx.fillStyle = '#22c55e';
+    ctx.beginPath();
+    ctx.arc(x + 4, y + 4, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 5. Specular Glint
+    ctx.fillStyle = '#86efac';
+    ctx.fillRect(x + 3, y + 3, 2, 2);
   }
 }
