@@ -16,6 +16,8 @@ export interface PlayerState {
   vy: number;
   tilt: number; // -1 (left), 0 (center), 1 (right)
   lives: number;
+  hp: number;
+  maxHp: number;
   score: number;
   highScore: number;
   invulnerableTimer: number;

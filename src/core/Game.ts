@@ -162,6 +162,7 @@ export class Game {
     this.terrain.setStage(this.stage);
     this.stageManager.loadStage(this.stage);
     this.audio.playStageBgm(this.stage);
+    this.player.repair(100); // Fully restore player shield/hull on stage transition!
 
     // Keep active orbs as power progression
     if (this.geminiManager.orbs.length === 0) {
@@ -501,7 +502,8 @@ export class Game {
               if (!remainingInFormation) {
                 // FORMATION WIPED! Drop floating Gemini logo item!
                 this.spawnGeminiDropItem(deadX, deadY);
-                this.addFloatingText(deadX, deadY - 24, 'FORMATION WIPE! GEMINI DROP', '#38bdf8');
+                this.player.repair(20);
+                this.addFloatingText(deadX, deadY - 24, 'FORMATION WIPE! +20 SHIELD', '#22c55e');
                 this.player.addScore(1500);
               }
             }
@@ -546,24 +548,25 @@ export class Game {
       }
     }
 
-    // 4. Player Ship vs Gemini Drop Items (自機で取ればもう一個のジェミニ追加！)
+    // 4. Player Ship vs Gemini Drop Items (自機で取ればもう一個のジェミニ追加＆シールド修復！)
     if (this.player.state.alive) {
       for (let i = this.geminiItems.length - 1; i >= 0; i--) {
         const it = this.geminiItems[i];
         const dist = Math.hypot(this.player.state.x - it.x, this.player.state.y - it.y);
 
         if (dist < 22 + it.size) {
-          // Player collected item: SPAWN NEW GEMINI ORB!
+          // Player collected item: SPAWN NEW GEMINI ORB & REPAIR SHIELD!
           this.geminiManager.spawn(it.x, it.y);
+          this.player.repair(15);
           this.audio.playItemCollect();
-          this.addFloatingText(it.x, it.y - 18, '+1 GEMINI GET!', '#38bdf8');
+          this.addFloatingText(it.x, it.y - 18, '+1 GEMINI! +15 SHIELD', '#38bdf8');
           this.player.addScore(2000);
           this.geminiItems.splice(i, 1);
         }
       }
     }
 
-    // 5. Existing Gemini Orbs vs Gemini Drop Items (持ってるジェミニに当てれば強化！)
+    // 5. Existing Gemini Orbs vs Gemini Drop Items (持ってるジェミニに当てれば強化＆シールド修復！)
     for (let i = this.geminiItems.length - 1; i >= 0; i--) {
       const it = this.geminiItems[i];
       let struck = false;
@@ -571,11 +574,12 @@ export class Game {
       for (const orb of this.geminiManager.orbs) {
         const dist = Math.hypot(orb.x - it.x, orb.y - it.y);
         if (dist < orb.radius + it.size) {
-          // Gemini orb struck item: LEVEL UP THAT ORB!
+          // Gemini orb struck item: LEVEL UP THAT ORB & REPAIR!
           this.geminiManager.levelUpOrb(orb);
+          this.player.repair(15);
           this.audio.playGeminiLevelUp();
           this.addExplosion(orb.x, orb.y, 28, false);
-          this.addFloatingText(orb.x, orb.y - 22, `GEMINI POWER UP! Lv.${orb.level}`, '#ec4899');
+          this.addFloatingText(orb.x, orb.y - 22, `POWER UP! Lv.${orb.level} (+15 SHIELD)`, '#ec4899');
           this.player.addScore(3000);
           struck = true;
           break;
@@ -587,7 +591,7 @@ export class Game {
       }
     }
 
-    // 6. Player Ship vs White Enemy Bullets
+    // 6. Player Ship vs White Enemy Bullets (ダメージ制: 即死＆巻き戻し撤廃！)
     if (this.player.state.alive && this.player.state.invulnerableTimer <= 0) {
       for (let bi = this.enemyBullets.length - 1; bi >= 0; bi--) {
         const b = this.enemyBullets[bi];
@@ -595,27 +599,58 @@ export class Game {
 
         if (dist < 10 + b.radius) {
           this.enemyBullets.splice(bi, 1);
-          const killed = this.player.hit();
-          if (killed) {
-            this.audio.playPlayerDeath();
-            this.addExplosion(this.player.state.x, this.player.state.y, 36, false);
-            this.playerRespawnTimer = 0;
+          const res = this.player.takeDamage(20);
+          if (res.damaged) {
+            this.renderer.triggerShake(7, 3.5);
+            if (res.destroyed) {
+              this.audio.playPlayerDeath();
+              this.addExplosion(this.player.state.x, this.player.state.y, 40, false);
+              this.playerRespawnTimer = 0;
+            } else if (res.restored) {
+              this.audio.playPlayerEmergency();
+              this.renderer.triggerShake(14, 7);
+              this.addExplosion(this.player.state.x, this.player.state.y, 44, false);
+              this.addFloatingText(this.player.state.x, this.player.state.y - 30, 'EMERGENCY REPAIR! RESTORED', '#38bdf8');
+              this.enemyBullets = this.enemyBullets.filter(
+                eb => Math.hypot(eb.x - this.player.state.x, eb.y - this.player.state.y) > 120
+              );
+            } else {
+              this.audio.playPlayerDamage();
+              this.addExplosion(this.player.state.x, this.player.state.y, 14, false);
+              this.addFloatingText(this.player.state.x, this.player.state.y - 18, '-20 SHIELD', '#ef4444');
+            }
             break;
           }
         }
       }
     }
 
-    // 7. Player Ship vs Airborne Enemies
+    // 7. Player Ship vs Airborne Enemies (ダメージ制: 衝突してもHP減少のみでそのまま戦線維持！)
     if (this.player.state.alive && this.player.state.invulnerableTimer <= 0) {
       for (const e of this.enemyManager.enemies) {
         const dist = Math.hypot(this.player.state.x - e.x, this.player.state.y - e.y);
         if (dist < 12 + e.width * 0.35) {
-          const killed = this.player.hit();
-          if (killed) {
-            this.audio.playPlayerDeath();
-            this.addExplosion(this.player.state.x, this.player.state.y, 36, false);
-            this.playerRespawnTimer = 0;
+          const dmg = (e.pattern === 'TACKLE_DASH' || e.pattern === 'ROCKET_ASCENT') ? 35 : 25;
+          const res = this.player.takeDamage(dmg);
+          if (res.damaged) {
+            this.renderer.triggerShake(9, 4.5);
+            if (res.destroyed) {
+              this.audio.playPlayerDeath();
+              this.addExplosion(this.player.state.x, this.player.state.y, 40, false);
+              this.playerRespawnTimer = 0;
+            } else if (res.restored) {
+              this.audio.playPlayerEmergency();
+              this.renderer.triggerShake(14, 7);
+              this.addExplosion(this.player.state.x, this.player.state.y, 44, false);
+              this.addFloatingText(this.player.state.x, this.player.state.y - 30, 'EMERGENCY REPAIR! RESTORED', '#38bdf8');
+              this.enemyBullets = this.enemyBullets.filter(
+                eb => Math.hypot(eb.x - this.player.state.x, eb.y - this.player.state.y) > 120
+              );
+            } else {
+              this.audio.playPlayerDamage();
+              this.addExplosion(this.player.state.x, this.player.state.y, 16, false);
+              this.addFloatingText(this.player.state.x, this.player.state.y - 18, `-${dmg} SHIELD`, '#ef4444');
+            }
             break;
           }
         }

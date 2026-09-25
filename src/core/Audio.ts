@@ -250,6 +250,16 @@ export class SoundEngine {
     this.playBuffer('level_up', 0.85, 1.0, 100);
   }
 
+  /** Player receives damage (shield / hull hit) */
+  public playPlayerDamage(): void {
+    this.playBuffer('armor_hit', 0.95, 0.9, 60);
+  }
+
+  /** Player emergency hull restoration */
+  public playPlayerEmergency(): void {
+    this.playBuffer('bomb_big', 0.8, 1.4, 200);
+  }
+
   /** Player destruction */
   public playPlayerDeath(): void {
     this.playBuffer('bomb_big', 0.95, 0.95, 200);

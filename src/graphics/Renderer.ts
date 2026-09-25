@@ -27,6 +27,9 @@ export class ArcadeRenderer {
   private elonPolygonImg: HTMLImageElement;
   private elonPolygonLoaded: boolean = false;
 
+  private shakeTimer: number = 0;
+  private shakeMagnitude: number = 0;
+
   constructor(canvas: HTMLCanvasElement, sprites: SpriteSheet, terrain: TerrainEngine) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
@@ -47,6 +50,11 @@ export class ArcadeRenderer {
     };
   }
 
+  public triggerShake(duration: number = 8, magnitude: number = 4): void {
+    this.shakeTimer = duration;
+    this.shakeMagnitude = magnitude;
+  }
+
   public render(
     state: GameState,
     player: PlayerState,
@@ -65,6 +73,14 @@ export class ArcadeRenderer {
     elonIntroTimer: number = 0
   ): void {
     const ctx = this.ctx;
+
+    ctx.save();
+    if (this.shakeTimer > 0) {
+      this.shakeTimer--;
+      const sx = (Math.random() - 0.5) * this.shakeMagnitude;
+      const sy = (Math.random() - 0.5) * this.shakeMagnitude;
+      ctx.translate(sx, sy);
+    }
 
     // 1. Draw Scrolling Terrain
     this.terrain.render(ctx, stage);
@@ -124,6 +140,8 @@ export class ArcadeRenderer {
 
     // 14. State Overlays (Title, Stage Clear, Game Over, Game Clear)
     this.renderStateOverlays(state, stage, stageTick, player.score);
+
+    ctx.restore();
   }
 
   // --- Ground Bases ---
@@ -249,9 +267,52 @@ export class ArcadeRenderer {
     if (!player.alive) return;
     const ctx = this.ctx;
 
-    // Invulnerability Blink
-    if (player.invulnerableTimer > 0 && Math.floor(player.invulnerableTimer / 4) % 2 === 0) {
-      return;
+    // Invulnerability Shield Barrier & Visual Feedback
+    const isInvulnerable = player.invulnerableTimer > 0;
+    if (isInvulnerable) {
+      // Shimmering elliptical cyber energy barrier
+      ctx.save();
+      const shieldPulse = Math.sin(player.invulnerableTimer * 0.3) * 2;
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.6;
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.22)';
+      ctx.beginPath();
+      ctx.ellipse(player.x, player.y, 20 + shieldPulse, 18 + shieldPulse, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Outer hexagonal barrier lines
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+      ctx.lineWidth = 1.0;
+      ctx.beginPath();
+      for (let a = 0; a < 6; a++) {
+        const rad = (a * Math.PI) / 3;
+        const hx = player.x + Math.cos(rad) * (23 + shieldPulse);
+        const hy = player.y + Math.sin(rad) * (20 + shieldPulse);
+        if (a === 0) ctx.moveTo(hx, hy);
+        else ctx.lineTo(hx, hy);
+      }
+      ctx.closePath();
+      ctx.stroke();
+      ctx.restore();
+
+      // Rapid i-frame transparency flicker
+      if (Math.floor(player.invulnerableTimer / 3) % 2 === 0) {
+        ctx.globalAlpha = 0.55;
+      }
+    }
+
+    // Low Hull Warning Sparks & Smoke
+    if (player.hp <= 30 && Math.random() < 0.35) {
+      ctx.save();
+      ctx.fillStyle = Math.random() > 0.5 ? '#ef4444' : '#f59e0b';
+      ctx.fillRect(
+        player.x + (Math.random() - 0.5) * 16,
+        player.y + (Math.random() - 0.5) * 12,
+        2,
+        2
+      );
+      ctx.restore();
     }
 
     // Thruster Exhaust Plume
@@ -265,6 +326,24 @@ export class ArcadeRenderer {
     const sprite = this.sprites.get(key);
     if (sprite) {
       ctx.drawImage(sprite, player.x - sprite.width / 2, player.y - sprite.height / 2);
+    }
+
+    ctx.globalAlpha = 1.0;
+
+    // Mini Shield Bar floating underneath ship
+    if (player.hp < player.maxHp || isInvulnerable) {
+      const barW = 24;
+      const barH = 3;
+      const barX = player.x - barW / 2;
+      const barY = player.y + 19;
+      const hpRatio = Math.max(0, player.hp / player.maxHp);
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
+
+      const color = hpRatio > 0.5 ? '#22c55e' : hpRatio > 0.25 ? '#f59e0b' : '#ef4444';
+      ctx.fillStyle = color;
+      ctx.fillRect(barX, barY, barW * hpRatio, barH);
     }
   }
 
@@ -696,19 +775,47 @@ export class ArcadeRenderer {
 
     // Top Header: 1UP Score & HIGH Score
     ctx.fillStyle = '#ef4444';
-    ctx.fillText('1UP', 16, 18);
+    ctx.fillText('1UP', 16, 17);
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(player.score.toString().padStart(6, '0'), 52, 18);
+    ctx.fillText(player.score.toString().padStart(6, '0'), 50, 17);
 
     ctx.fillStyle = '#ef4444';
-    ctx.fillText('HIGH', w - 120, 18);
+    ctx.fillText('HIGH', w - 120, 17);
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(player.highScore.toString().padStart(6, '0'), w - 74, 18);
+    ctx.fillText(player.highScore.toString().padStart(6, '0'), w - 74, 17);
+
+    // Player SHIELD / Armor Bar (Damage System)
+    const shieldX = 16;
+    const shieldY = 24;
+    const barW = 54;
+    const barH = 5;
+
+    ctx.font = '6px "Press Start 2P", monospace';
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText('SHIELD', shieldX, shieldY + 5);
+
+    const gaugeX = shieldX + 44;
+    const hpRatio = Math.max(0, player.hp / player.maxHp);
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(gaugeX - 1, shieldY - 1, barW + 2, barH + 2);
+
+    const shieldColor = hpRatio > 0.5 ? '#22c55e' : hpRatio > 0.25 ? '#f59e0b' : '#ef4444';
+    ctx.fillStyle = shieldColor;
+    ctx.fillRect(gaugeX, shieldY, barW * hpRatio, barH);
+
+    ctx.strokeStyle = '#475569';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(gaugeX - 1, shieldY - 1, barW + 2, barH + 2);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '6px "Press Start 2P", monospace';
+    ctx.fillText(`${player.hp}%`, gaugeX + barW + 5, shieldY + 5);
 
     // Bottom Bar: Lives, Stage Indicator, Gemini Power Level
     const btmY = this.canvas.height - 10;
 
-    // Mini Lives Ships
+    // Mini Lives Ships (Emergency Hull Restores)
     const shipSprite = this.sprites.get('PLAYER_CENTER');
     if (shipSprite) {
       for (let i = 0; i < player.lives - 1; i++) {
@@ -719,6 +826,7 @@ export class ArcadeRenderer {
     // Stage Display
     ctx.fillStyle = '#38bdf8';
     ctx.textAlign = 'center';
+    ctx.font = '9px "Press Start 2P", monospace';
     ctx.fillText(`STAGE ${stage}`, w / 2, btmY - 4);
 
     // Gemini Orb count & MAX Level indicator
@@ -734,26 +842,26 @@ export class ArcadeRenderer {
 
     // Boss HP Bar
     if (boss && !boss.defeated && boss.y > 0) {
-      const barW = 160;
-      const barH = 6;
-      const barX = (w - barW) / 2;
-      const barY = 32;
+      const bossBarW = 160;
+      const bossBarH = 6;
+      const bossBarX = (w - bossBarW) / 2;
+      const bossBarY = 38;
 
       ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-      ctx.fillRect(barX - 2, barY - 2, barW + 4, barH + 4);
+      ctx.fillRect(bossBarX - 2, bossBarY - 2, bossBarW + 4, bossBarH + 4);
 
-      const hpPercent = Math.max(0, boss.hp / boss.maxHp);
-      ctx.fillStyle = hpPercent > 0.3 ? '#ef4444' : '#fbbf24';
-      ctx.fillRect(barX, barY, barW * hpPercent, barH);
+      const bossHpPercent = Math.max(0, boss.hp / boss.maxHp);
+      ctx.fillStyle = bossHpPercent > 0.3 ? '#ef4444' : '#fbbf24';
+      ctx.fillRect(bossBarX, bossBarY, bossBarW * bossHpPercent, bossBarH);
 
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 1;
-      ctx.strokeRect(barX, barY, barW, barH);
+      ctx.strokeRect(bossBarX, bossBarY, bossBarW, bossBarH);
 
       ctx.fillStyle = '#ffffff';
       ctx.font = '7px "Press Start 2P", monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(boss.name, w / 2, barY - 4);
+      ctx.fillText(boss.name, w / 2, bossBarY - 4);
     }
   }
 
