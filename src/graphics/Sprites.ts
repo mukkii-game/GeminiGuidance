@@ -387,6 +387,15 @@ export class SpriteSheet {
     // Grok Slash-X Official Path
     const GROK_PATH = "M6.469 8.776L16.512 23h-4.464L2.005 8.776H6.47zm-.004 7.9l2.233 3.164L6.467 23H2l4.465-6.324zM22 2.582V23h-3.659V7.764L22 2.582zM22 1l-9.952 14.095-2.233-3.163L17.533 1H22z";
 
+    // DeepSeek Blue Whale Official Path
+    const DEEPSEEK_PATH = "M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588z";
+
+    // Perplexity Official Path
+    const PERPLEXITY_PATH = "M19.785 0v7.272H22.5V17.62h-2.935V24l-7.037-6.194v6.145h-1.091v-6.152L4.392 24v-6.465H1.5V7.188h2.884V0l7.053 6.494V.19h1.09v6.49L19.786 0zm-7.257 9.044v7.319l5.946 5.234V14.44l-5.946-5.397zm-1.099-.08l-5.946 5.398v7.235l5.946-5.234V8.965zm8.136 7.58h1.844V8.349H13.46l6.105 5.54v2.655zm-8.982-8.28H2.59v8.195h1.8v-2.576l6.192-5.62zM5.475 2.476v4.71h5.115l-5.115-4.71zm13.219 0l-5.115 4.71h5.115v-4.71z";
+
+    // Kimi Official Path
+    const KIMI_PATH = "M11.065 11.199l7.257-7.2c.137-.136.06-.41-.116-.41H14.3a.164.164 0 00-.117.051l-7.82 7.756c-.122.12-.302.013-.302-.179V3.82c0-.127-.083-.23-.185-.23H3.186c-.103 0-.186.103-.186.23V19.77c0 .128.083.23.186.23h2.69c.103 0 .186-.102.186-.23v-3.25c0-.069.025-.135.069-.178l2.424-2.406a.158.158 0 01.205-.023l6.484 4.772a7.677 7.677 0 003.453 1.283c.108.012.2-.095.2-.23v-3.06c0-.117-.07-.212-.164-.227a5.028 5.028 0 01-2.027-.807l-5.613-4.064c-.117-.078-.132-.279-.028-.381z";
+
     // 1. OpenAI Hierarchy
     this.registerSvgSprite('GPT6_LUNA', 24, 24, './assets/logos/openai_luna.svg', OPENAI_PATH, '#10a37f');
     this.registerSvgSprite('GPT6_TERRA', 34, 34, './assets/logos/openai_terra.svg', OPENAI_PATH, '#38bdf8');
@@ -400,13 +409,13 @@ export class SpriteSheet {
     this.registerSvgSprite('CLAUDE_FABLE', 48, 48, './assets/logos/claude_fable.svg', CLAUDE_PATH, '#fbbf24');
 
     // 3. Other Major AI Players
-    this.registerSvgSprite('DEEPSEEK_FLASH', 28, 24, './assets/logos/deepseek.svg');
+    this.registerSvgSprite('DEEPSEEK_FLASH', 28, 24, './assets/logos/deepseek.svg', DEEPSEEK_PATH, '#4D6BFE');
     this.registerSvgSprite('GROK_RAIDER', 28, 28, './assets/logos/grok.svg', GROK_PATH, '#f8fafc');
     this.registerSvgSprite('CURSOR_PROBE', 26, 26, './assets/logos/cursor.svg');
     this.registerSvgSprite('MISTRAL_FLAME', 24, 24, './assets/logos/mistral.svg');
-    this.registerSvgSprite('KIMI_MOON', 26, 26, './assets/logos/kimi.svg');
+    this.registerSvgSprite('KIMI_MOON', 26, 26, './assets/logos/kimi.svg', KIMI_PATH, '#1783FF');
     this.registerSvgSprite('COPILOT_GLIDER', 26, 26, './assets/logos/copilot.svg');
-    this.registerSvgSprite('PERPLEXITY_SPINNER', 26, 26, './assets/logos/perplexity.svg');
+    this.registerSvgSprite('PERPLEXITY_SPINNER', 26, 26, './assets/logos/perplexity.svg', PERPLEXITY_PATH, '#22B8CD');
     this.registerSvgSprite('QWEN_CUBE', 26, 26, './assets/logos/qwen.svg');
   }
 
