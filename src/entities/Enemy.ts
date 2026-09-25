@@ -208,7 +208,7 @@ export class EnemyManager {
         if (e.x < -60 || e.x > canvasWidth + 60) {
           this.enemies.splice(i, 1);
         }
-      } else if (e.pattern !== 'INVADER') {
+      } else if (e.pattern !== 'INVADER' && e.pattern !== 'DUMMY') {
         if (e.y > canvasHeight + 100 || e.y < -160 || e.x < -120 || e.x > canvasWidth + 120) {
           this.enemies.splice(i, 1);
         }
@@ -281,6 +281,13 @@ export class EnemyManager {
     const t = e.age;
 
     switch (e.pattern) {
+      case 'DUMMY': {
+        // Stationary target dummy with gentle hover bobbing
+        e.vx = 0;
+        e.vy = Math.sin(t * 0.05) * 0.15;
+        break;
+      }
+
       case 'UFO_FLYBY': {
         // Horizontal cruise across top
         break;

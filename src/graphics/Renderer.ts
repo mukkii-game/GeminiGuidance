@@ -11,6 +11,8 @@ import {
   ExplosionEffect,
   FloatingText,
   GameState,
+  PhysicsPresetConfig,
+  PhysicsPresetId,
 } from '../types';
 import { SpriteSheet } from './Sprites';
 import { TerrainEngine } from './Terrain';
@@ -70,7 +72,10 @@ export class ArcadeRenderer {
     floatingTexts: FloatingText[],
     stage: number,
     stageTick: number,
-    elonIntroTimer: number = 0
+    elonIntroTimer: number = 0,
+    presetConfig?: PhysicsPresetConfig,
+    telemetry?: { dist: number; speed: number; tangentSpeed: number },
+    testBossDamage: number = 0
   ): void {
     const ctx = this.ctx;
 
@@ -88,7 +93,7 @@ export class ArcadeRenderer {
     // 2. Draw Ground Bases (Nvidia, Meta, HuggingFace, Stability AI octagons)
     this.renderGroundTargets(groundTargets);
 
-    // 2.5 Draw Breakout Blocks (Stage 2)
+    // 2.5 Draw Breakout Blocks (Stage 2 & Test Stage)
     if (blocks && blocks.length > 0) {
       this.renderBreakoutBlocks(blocks);
     }
@@ -111,7 +116,7 @@ export class ArcadeRenderer {
     this.renderGeminiOrbs(geminiOrbs, player.x, player.y);
 
     // 8. Draw Player Ship
-    if (state === 'PLAYING' || state === 'STAGE_CLEAR') {
+    if (state === 'PLAYING' || state === 'STAGE_CLEAR' || state === 'TEST_STAGE') {
       this.renderPlayer(player);
     }
 
@@ -136,7 +141,11 @@ export class ArcadeRenderer {
     }
 
     // 13. Arcade HUD
-    this.renderHUD(player, stage, geminiOrbs, boss);
+    if (state === 'TEST_STAGE') {
+      this.renderTestStageHUD(player, geminiOrbs, boss, presetConfig, telemetry, testBossDamage);
+    } else {
+      this.renderHUD(player, stage, geminiOrbs, boss, presetConfig);
+    }
 
     // 14. State Overlays (Title, Stage Clear, Game Over, Game Clear)
     this.renderStateOverlays(state, stage, stageTick, player.score);
@@ -781,7 +790,13 @@ export class ArcadeRenderer {
   }
 
   // --- Retro Arcade HUD ---
-  private renderHUD(player: PlayerState, stage: number, geminiOrbs: GeminiOrb[], boss: BossEntity | null): void {
+  private renderHUD(
+    player: PlayerState,
+    stage: number,
+    geminiOrbs: GeminiOrb[],
+    boss: BossEntity | null,
+    presetConfig?: PhysicsPresetConfig
+  ): void {
     const ctx = this.ctx;
     const w = this.canvas.width;
 
@@ -790,23 +805,45 @@ export class ArcadeRenderer {
 
     // Top Header: 1UP Score & HIGH Score
     ctx.fillStyle = '#ef4444';
-    ctx.fillText('1UP', 16, 17);
+    ctx.fillText('1UP', 14, 16);
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(player.score.toString().padStart(6, '0'), 50, 17);
+    ctx.fillText(player.score.toString().padStart(6, '0'), 46, 16);
 
     ctx.fillStyle = '#ef4444';
-    ctx.fillText('HIGH', w - 120, 17);
+    ctx.fillText('HI', 116, 16);
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(player.highScore.toString().padStart(6, '0'), w - 74, 17);
+    ctx.fillText(player.highScore.toString().padStart(6, '0'), 138, 16);
+
+    // Top Right Preset Badge & Test Button
+    const btnTestX = w - 48;
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+    ctx.fillRect(btnTestX, 5, 42, 15);
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(btnTestX, 5, 42, 15);
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = '6px "Press Start 2P", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('LAB(T)', btnTestX + 21, 15);
+
+    const btnPresetX = btnTestX - 86;
+    ctx.fillStyle = 'rgba(234, 179, 8, 0.25)';
+    ctx.fillRect(btnPresetX, 5, 80, 15);
+    ctx.strokeStyle = '#fde047';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(btnPresetX, 5, 80, 15);
+    ctx.fillStyle = '#fde047';
+    ctx.fillText(`[1-5:${presetConfig?.name.slice(0, 5) || 'STD'}]`, btnPresetX + 40, 15);
 
     // Player SHIELD / Armor Bar (Damage System)
-    const shieldX = 16;
+    const shieldX = 14;
     const shieldY = 24;
     const barW = 54;
     const barH = 5;
 
     ctx.font = '6px "Press Start 2P", monospace';
     ctx.fillStyle = '#94a3b8';
+    ctx.textAlign = 'left';
     ctx.fillText('SHIELD', shieldX, shieldY + 5);
 
     const gaugeX = shieldX + 44;
@@ -878,6 +915,145 @@ export class ArcadeRenderer {
       ctx.textAlign = 'center';
       ctx.fillText(boss.name, w / 2, bossBarY - 4);
     }
+  }
+
+  // --- Test Stage / Physics Lab HUD & Control Panel ---
+  private renderTestStageHUD(
+    player: PlayerState,
+    geminiOrbs: GeminiOrb[],
+    boss: BossEntity | null,
+    presetConfig?: PhysicsPresetConfig,
+    telemetry?: { dist: number; speed: number; tangentSpeed: number },
+    testBossDamage: number = 0
+  ): void {
+    const ctx = this.ctx;
+    const w = this.canvas.width;
+
+    ctx.save();
+
+    // 1. Top Lab Header Bar
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.94)';
+    ctx.fillRect(0, 0, w, 70);
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(0, 0, w, 70);
+
+    // Title & Shield
+    ctx.font = '8px "Press Start 2P", monospace';
+    ctx.fillStyle = '#38bdf8';
+    ctx.textAlign = 'left';
+    ctx.fillText('⚡LAB', 10, 15);
+
+    ctx.fillStyle = player.hp > 30 ? '#22c55e' : '#ef4444';
+    ctx.font = '7px "Press Start 2P", monospace';
+    ctx.fillText(`SHLD:${player.hp}%`, 56, 15);
+
+    // Lv Toggle Button
+    const lv = geminiOrbs[0]?.level || 1;
+    ctx.fillStyle = 'rgba(236, 72, 153, 0.25)';
+    ctx.fillRect(150, 4, 58, 16);
+    ctx.strokeStyle = '#ec4899';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(150, 4, 58, 16);
+    ctx.fillStyle = '#ec4899';
+    ctx.font = '6px "Press Start 2P", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`Lv.${lv} [L]`, 179, 15);
+
+    // Return to Game Button
+    ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
+    ctx.fillRect(214, 4, 136, 16);
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(214, 4, 136, 16);
+    ctx.fillStyle = '#f87171';
+    ctx.fillText('✕ RETURN (T)', 282, 15);
+
+    // 2. 5 Preset Switcher Tabs (x: 10 to 350, y: 24 to 42, width 64 each, gap 5)
+    const tabs: Array<{ id: PhysicsPresetId; label: string; num: string }> = [
+      { id: 'BALANCED', label: 'バランス', num: '1' },
+      { id: 'HEAVY_FLAIL', label: '重量鉄球', num: '2' },
+      { id: 'SNAP_YOYO', label: 'ヨーヨー', num: '3' },
+      { id: 'LUNAR_ORBIT', label: '衛星バリア', num: '4' },
+      { id: 'WHIP_SLASH', label: 'しなり鞭', num: '5' },
+    ];
+
+    const tabW = 64;
+    const tabH = 18;
+    const tabY = 24;
+
+    for (let i = 0; i < tabs.length; i++) {
+      const t = tabs[i];
+      const tabX = 10 + i * (tabW + 5);
+      const isActive = presetConfig?.id === t.id;
+
+      ctx.fillStyle = isActive ? 'rgba(234, 179, 8, 0.55)' : 'rgba(30, 41, 59, 0.85)';
+      ctx.fillRect(tabX, tabY, tabW, tabH);
+
+      ctx.strokeStyle = isActive ? '#fde047' : '#475569';
+      ctx.lineWidth = isActive ? 2 : 1;
+      ctx.strokeRect(tabX, tabY, tabW, tabH);
+
+      ctx.fillStyle = isActive ? '#ffffff' : '#94a3b8';
+      ctx.font = '8px "DotGothic16", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`[${t.num}]${t.label}`, tabX + tabW / 2, tabY + 13);
+    }
+
+    // 3. Preset Parameters & Description Readout Box (y: 44 to 68)
+    if (presetConfig) {
+      ctx.font = '8px "DotGothic16", monospace';
+      ctx.fillStyle = '#fde047';
+      ctx.textAlign = 'left';
+      ctx.fillText(`【${presetConfig.nameJa}】 ${presetConfig.descJa}`, 10, 55);
+
+      ctx.font = '6px "Press Start 2P", monospace';
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText(`r0:${presetConfig.r0}px | TEN:${presetConfig.maxTension} | WHIRL:${presetConfig.whirlTransfer} | SPD:${presetConfig.maxSpeedBase}`, 10, 65);
+    }
+
+    // 4. Real-time Telemetry Bar at Screen Bottom
+    const btmY = this.canvas.height - 24;
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.92)';
+    ctx.fillRect(0, btmY, w, 24);
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0, btmY, w, 24);
+
+    ctx.font = '7px "Press Start 2P", monospace';
+    ctx.fillStyle = '#38bdf8';
+    ctx.textAlign = 'left';
+    ctx.fillText(`DIST:${telemetry?.dist || 0}px  SPD:${telemetry?.speed || 0}  TGT:${telemetry?.tangentSpeed || 0}`, 10, btmY + 15);
+
+    ctx.fillStyle = '#22c55e';
+    ctx.textAlign = 'right';
+    ctx.fillText(`DMG:${testBossDamage}`, w - 10, btmY + 15);
+
+    // Boss HP Bar in Test Stage if boss active
+    if (boss && boss.y > 0) {
+      const bossBarW = 160;
+      const bossBarH = 6;
+      const bossBarX = (w - bossBarW) / 2;
+      const bossBarY = 78;
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+      ctx.fillRect(bossBarX - 2, bossBarY - 2, bossBarW + 4, bossBarH + 4);
+
+      const bossHpPercent = Math.max(0, boss.hp / boss.maxHp);
+      ctx.fillStyle = '#22c55e';
+      ctx.fillRect(bossBarX, bossBarY, bossBarW * bossHpPercent, bossBarH);
+
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(bossBarX, bossBarY, bossBarW, bossBarH);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '7px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(boss.name, w / 2, bossBarY - 4);
+    }
+
+    ctx.restore();
   }
 
   // --- State Overlays ---

@@ -1,4 +1,26 @@
-export type GameState = 'TITLE' | 'PLAYING' | 'STAGE_CLEAR' | 'GAME_OVER' | 'GAME_CLEAR';
+export type GameState = 'TITLE' | 'PLAYING' | 'STAGE_CLEAR' | 'GAME_OVER' | 'GAME_CLEAR' | 'TEST_STAGE';
+
+export type PhysicsPresetId = 'BALANCED' | 'HEAVY_FLAIL' | 'SNAP_YOYO' | 'LUNAR_ORBIT' | 'WHIP_SLASH';
+
+export interface PhysicsPresetConfig {
+  id: PhysicsPresetId;
+  name: string;
+  nameJa: string;
+  descJa: string;
+  r0: number;
+  baseTension: number;
+  extremeDiv: number;
+  extremePow: number;
+  extremeMult: number;
+  maxTension: number;
+  pushForce: number;
+  whirlTransfer: number;
+  barrierSpeed: number;
+  barrierAccel: number;
+  damping: number;
+  maxSpeedBase: number;
+  maxSpeedPerLevel: number;
+}
 
 export interface InputState {
   x: number;
@@ -7,6 +29,9 @@ export interface InputState {
   isTouch: boolean;
   crtTogglePressed?: boolean;
   audioTogglePressed?: boolean;
+  presetSelectPressed?: PhysicsPresetId;
+  testStageTogglePressed?: boolean;
+  levelUpPressed?: boolean;
 }
 
 export interface PlayerState {
@@ -88,7 +113,8 @@ export type MovementPattern =
   | 'ROCKET_ASCENT'
   | 'INVADER'
   | 'UFO_FLYBY'
-  | 'TACKLE_DASH';
+  | 'TACKLE_DASH'
+  | 'DUMMY';
 
 export interface EnemyEntity {
   id: string;

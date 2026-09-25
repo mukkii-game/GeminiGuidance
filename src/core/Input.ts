@@ -14,6 +14,8 @@ export class InputManager {
   private lastTouchX: number = 0;
   private lastTouchY: number = 0;
   private keysDown: Set<string> = new Set();
+  private lastClick: { x: number; y: number } | null = null;
+  private cyclePresetPressed: boolean = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -36,6 +38,13 @@ export class InputManager {
     this.canvas.addEventListener('mousedown', (e) => {
       if (e.button === 0) {
         this.state.active = true;
+        const rect = this.canvas.getBoundingClientRect();
+        const scaleX = this.canvas.width / rect.width;
+        const scaleY = this.canvas.height / rect.height;
+        this.lastClick = {
+          x: (e.clientX - rect.left) * scaleX,
+          y: (e.clientY - rect.top) * scaleY,
+        };
       }
     });
 
@@ -51,6 +60,7 @@ export class InputManager {
         this.lastTouchY = (touch.clientY - rect.top) * scaleY;
         this.state.active = true;
         this.state.isTouch = true;
+        this.lastClick = { x: this.lastTouchX, y: this.lastTouchY };
       }
     }, { passive: false });
 
@@ -85,6 +95,30 @@ export class InputManager {
       if (e.code === 'KeyM') {
         this.state.audioTogglePressed = true;
       }
+      if (e.code === 'KeyT') {
+        this.state.testStageTogglePressed = true;
+      }
+      if (e.code === 'KeyL') {
+        this.state.levelUpPressed = true;
+      }
+      if (e.code === 'KeyP') {
+        this.cyclePresetPressed = true;
+      }
+      if (e.code === 'Digit1') {
+        this.state.presetSelectPressed = 'BALANCED';
+      }
+      if (e.code === 'Digit2') {
+        this.state.presetSelectPressed = 'HEAVY_FLAIL';
+      }
+      if (e.code === 'Digit3') {
+        this.state.presetSelectPressed = 'SNAP_YOYO';
+      }
+      if (e.code === 'Digit4') {
+        this.state.presetSelectPressed = 'LUNAR_ORBIT';
+      }
+      if (e.code === 'Digit5') {
+        this.state.presetSelectPressed = 'WHIP_SLASH';
+      }
     });
 
     window.addEventListener('keyup', (e) => {
@@ -108,6 +142,12 @@ export class InputManager {
     }
   }
 
+  public consumeClick(): { x: number; y: number } | null {
+    const click = this.lastClick;
+    this.lastClick = null;
+    return click;
+  }
+
   public consumeCrtToggle(): boolean {
     const val = !!this.state.crtTogglePressed;
     this.state.crtTogglePressed = false;
@@ -117,6 +157,28 @@ export class InputManager {
   public consumeAudioToggle(): boolean {
     const val = !!this.state.audioTogglePressed;
     this.state.audioTogglePressed = false;
+    return val;
+  }
+
+  public consumeTestStageToggle(): boolean {
+    const val = !!this.state.testStageTogglePressed;
+    this.state.testStageTogglePressed = false;
+    return val;
+  }
+
+  public consumeLevelUp(): boolean {
+    const val = !!this.state.levelUpPressed;
+    this.state.levelUpPressed = false;
+    return val;
+  }
+
+  public consumePresetSelect(): string | null {
+    if (this.cyclePresetPressed) {
+      this.cyclePresetPressed = false;
+      return 'CYCLE';
+    }
+    const val = this.state.presetSelectPressed || null;
+    this.state.presetSelectPressed = undefined;
     return val;
   }
 }
