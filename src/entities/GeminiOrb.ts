@@ -72,50 +72,49 @@ export class GeminiOrbManager {
       const tx = -ry;
       const ty = rx;
 
-      // 1. Spring-Tether Elastic Tension (バネの付いた分銅の弾性張力)
+      // 1. Spring-Tether Elastic Tension (バネの付いた分銅の弾性張力 - 加速度を約半分にマイルド化)
       // Equilibrium distance (resting barrier radius)
       const r0 = 48;
 
       if (dist > r0) {
         const stretch = dist - r0;
         // Non-linear spring tension:
-        // When stretched far (e.g. player dashes into enemy), creates immense forward whip snap!
-        const baseTension = stretch * 0.0034;
-        const extremeTension = Math.pow(stretch / 125, 2.2) * 0.24;
-        const tensionForce = Math.min(0.96, baseTension + extremeTension);
+        // Half-scaled acceleration curve for tangible weight and controllability
+        const baseTension = stretch * 0.0016;
+        const extremeTension = Math.pow(stretch / 140, 2.0) * 0.12;
+        const tensionForce = Math.min(0.48, baseTension + extremeTension);
 
         // Pull toward player (-rx, -ry)
         orb.vx -= rx * tensionForce;
         orb.vy -= ry * tensionForce;
       } else {
         // Soft outward repulsion when compressed inside equilibrium zone
-        const pushForce = (r0 - dist) * 0.038;
+        const pushForce = (r0 - dist) * 0.018;
         orb.vx += rx * pushForce;
         orb.vy += ry * pushForce;
       }
 
-      // 2. Whirling & Tangential Momentum Coupling (円形旋回の遅延伝達＆外周遠心力)
-      // Transfer player's circling velocity into Gemini's angular speed!
+      // 2. Whirling & Tangential Momentum Coupling (自機の旋回運動からの角加速度 - 半分に調整)
       const playerTangential = playerVx * tx + playerVy * ty;
       const curTangential = orb.vx * tx + orb.vy * ty;
 
-      // Whirling acceleration: circling the ship spins the flail into a wide, lagging ellipse
-      orb.vx += tx * (playerTangential * 0.24);
-      orb.vy += ty * (playerTangential * 0.24);
+      // Whirling acceleration: circling the ship spins the flail into a wide, controllable ellipse
+      orb.vx += tx * (playerTangential * 0.12);
+      orb.vy += ty * (playerTangential * 0.12);
 
-      // 3. Resting Barrier Orbit (近くにいる時、割と近くのままバリアとして旋回)
-      if (dist < 85 && Math.abs(curTangential) < 2.4) {
-        const spinDir = curTangential < -0.1 ? -1 : 1;
-        orb.vx += tx * (0.11 * spinDir);
-        orb.vy += ty * (0.11 * spinDir);
+      // 3. Resting Barrier Orbit (近くにいる時は落ち着いた速度で優雅に旋回バリア)
+      if (dist < 85 && Math.abs(curTangential) < 1.6) {
+        const spinDir = curTangential < -0.05 ? -1 : 1;
+        orb.vx += tx * (0.055 * spinDir);
+        orb.vy += ty * (0.055 * spinDir);
       }
 
       // 4. Momentum Retention & Slight Air Resistance
-      orb.vx *= 0.9935;
-      orb.vy *= 0.9935;
+      orb.vx *= 0.992;
+      orb.vy *= 0.992;
 
-      // 5. Terminal Velocity Ceiling (allows explosive flail swings up to 14.5 px/frame!)
-      const maxSpeed = 11.5 + (orb.level - 1) * 2.0;
+      // 5. Terminal Velocity Ceiling (最高速度も約半分に調整: 制御しやすく視認できる速度域)
+      const maxSpeed = 6.2 + (orb.level - 1) * 1.0;
       const curSpeed = Math.hypot(orb.vx, orb.vy);
       if (curSpeed > maxSpeed) {
         orb.vx = (orb.vx / curSpeed) * maxSpeed;
