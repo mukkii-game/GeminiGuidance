@@ -1,4 +1,4 @@
-import { GeminiOrb, PhysicsPresetConfig, PhysicsPresetId } from '../types';
+import { GeminiCollisionMode, GeminiOrb, PhysicsPresetConfig, PhysicsPresetId } from '../types';
 
 export const PHYSICS_PRESETS: Record<PhysicsPresetId, PhysicsPresetConfig> = {
   SNAP_SLING: {
@@ -79,7 +79,23 @@ export const PRESET_ORDER: PhysicsPresetId[] = [
 export class GeminiOrbManager {
   public orbs: GeminiOrb[] = [];
   public currentPresetId: PhysicsPresetId = 'SNAP_SLING';
+  public collisionMode: GeminiCollisionMode = 'PENETRATE';
   private orbCounter: number = 0;
+
+  public toggleCollisionMode(): GeminiCollisionMode {
+    this.collisionMode = this.collisionMode === 'PENETRATE' ? 'REFLECT' : 'PENETRATE';
+    for (const orb of this.orbs) {
+      orb.collisionMode = this.collisionMode;
+    }
+    return this.collisionMode;
+  }
+
+  public setCollisionMode(mode: GeminiCollisionMode): void {
+    this.collisionMode = mode;
+    for (const orb of this.orbs) {
+      orb.collisionMode = mode;
+    }
+  }
 
   public setPreset(id: PhysicsPresetId): PhysicsPresetConfig {
     if (PHYSICS_PRESETS[id]) {
@@ -168,12 +184,13 @@ export class GeminiOrbManager {
     speed: number;
     tangentSpeed: number;
     mode: 'SLING' | 'ORBIT';
+    collisionMode: GeminiCollisionMode;
     isApex: boolean;
     orbitRadius: number;
     effectiveDamage: number;
   } {
     if (this.orbs.length === 0) {
-      return { dist: 0, speed: 0, tangentSpeed: 0, mode: 'SLING', isApex: false, orbitRadius: 0, effectiveDamage: 1 };
+      return { dist: 0, speed: 0, tangentSpeed: 0, mode: 'SLING', collisionMode: this.collisionMode, isApex: false, orbitRadius: 0, effectiveDamage: 1 };
     }
     const orb = this.orbs[0];
     const dx = orb.x - playerX;
@@ -190,6 +207,7 @@ export class GeminiOrbManager {
       speed: Math.round(speed * 10) / 10,
       tangentSpeed: Math.round(tangentSpeed * 10) / 10,
       mode: orb.mode,
+      collisionMode: orb.collisionMode || this.collisionMode,
       isApex: orb.isHoveringApex,
       orbitRadius: Math.round(orb.orbitRadius),
       effectiveDamage: this.getEffectiveDamage(orb),
@@ -209,6 +227,7 @@ export class GeminiOrbManager {
       trail: [],
       fuseTimer: 20,
       mode: 'SLING',
+      collisionMode: this.collisionMode,
       orbitRadius: 75,
       orbitAngle: -Math.PI / 2,
       orbitAngularVel: 0.065,

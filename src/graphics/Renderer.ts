@@ -13,6 +13,7 @@ import {
   GameState,
   PhysicsPresetConfig,
   PhysicsPresetId,
+  GeminiCollisionMode,
 } from '../types';
 import { SpriteSheet } from './Sprites';
 import { TerrainEngine } from './Terrain';
@@ -79,11 +80,14 @@ export class ArcadeRenderer {
       speed: number;
       tangentSpeed: number;
       mode?: 'SLING' | 'ORBIT';
+      collisionMode?: GeminiCollisionMode;
       isApex?: boolean;
       orbitRadius?: number;
       effectiveDamage?: number;
     },
-    testBossDamage: number = 0
+    testBossDamage: number = 0,
+    testDummyLayout: 'DUAL' | 'ALL_PENETRATE' | 'ALL_REFLECT' = 'DUAL',
+    testBossCollisionMode: 'PENETRATE' | 'REFLECT' = 'PENETRATE'
   ): void {
     const ctx = this.ctx;
 
@@ -125,7 +129,7 @@ export class ArcadeRenderer {
 
     // 8. Draw Player Ship
     if (state === 'PLAYING' || state === 'STAGE_CLEAR' || state === 'TEST_STAGE') {
-      this.renderPlayer(player);
+      this.renderPlayer(player, telemetry?.mode, telemetry?.collisionMode);
     }
 
     // 9. Draw Explosions & Particle Effects
@@ -150,9 +154,9 @@ export class ArcadeRenderer {
 
     // 13. Arcade HUD
     if (state === 'TEST_STAGE') {
-      this.renderTestStageHUD(player, geminiOrbs, boss, presetConfig, telemetry, testBossDamage);
+      this.renderTestStageHUD(player, geminiOrbs, boss, presetConfig, telemetry, testBossDamage, testDummyLayout, testBossCollisionMode);
     } else {
-      this.renderHUD(player, stage, geminiOrbs, boss, presetConfig);
+      this.renderHUD(player, stage, geminiOrbs, boss, presetConfig, telemetry);
     }
 
     // 14. State Overlays (Title, Stage Clear, Game Over, Game Clear)
@@ -280,7 +284,7 @@ export class ArcadeRenderer {
   }
 
   // --- Player Ship ---
-  private renderPlayer(player: PlayerState): void {
+  private renderPlayer(player: PlayerState, mode?: 'SLING' | 'ORBIT', colMode?: GeminiCollisionMode): void {
     if (!player.alive) return;
     const ctx = this.ctx;
 
@@ -361,6 +365,17 @@ export class ArcadeRenderer {
       const color = hpRatio > 0.5 ? '#22c55e' : hpRatio > 0.25 ? '#f59e0b' : '#ef4444';
       ctx.fillStyle = color;
       ctx.fillRect(barX, barY, barW * hpRatio, barH);
+    }
+
+    // Weapon Mode Indicator floating above ship
+    if (mode) {
+      ctx.save();
+      ctx.font = '7px "DotGothic16", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = mode === 'ORBIT' ? '#38bdf8' : '#fde047';
+      const colLabel = colMode === 'REFLECT' ? '[反射]' : '[貫通]';
+      ctx.fillText(`${mode === 'ORBIT' ? '⚡旋回' : '🚀ヨーヨー'}${colLabel}`, player.x, player.y - 18);
+      ctx.restore();
     }
   }
 
@@ -570,19 +585,30 @@ export class ArcadeRenderer {
         ctx.restore();
       }
 
-      // In TEST_STAGE: show clear collision property badges!
+      // In TEST_STAGE: show clear collision property badges & HP gauges!
       if (e.pattern === 'DUMMY') {
         ctx.save();
         ctx.font = '8px "DotGothic16", monospace';
         ctx.textAlign = 'center';
-        if (e.collisionType === 'PENETRATE') {
-          ctx.fillStyle = '#22c55e';
-          ctx.fillText('【貫通:滞在】', e.x, e.y - e.height / 2 - 4);
-        } else {
-          const massStr = (e.mass || 2) >= 100 ? '重壁' : (e.mass || 2) >= 3 ? '中' : '軽';
-          ctx.fillStyle = '#f97316';
-          ctx.fillText(`【反射:反作用 ${massStr}】`, e.x, e.y - e.height / 2 - 4);
-        }
+        const isPen = e.collisionType === 'PENETRATE';
+        const massStr = (e.mass || 2) >= 100 ? '重壁' : (e.mass || 2) >= 3 ? '中' : '軽';
+        const label = isPen ? `【貫通】HP:${Math.max(0, e.hp)}` : `【反射:${massStr}】HP:${Math.max(0, e.hp)}`;
+        ctx.fillStyle = isPen ? '#22c55e' : '#f97316';
+        ctx.fillText(label, e.x, e.y - e.height / 2 - 8);
+
+        // Dummy HP Bar (Width: 44, Height: 4)
+        const barW = 44;
+        const barH = 4;
+        const barX = e.x - barW / 2;
+        const barY = e.y - e.height / 2 - 6;
+        ctx.fillStyle = 'rgba(0,0,0,0.75)';
+        ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
+        const ratio = Math.max(0, Math.min(1, e.hp / (e.maxHp || 500)));
+        ctx.fillStyle = isPen ? '#22c55e' : '#f97316';
+        ctx.fillRect(barX, barY, barW * ratio, barH);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 0.8;
+        ctx.strokeRect(barX - 1, barY - 1, barW + 2, barH + 2);
         ctx.restore();
       }
     }
@@ -892,6 +918,7 @@ export class ArcadeRenderer {
       speed: number;
       tangentSpeed: number;
       mode?: 'SLING' | 'ORBIT';
+      collisionMode?: GeminiCollisionMode;
       isApex?: boolean;
       orbitRadius?: number;
       effectiveDamage?: number;
@@ -910,47 +937,65 @@ export class ArcadeRenderer {
     ctx.fillText(player.score.toString().padStart(6, '0'), 46, 16);
 
     ctx.fillStyle = '#ef4444';
-    ctx.fillText('HI', 116, 16);
+    ctx.fillText('HI', 114, 16);
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(player.highScore.toString().padStart(6, '0'), 138, 16);
+    ctx.fillText(player.highScore.toString().padStart(6, '0'), 136, 16);
 
-    // Top Right Preset Badge & Test Button
-    const btnTestX = w - 48;
+    // Row 1 Buttons: Preset & LAB
+    const btnTestX = w - 46;
     ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
-    ctx.fillRect(btnTestX, 5, 42, 15);
+    ctx.fillRect(btnTestX, 4, 40, 15);
     ctx.strokeStyle = '#38bdf8';
     ctx.lineWidth = 1;
-    ctx.strokeRect(btnTestX, 5, 42, 15);
+    ctx.strokeRect(btnTestX, 4, 40, 15);
     ctx.fillStyle = '#38bdf8';
     ctx.font = '6px "Press Start 2P", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('LAB(T)', btnTestX + 21, 15);
+    ctx.fillText('LAB(T)', btnTestX + 20, 14);
 
     const btnPresetX = btnTestX - 86;
     ctx.fillStyle = 'rgba(234, 179, 8, 0.25)';
-    ctx.fillRect(btnPresetX, 5, 80, 15);
+    ctx.fillRect(btnPresetX, 4, 82, 15);
     ctx.strokeStyle = '#fde047';
     ctx.lineWidth = 1;
-    ctx.strokeRect(btnPresetX, 5, 80, 15);
+    ctx.strokeRect(btnPresetX, 4, 82, 15);
     ctx.fillStyle = '#fde047';
-    ctx.fillText(`[1-5:${presetConfig?.name.slice(0, 5) || 'STD'}]`, btnPresetX + 40, 15);
+    ctx.font = '7px "DotGothic16", monospace';
+    ctx.fillText(`[1-5:${presetConfig?.nameJa.slice(0, 4) || '標準'}]`, btnPresetX + 41, 14);
 
-    // Mode Toggle Button (SLING / ORBIT)
+    // Row 2 Buttons: Attack Mode (ヨーヨー / 公転) & Attribute (貫通 / 反射)
     const curMode = telemetry?.mode || 'SLING';
     const isOrbit = curMode === 'ORBIT';
-    const btnModeX = btnPresetX - 68;
-    ctx.fillStyle = isOrbit ? 'rgba(56, 189, 248, 0.40)' : 'rgba(234, 179, 8, 0.30)';
-    ctx.fillRect(btnModeX, 5, 64, 15);
+    const btnModeX = w - 176;
+    const btnModeW = 84;
+    ctx.fillStyle = isOrbit ? 'rgba(56, 189, 248, 0.45)' : 'rgba(234, 179, 8, 0.35)';
+    ctx.fillRect(btnModeX, 23, btnModeW, 16);
     ctx.strokeStyle = isOrbit ? '#38bdf8' : '#fde047';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(btnModeX, 5, 64, 15);
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(btnModeX, 23, btnModeW, 16);
     ctx.fillStyle = isOrbit ? '#38bdf8' : '#fde047';
-    ctx.fillText(isOrbit ? '⚡ORBIT' : '🚀SLING', btnModeX + 32, 15);
+    ctx.font = '8px "DotGothic16", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(isOrbit ? '⚡攻撃:旋回' : '🚀攻撃:ヨーヨー', btnModeX + btnModeW / 2, 34);
 
-    // Player SHIELD / Armor Bar (Damage System)
+    const curCol = telemetry?.collisionMode || 'PENETRATE';
+    const isPen = curCol === 'PENETRATE';
+    const btnColX = w - 88;
+    const btnColW = 82;
+    ctx.fillStyle = isPen ? 'rgba(34, 197, 94, 0.40)' : 'rgba(249, 115, 22, 0.40)';
+    ctx.fillRect(btnColX, 23, btnColW, 16);
+    ctx.strokeStyle = isPen ? '#22c55e' : '#f97316';
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(btnColX, 23, btnColW, 16);
+    ctx.fillStyle = isPen ? '#22c55e' : '#f97316';
+    ctx.font = '8px "DotGothic16", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(isPen ? '⚔️属性:貫通' : '🛡️属性:反射', btnColX + btnColW / 2, 34);
+
+    // Player SHIELD / Armor Bar (Left side of Row 2)
     const shieldX = 14;
-    const shieldY = 24;
-    const barW = 54;
+    const shieldY = 28;
+    const barW = 44;
     const barH = 5;
 
     ctx.font = '6px "Press Start 2P", monospace';
@@ -1040,69 +1085,96 @@ export class ArcadeRenderer {
       speed: number;
       tangentSpeed: number;
       mode?: 'SLING' | 'ORBIT';
+      collisionMode?: GeminiCollisionMode;
       isApex?: boolean;
       orbitRadius?: number;
       effectiveDamage?: number;
     },
-    testBossDamage: number = 0
+    testBossDamage: number = 0,
+    testDummyLayout: 'DUAL' | 'ALL_PENETRATE' | 'ALL_REFLECT' = 'DUAL',
+    testBossCollisionMode: 'PENETRATE' | 'REFLECT' = 'PENETRATE'
   ): void {
     const ctx = this.ctx;
     const w = this.canvas.width;
 
     ctx.save();
 
-    // 1. Top Lab Header Bar
-    ctx.fillStyle = 'rgba(2, 6, 23, 0.94)';
-    ctx.fillRect(0, 0, w, 70);
+    // 1. Top Lab Header Bar (Height: 88px)
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.95)';
+    ctx.fillRect(0, 0, w, 88);
     ctx.strokeStyle = '#38bdf8';
     ctx.lineWidth = 1.5;
-    ctx.strokeRect(0, 0, w, 70);
+    ctx.strokeRect(0, 0, w, 88);
 
-    // Title & Shield
+    // Row 1: Title, Shield, Lv, Return
     ctx.font = '8px "Press Start 2P", monospace';
     ctx.fillStyle = '#38bdf8';
     ctx.textAlign = 'left';
-    ctx.fillText('⚡LAB', 10, 15);
+    ctx.fillText('⚡LAB', 10, 14);
 
     ctx.fillStyle = player.hp > 30 ? '#22c55e' : '#ef4444';
     ctx.font = '7px "Press Start 2P", monospace';
-    ctx.fillText(`SHLD:${player.hp}%`, 56, 15);
+    ctx.fillText(`SHLD:${player.hp}%`, 54, 14);
 
-    // Mode Toggle Button (SLING / ORBIT)
-    const curMode = telemetry?.mode || 'SLING';
-    const isOrbit = curMode === 'ORBIT';
-    ctx.fillStyle = isOrbit ? 'rgba(56, 189, 248, 0.45)' : 'rgba(234, 179, 8, 0.35)';
-    ctx.fillRect(144, 4, 76, 16);
-    ctx.strokeStyle = isOrbit ? '#38bdf8' : '#fde047';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(144, 4, 76, 16);
-    ctx.fillStyle = isOrbit ? '#38bdf8' : '#fde047';
-    ctx.font = '7px "DotGothic16", monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(isOrbit ? '⚡公転[SPACE]' : '🚀スリング', 182, 15);
-
-    // Lv Toggle Button
     const lv = geminiOrbs[0]?.level || 1;
     ctx.fillStyle = 'rgba(236, 72, 153, 0.25)';
-    ctx.fillRect(224, 4, 44, 16);
+    ctx.fillRect(236, 3, 48, 15);
     ctx.strokeStyle = '#ec4899';
     ctx.lineWidth = 1;
-    ctx.strokeRect(224, 4, 44, 16);
+    ctx.strokeRect(236, 3, 48, 15);
     ctx.fillStyle = '#ec4899';
     ctx.font = '6px "Press Start 2P", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(`Lv.${lv}[L]`, 246, 15);
+    ctx.fillText(`Lv.${lv}[L]`, 260, 13);
 
-    // Return to Game Button
     ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
-    ctx.fillRect(272, 4, 82, 16);
+    ctx.fillRect(288, 3, 66, 15);
     ctx.strokeStyle = '#ef4444';
     ctx.lineWidth = 1;
-    ctx.strokeRect(272, 4, 82, 16);
+    ctx.strokeRect(288, 3, 66, 15);
     ctx.fillStyle = '#f87171';
-    ctx.fillText('✕ RETURN(T)', 313, 15);
+    ctx.fillText('✕戻る(T)', 321, 13);
 
-    // 2. 5 Preset Switcher Tabs (x: 10 to 350, y: 24 to 42, width 64 each, gap 5)
+    // Row 2: Attack Mode (ヨーヨー / 公転), Gemini Attribute (貫通 / 反射), Boss Attribute (貫通 / 反射)
+    const curMode = telemetry?.mode || 'SLING';
+    const isOrbit = curMode === 'ORBIT';
+    const btnAtkW = 110;
+    ctx.fillStyle = isOrbit ? 'rgba(56, 189, 248, 0.50)' : 'rgba(234, 179, 8, 0.45)';
+    ctx.fillRect(8, 20, btnAtkW, 16);
+    ctx.strokeStyle = isOrbit ? '#38bdf8' : '#fde047';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(8, 20, btnAtkW, 16);
+    ctx.fillStyle = isOrbit ? '#38bdf8' : '#fde047';
+    ctx.font = '8px "DotGothic16", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(isOrbit ? '⚡攻撃②:旋回(Space)' : '🚀攻撃①:ヨーヨー', 8 + btnAtkW / 2, 31);
+
+    const curCol = telemetry?.collisionMode || 'PENETRATE';
+    const isPen = curCol === 'PENETRATE';
+    const btnColW = 110;
+    ctx.fillStyle = isPen ? 'rgba(34, 197, 94, 0.45)' : 'rgba(249, 115, 22, 0.45)';
+    ctx.fillRect(124, 20, btnColW, 16);
+    ctx.strokeStyle = isPen ? '#22c55e' : '#f97316';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(124, 20, btnColW, 16);
+    ctx.fillStyle = isPen ? '#22c55e' : '#f97316';
+    ctx.font = '8px "DotGothic16", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(isPen ? '⚔️ジェミニ:貫通[X]' : '🛡️ジェミニ:反射[X]', 124 + btnColW / 2, 31);
+
+    const isBossPen = testBossCollisionMode === 'PENETRATE';
+    const btnBossW = 112;
+    ctx.fillStyle = isBossPen ? 'rgba(34, 197, 94, 0.35)' : 'rgba(249, 115, 22, 0.35)';
+    ctx.fillRect(240, 20, btnBossW, 16);
+    ctx.strokeStyle = isBossPen ? '#22c55e' : '#f97316';
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(240, 20, btnBossW, 16);
+    ctx.fillStyle = isBossPen ? '#22c55e' : '#f97316';
+    ctx.font = '8px "DotGothic16", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(isBossPen ? 'ボス属性:貫通' : 'ボス属性:反射', 240 + btnBossW / 2, 31);
+
+    // Row 3: 5 Preset Switcher Tabs (y: 38 to 53, width 64 each, gap 5)
     const tabs: Array<{ id: PhysicsPresetId; label: string; num: string }> = [
       { id: 'SNAP_SLING', label: 'スリング', num: '1' },
       { id: 'HYPER_BOOMERANG', label: 'ブーメラン', num: '2' },
@@ -1110,40 +1182,64 @@ export class ArcadeRenderer {
       { id: 'HEAVY_WRECKER', label: '重量分銅', num: '4' },
       { id: 'RAPID_ORBIT', label: '公転バリア', num: '5' },
     ];
-
     const tabW = 64;
-    const tabH = 18;
-    const tabY = 24;
-
+    const tabH = 14;
+    const tabY = 38;
     for (let i = 0; i < tabs.length; i++) {
       const t = tabs[i];
       const tabX = 10 + i * (tabW + 5);
       const isActive = presetConfig?.id === t.id;
-
       ctx.fillStyle = isActive ? 'rgba(234, 179, 8, 0.55)' : 'rgba(30, 41, 59, 0.85)';
       ctx.fillRect(tabX, tabY, tabW, tabH);
-
       ctx.strokeStyle = isActive ? '#fde047' : '#475569';
       ctx.lineWidth = isActive ? 2 : 1;
       ctx.strokeRect(tabX, tabY, tabW, tabH);
-
       ctx.fillStyle = isActive ? '#ffffff' : '#94a3b8';
-      ctx.font = '8px "DotGothic16", monospace';
+      ctx.font = '7px "DotGothic16", monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(`[${t.num}]${t.label}`, tabX + tabW / 2, tabY + 13);
+      ctx.fillText(`[${t.num}]${t.label}`, tabX + tabW / 2, tabY + 10);
     }
 
-    // 3. Preset Parameters & Description Readout Box (y: 44 to 68)
-    if (presetConfig) {
-      ctx.font = '8px "DotGothic16", monospace';
-      ctx.fillStyle = '#fde047';
-      ctx.textAlign = 'left';
-      ctx.fillText(`【${presetConfig.nameJa}】 ${presetConfig.descJa}`, 10, 55);
+    // Row 4: Enemy Dummy Layout Switcher (y: 54 to 70)
+    const dBtnW = 110;
+    const dBtnH = 15;
+    const dBtnY = 54;
 
-      ctx.font = '6px "Press Start 2P", monospace';
-      ctx.fillStyle = '#94a3b8';
-      ctx.fillText(`K:${presetConfig.springK} | NONLIN:${presetConfig.springNonlinear} | DAMP:${presetConfig.damping} | MAX:${presetConfig.maxSpeed}`, 10, 65);
-    }
+    const isDual = testDummyLayout === 'DUAL';
+    ctx.fillStyle = isDual ? 'rgba(56, 189, 248, 0.40)' : 'rgba(30, 41, 59, 0.85)';
+    ctx.fillRect(8, dBtnY, dBtnW, dBtnH);
+    ctx.strokeStyle = isDual ? '#38bdf8' : '#475569';
+    ctx.lineWidth = isDual ? 1.5 : 1;
+    ctx.strokeRect(8, dBtnY, dBtnW, dBtnH);
+    ctx.fillStyle = isDual ? '#ffffff' : '#94a3b8';
+    ctx.font = '7px "DotGothic16", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('敵:半々(貫通/反射)', 8 + dBtnW / 2, dBtnY + 11);
+
+    const isAllPen = testDummyLayout === 'ALL_PENETRATE';
+    ctx.fillStyle = isAllPen ? 'rgba(34, 197, 94, 0.45)' : 'rgba(30, 41, 59, 0.85)';
+    ctx.fillRect(124, dBtnY, dBtnW, dBtnH);
+    ctx.strokeStyle = isAllPen ? '#22c55e' : '#475569';
+    ctx.lineWidth = isAllPen ? 1.5 : 1;
+    ctx.strokeRect(124, dBtnY, dBtnW, dBtnH);
+    ctx.fillStyle = isAllPen ? '#ffffff' : '#94a3b8';
+    ctx.fillText('★敵:全員貫通', 124 + dBtnW / 2, dBtnY + 11);
+
+    const isAllRef = testDummyLayout === 'ALL_REFLECT';
+    const dBtnW3 = 112;
+    ctx.fillStyle = isAllRef ? 'rgba(249, 115, 22, 0.45)' : 'rgba(30, 41, 59, 0.85)';
+    ctx.fillRect(240, dBtnY, dBtnW3, dBtnH);
+    ctx.strokeStyle = isAllRef ? '#f97316' : '#475569';
+    ctx.lineWidth = isAllRef ? 1.5 : 1;
+    ctx.strokeRect(240, dBtnY, dBtnW3, dBtnH);
+    ctx.fillStyle = isAllRef ? '#ffffff' : '#94a3b8';
+    ctx.fillText('★敵:全員反射', 240 + dBtnW3 / 2, dBtnY + 11);
+
+    // Row 5: Preset Description & Controls Guide (y: 72 to 85)
+    ctx.font = '7px "DotGothic16", monospace';
+    ctx.fillStyle = '#fde047';
+    ctx.textAlign = 'left';
+    ctx.fillText(`【${presetConfig?.nameJa || ''}】 [Space/右クリック]攻撃 [X]貫通/反射 [1-5]物理`, 8, 81);
 
     // 4. Real-time Telemetry Bar at Screen Bottom
     const btmY = this.canvas.height - 24;
@@ -1156,7 +1252,7 @@ export class ArcadeRenderer {
     ctx.font = '7px "Press Start 2P", monospace';
     ctx.fillStyle = '#38bdf8';
     ctx.textAlign = 'left';
-    ctx.fillText(`DIST:${telemetry?.dist || 0}px SPD:${telemetry?.speed || 0} [${curMode}]`, 10, btmY + 15);
+    ctx.fillText(`DIST:${telemetry?.dist || 0}px SPD:${telemetry?.speed || 0} [${curMode}]`, 8, btmY + 15);
 
     if (telemetry?.isApex) {
       ctx.fillStyle = '#fde047';
@@ -1167,18 +1263,18 @@ export class ArcadeRenderer {
     ctx.textAlign = 'right';
     ctx.fillText(`DMG:${testBossDamage}`, w - 10, btmY + 15);
 
-    // Boss HP Bar in Test Stage if boss active
+    // Boss HP Bar in Test Stage if boss active (y = 94)
     if (boss && boss.y > 0) {
       const bossBarW = 160;
       const bossBarH = 6;
       const bossBarX = (w - bossBarW) / 2;
-      const bossBarY = 78;
+      const bossBarY = 94;
 
       ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
       ctx.fillRect(bossBarX - 2, bossBarY - 2, bossBarW + 4, bossBarH + 4);
 
       const bossHpPercent = Math.max(0, boss.hp / boss.maxHp);
-      ctx.fillStyle = '#22c55e';
+      ctx.fillStyle = isBossPen ? '#22c55e' : '#f97316';
       ctx.fillRect(bossBarX, bossBarY, bossBarW * bossHpPercent, bossBarH);
 
       ctx.strokeStyle = '#ffffff';
@@ -1186,9 +1282,9 @@ export class ArcadeRenderer {
       ctx.strokeRect(bossBarX, bossBarY, bossBarW, bossBarH);
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = '7px "Press Start 2P", monospace';
+      ctx.font = '7px "DotGothic16", monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(boss.name, w / 2, bossBarY - 4);
+      ctx.fillText(`${boss.name} [${isBossPen ? '貫通' : '反射'}]`, w / 2, bossBarY - 4);
     }
 
     ctx.restore();
@@ -1238,17 +1334,17 @@ export class ArcadeRenderer {
       }
 
       // 4. Instructions / Rules (Reflecting Latest Mechanics)
-      ctx.font = '10px "DotGothic16", monospace';
+      ctx.font = '9px "DotGothic16", monospace';
       ctx.fillStyle = '#22c55e';
-      ctx.fillText('★ １面: インベーダー！ M字ロゴ軍団＆クジラUFO出現', w / 2, 272);
+      ctx.fillText('★ 攻撃① ヨーヨー投擲: 引っ張って放つ！折り返し滞空で連続集中削り！', w / 2, 270);
       ctx.fillStyle = '#38bdf8';
-      ctx.fillText('★ ２面: ブロック崩し！ 穴を開けて奥の帝王を猛攻！', w / 2, 290);
+      ctx.fillText('★ 攻撃② 旋回シールド: [Space / 右クリック]で紐ロック公転！', w / 2, 288);
       ctx.fillStyle = '#fef08a';
-      ctx.fillText('敵を倒せなかった時は跳ね返り、倒した時はそのまま貫通！', w / 2, 308);
+      ctx.fillText('★ [Xキー] 貫通モード(すり抜け多段)と反射モード(ピンボール)切替！', w / 2, 306);
       ctx.fillStyle = '#ec4899';
-      ctx.fillText('敵の白弾はジェミニで消滅！編隊全滅でジェミニ出現！', w / 2, 326);
+      ctx.fillText('★ 敵の白弾は相殺消滅！編隊全滅でジェミニ出現＆シールド回復！', w / 2, 324);
       ctx.fillStyle = '#cbd5e1';
-      ctx.fillText('自機で取れば【追加】/ ジェミニで叩けば【強化】！', w / 2, 344);
+      ctx.fillText('★ [1〜5キー] 物理切替 / [Tキー] いつでも【物理テストステージ】へ！', w / 2, 342);
 
       // Separator Line
       ctx.strokeStyle = '#1e293b';

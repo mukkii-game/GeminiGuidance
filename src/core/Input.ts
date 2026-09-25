@@ -54,6 +54,12 @@ export class InputManager {
       this.state.isPointerDown = false;
     });
 
+    // Right-Click: Toggle Attack Mode (ヨーヨー ⇄ 公転)
+    this.canvas.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      this.state.orbitTogglePressed = true;
+    });
+
     // Touch Events: Relative Delta Dragging (Ergonomic 1-finger control)
     this.canvas.addEventListener('touchstart', (e) => {
       e.preventDefault();
@@ -118,6 +124,9 @@ export class InputManager {
       }
       if (e.code === 'Space' || e.code === 'KeyZ' || e.code === 'KeyO') {
         this.state.orbitTogglePressed = true;
+      }
+      if (e.code === 'KeyX') {
+        this.state.collisionTogglePressed = true;
       }
       if (e.code === 'Digit1') {
         this.state.presetSelectPressed = 'SNAP_SLING';
@@ -190,6 +199,12 @@ export class InputManager {
   public consumeOrbitToggle(): boolean {
     const val = !!this.state.orbitTogglePressed;
     this.state.orbitTogglePressed = false;
+    return val;
+  }
+
+  public consumeCollisionToggle(): boolean {
+    const val = !!this.state.collisionTogglePressed;
+    this.state.collisionTogglePressed = false;
     return val;
   }
 

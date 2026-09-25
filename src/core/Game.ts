@@ -64,7 +64,11 @@ export class Game {
     y: number;
     pattern: MovementPattern;
     timer: number;
+    collisionType: 'PENETRATE' | 'REFLECT';
+    mass: number;
   }> = [];
+  public testDummyLayout: 'DUAL' | 'ALL_PENETRATE' | 'ALL_REFLECT' = 'DUAL';
+  public testBossCollisionMode: 'PENETRATE' | 'REFLECT' = 'PENETRATE';
   private testBlockRegenTimer: number = 0;
   private testBulletTimer: number = 0;
   private testBossTotalDamage: number = 0;
@@ -230,15 +234,27 @@ export class Game {
       return;
     }
 
-    // Handle Orbit / Sling Mode toggle hotkey (Space / KeyZ / KeyO)
+    // Handle Orbit / Sling Mode toggle hotkey (Space / KeyZ / KeyO / Right-Click)
     if (this.input.consumeOrbitToggle()) {
       const isOrbit = this.geminiManager.toggleOrbit(this.player.state.x, this.player.state.y);
       this.audio.playGeminiBounce();
       this.addFloatingText(
         this.player.state.x,
         this.player.state.y - 30,
-        isOrbit ? '⚡ ORBIT LOCK (公転紐)' : '🚀 SLING MODE (反発ヨーヨー)',
+        isOrbit ? '⚡ 攻撃②: 旋回シールド (公転)' : '🚀 攻撃①: ヨーヨー投擲 (スリング)',
         isOrbit ? '#38bdf8' : '#fde047'
+      );
+    }
+
+    // Handle Collision Mode toggle hotkey (KeyX)
+    if (this.input.consumeCollisionToggle()) {
+      const colMode = this.geminiManager.toggleCollisionMode();
+      this.audio.playGeminiBounce();
+      this.addFloatingText(
+        this.player.state.x,
+        this.player.state.y - 30,
+        colMode === 'PENETRATE' ? '⚔️ 属性: 貫通 (すり抜け多段削り)' : '🛡️ 属性: 反射 (跳ね返りピンボール)',
+        colMode === 'PENETRATE' ? '#22c55e' : '#f97316'
       );
     }
 
@@ -265,21 +281,11 @@ export class Game {
       this.addFloatingText(this.player.state.x, this.player.state.y - 30, 'GEMINI LEVEL UP!', '#ec4899');
     }
 
-    // Handle Click/Touch on HUD Buttons or Field Orbit Toggle
+    // Handle Click/Touch on HUD Buttons
     let clickedUI = false;
     const click = this.input.consumeClick();
     if (click) {
       clickedUI = this.handlePointerClick(click.x, click.y);
-      if (!clickedUI && click.y > 45 && (this.state === 'PLAYING' || this.state === 'TEST_STAGE')) {
-        const isOrbit = this.geminiManager.toggleOrbit(this.player.state.x, this.player.state.y);
-        this.audio.playGeminiBounce();
-        this.addFloatingText(
-          this.player.state.x,
-          this.player.state.y - 30,
-          isOrbit ? '⚡ ORBIT LOCK (公転紐)' : '🚀 SLING MODE (反発ヨーヨー)',
-          isOrbit ? '#38bdf8' : '#fde047'
-        );
-      }
     }
 
     // Test Stage Update Dispatch
@@ -576,12 +582,21 @@ export class Game {
             continue;
           }
 
+          // Determine reflection vs penetration:
+          let isReflect = false;
+          if (this.geminiManager.collisionMode === 'REFLECT') {
+            isReflect = true;
+          } else if (this.geminiManager.collisionMode === 'PENETRATE') {
+            isReflect = false;
+          } else {
+            isReflect = e.collisionType === 'REFLECT';
+          }
+
           // Damage application
           e.hp -= effectiveDmg;
-          e.hitCooldown = e.collisionType === 'REFLECT' ? 7 : 4; // Faster 4-frame tick for penetrating!
+          e.hitCooldown = isReflect ? 7 : 4; // Faster 4-frame tick for penetrating!
 
-          // Reaction / Reflection Physics
-          if (e.collisionType === 'REFLECT') {
+          if (isReflect) {
             const nx = (orb.x - e.x) / (dist || 1);
             const ny = (orb.y - e.y) / (dist || 1);
 
@@ -605,16 +620,28 @@ export class Game {
               e.knockbackVx = -nx * (Math.max(2.5, speed * 0.75) * kFactor);
               e.knockbackVy = -ny * (Math.max(2.5, speed * 0.75) * kFactor);
             }
-          }
 
-          if (e.hp > 0) {
-            this.audio.playGeminiBounce();
-            this.addExplosion(e.x, e.y, 14, false);
-            this.player.addScore(50 * effectiveDmg);
-            if (orb.isHoveringApex) {
-              this.addFloatingText(e.x, e.y - 14, `APEX SHRED! -${effectiveDmg}`, '#38bdf8');
+            if (e.hp > 0) {
+              this.audio.playGeminiBounce();
+              this.addExplosion(e.x, e.y, 14, false);
+              this.player.addScore(50 * effectiveDmg);
+              this.addFloatingText(e.x, e.y - 14, `BOUNCE! -${effectiveDmg}`, '#f97316');
             }
           } else {
+            // PENETRATE: Gemini DOES NOT BOUNCE! Passes straight through enemy!
+            if (e.hp > 0) {
+              this.audio.playAirExplosion();
+              this.addExplosion(e.x, e.y, 14, false);
+              this.player.addScore(50 * effectiveDmg);
+              if (orb.isHoveringApex) {
+                this.addFloatingText(e.x, e.y - 14, `★APEX SHRED!! -${effectiveDmg}`, '#fde047');
+              } else {
+                this.addFloatingText(e.x, e.y - 14, `貫通HIT! -${effectiveDmg}`, '#38bdf8');
+              }
+            }
+          }
+
+          if (e.hp <= 0) {
             // ENEMY DESTROYED
             this.audio.playAirExplosion();
             this.addExplosion(e.x, e.y, 18 + orb.level * 4, false);
@@ -629,9 +656,11 @@ export class Game {
             const deadY = e.y;
             const deadType = e.type;
             const deadPattern = e.pattern;
+            const deadCollision = e.collisionType || 'PENETRATE';
+            const deadMass = e.mass || 1.0;
             this.enemyManager.enemies.splice(i, 1);
 
-            // In TEST_STAGE, queue respawn of the destroyed dummy!
+            // In TEST_STAGE, queue respawn of the destroyed dummy with 500 HP!
             if (this.state === 'TEST_STAGE') {
               this.testDummyRespawnQueue.push({
                 type: deadType,
@@ -639,6 +668,8 @@ export class Game {
                 y: deadY,
                 pattern: (deadPattern as MovementPattern) || 'DUMMY',
                 timer: 75,
+                collisionType: deadCollision,
+                mass: deadMass,
               });
             }
 
@@ -656,41 +687,62 @@ export class Game {
         }
       }
 
-      // 3. Gemini Orbs vs Boss (巨大反射体 / リフレクション)
+      // 3. Gemini Orbs vs Boss (貫通 vs 反射)
       if (this.bossManager.currentBoss) {
         const b = this.bossManager.currentBoss;
         if (!b.hitCooldown || b.hitCooldown <= 0) {
-          const res = this.bossManager.hit(effectiveDmg, orb.x, orb.y);
-          if (res.bossHit) {
-            b.hitCooldown = 6;
-            this.audio.playGeminiBounce();
-            this.addExplosion(orb.x, orb.y, 22, false);
-            this.player.addScore(res.points);
+          const bdx = orb.x - b.x;
+          const bdy = orb.y - b.y;
+          const bdist = Math.hypot(bdx, bdy) || 1;
+          const bossHitRadius = Math.max(b.width, b.height) * 0.48 + orbRadius;
 
-            // Elastic reflection off boss body in SLING mode!
-            if (orb.mode === 'SLING') {
-              const bdx = orb.x - b.x;
-              const bdy = orb.y - b.y;
-              const bdist = Math.hypot(bdx, bdy) || 1;
-              const bnx = bdx / bdist;
-              const bny = bdy / bdist;
-              const dot = orb.vx * bnx + orb.vy * bny;
-              if (dot < 0) {
-                orb.vx -= 1.95 * dot * bnx;
-                orb.vy -= 1.95 * dot * bny;
-                orb.x = b.x + bnx * (b.width * 0.45 + orbRadius + 2);
-                orb.y = b.y + bny * (b.height * 0.45 + orbRadius + 2);
-              }
-            }
+          if (bdist < bossHitRadius) {
+            const isBossReflect = (this.state === 'TEST_STAGE')
+              ? (this.testBossCollisionMode === 'REFLECT' || this.geminiManager.collisionMode === 'REFLECT')
+              : (this.geminiManager.collisionMode === 'REFLECT');
 
-            if (this.state === 'TEST_STAGE') {
-              this.testBossTotalDamage += effectiveDmg;
-              if (b.hp < 10000) {
-                b.hp = 99999;
-                b.defeated = false;
+            const res = this.bossManager.hit(effectiveDmg, orb.x, orb.y);
+            if (res.bossHit) {
+              b.hitCooldown = isBossReflect ? 8 : 4;
+              this.player.addScore(res.points);
+
+              if (isBossReflect) {
+                this.audio.playGeminiBounce();
+                this.addExplosion(orb.x, orb.y, 22, false);
+                this.addFloatingText(orb.x, orb.y - 16, `BOUNCE! -${effectiveDmg}`, '#f97316');
+
+                // Elastic reflection off boss body in SLING mode!
+                if (orb.mode === 'SLING') {
+                  const bnx = bdx / bdist;
+                  const bny = bdy / bdist;
+                  const dot = orb.vx * bnx + orb.vy * bny;
+                  if (dot < 0) {
+                    orb.vx -= 1.95 * dot * bnx;
+                    orb.vy -= 1.95 * dot * bny;
+                    orb.x = b.x + bnx * (b.width * 0.45 + orbRadius + 2);
+                    orb.y = b.y + bny * (b.height * 0.45 + orbRadius + 2);
+                  }
+                } else {
+                  orb.orbitAngularVel = -orb.orbitAngularVel * 0.85;
+                }
+              } else {
+                // Boss Penetration: NO bounce! Glides or hovers inside!
+                this.addExplosion(orb.x, orb.y, 16, false);
+                if (orb.isHoveringApex) {
+                  this.addFloatingText(b.x, b.y - 20, `★APEX SHRED!! -${effectiveDmg * 2}`, '#fde047');
+                } else {
+                  this.addFloatingText(b.x, b.y - 20, `貫通HIT! -${effectiveDmg}`, '#38bdf8');
+                }
               }
-              continue;
-            }
+
+              if (this.state === 'TEST_STAGE') {
+                this.testBossTotalDamage += effectiveDmg;
+                if (b.hp < 10000) {
+                  b.hp = 99999;
+                  b.defeated = false;
+                }
+                continue;
+              }
 
             if (res.defeated) {
               // Boss Defeat Chain
@@ -715,6 +767,7 @@ export class Game {
         }
       }
     }
+  }
 
     // 4. Player Ship vs Gemini Drop Items (自機で取ればもう一個のジェミニ追加＆シールド修復！)
     if (this.player.state.alive) {
@@ -924,7 +977,9 @@ export class Game {
       this.elonIntroTimer,
       presetConfig,
       telemetry,
-      this.testBossTotalDamage
+      this.testBossTotalDamage,
+      this.testDummyLayout,
+      this.testBossCollisionMode
     );
   }
 
@@ -1011,17 +1066,62 @@ export class Game {
     this.addFloatingText(this.canvas.width / 2, 140, 'RESUMING MISSION', '#22c55e');
   }
 
-  private spawnTestDummies(): void {
-    const w = this.canvas.width;
-    // Row 1: Soft Penetrating Dummies (貫通ダミー - 滞在連続ダメージ検証用)
-    this.enemyManager.spawn('DEEPSEEK_FLASH', w * 0.25, 135, 'DUMMY');
-    this.enemyManager.spawn('MISTRAL_FLAME', w * 0.50, 135, 'DUMMY');
-    this.enemyManager.spawn('CLAUDE_HAIKU', w * 0.75, 135, 'DUMMY');
+  private spawnTestDummies(layout: 'DUAL' | 'ALL_PENETRATE' | 'ALL_REFLECT' = this.testDummyLayout): void {
+    this.testDummyLayout = layout;
+    for (let i = this.enemyManager.enemies.length - 1; i >= 0; i--) {
+      if (this.enemyManager.enemies[i].pattern === 'DUMMY') {
+        this.enemyManager.enemies.splice(i, 1);
+      }
+    }
+    this.testDummyRespawnQueue = [];
 
-    // Row 2: Reaction & Reflection Dummies (反射ダミー - 作用反作用＆ノックバック検証用)
-    this.enemyManager.spawn('CURSOR_PROBE', w * 0.25, 195, 'DUMMY'); // mass 1.0 (light, high knockback)
-    this.enemyManager.spawn('QWEN_CUBE', w * 0.50, 195, 'DUMMY');    // mass 3.0 (medium, moderate knockback)
-    this.enemyManager.spawn('SPACEX_ROCKET', w * 0.75, 195, 'DUMMY'); // mass 999 (heavy, zero knockback, pure bounce)
+    const w = this.canvas.width;
+    const dummyHp = 500;
+
+    if (layout === 'ALL_PENETRATE') {
+      const d1 = this.enemyManager.spawn('DEEPSEEK_FLASH', w * 0.25, 140, 'DUMMY', undefined, dummyHp);
+      d1.collisionType = 'PENETRATE';
+      const d2 = this.enemyManager.spawn('MISTRAL_FLAME', w * 0.50, 140, 'DUMMY', undefined, dummyHp);
+      d2.collisionType = 'PENETRATE';
+      const d3 = this.enemyManager.spawn('CLAUDE_HAIKU', w * 0.75, 140, 'DUMMY', undefined, dummyHp);
+      d3.collisionType = 'PENETRATE';
+
+      const d4 = this.enemyManager.spawn('KIMI_MOON', w * 0.25, 205, 'DUMMY', undefined, dummyHp);
+      d4.collisionType = 'PENETRATE';
+      const d5 = this.enemyManager.spawn('COPILOT_GLIDER', w * 0.50, 205, 'DUMMY', undefined, dummyHp);
+      d5.collisionType = 'PENETRATE';
+      const d6 = this.enemyManager.spawn('GPT6_LUNA', w * 0.75, 205, 'DUMMY', undefined, dummyHp);
+      d6.collisionType = 'PENETRATE';
+    } else if (layout === 'ALL_REFLECT') {
+      const d1 = this.enemyManager.spawn('CURSOR_PROBE', w * 0.25, 140, 'DUMMY', undefined, dummyHp);
+      d1.collisionType = 'REFLECT'; d1.mass = 1.0;
+      const d2 = this.enemyManager.spawn('QWEN_CUBE', w * 0.50, 140, 'DUMMY', undefined, dummyHp);
+      d2.collisionType = 'REFLECT'; d2.mass = 3.0;
+      const d3 = this.enemyManager.spawn('SPACEX_ROCKET', w * 0.75, 140, 'DUMMY', undefined, dummyHp);
+      d3.collisionType = 'REFLECT'; d3.mass = 999;
+
+      const d4 = this.enemyManager.spawn('CURSOR_PROBE', w * 0.25, 205, 'DUMMY', undefined, dummyHp);
+      d4.collisionType = 'REFLECT'; d4.mass = 1.0;
+      const d5 = this.enemyManager.spawn('QWEN_CUBE', w * 0.50, 205, 'DUMMY', undefined, dummyHp);
+      d5.collisionType = 'REFLECT'; d5.mass = 3.0;
+      const d6 = this.enemyManager.spawn('SPACEX_ROCKET', w * 0.75, 205, 'DUMMY', undefined, dummyHp);
+      d6.collisionType = 'REFLECT'; d6.mass = 999;
+    } else {
+      // DUAL (Half & Half): Row 1 = Penetrate, Row 2 = Reflect
+      const d1 = this.enemyManager.spawn('DEEPSEEK_FLASH', w * 0.25, 140, 'DUMMY', undefined, dummyHp);
+      d1.collisionType = 'PENETRATE';
+      const d2 = this.enemyManager.spawn('MISTRAL_FLAME', w * 0.50, 140, 'DUMMY', undefined, dummyHp);
+      d2.collisionType = 'PENETRATE';
+      const d3 = this.enemyManager.spawn('CLAUDE_HAIKU', w * 0.75, 140, 'DUMMY', undefined, dummyHp);
+      d3.collisionType = 'PENETRATE';
+
+      const d4 = this.enemyManager.spawn('CURSOR_PROBE', w * 0.25, 205, 'DUMMY', undefined, dummyHp);
+      d4.collisionType = 'REFLECT'; d4.mass = 1.0;
+      const d5 = this.enemyManager.spawn('QWEN_CUBE', w * 0.50, 205, 'DUMMY', undefined, dummyHp);
+      d5.collisionType = 'REFLECT'; d5.mass = 3.0;
+      const d6 = this.enemyManager.spawn('SPACEX_ROCKET', w * 0.75, 205, 'DUMMY', undefined, dummyHp);
+      d6.collisionType = 'REFLECT'; d6.mass = 999;
+    }
   }
 
   private updateTestStage(dtFactor: number = 1.0): void {
@@ -1045,12 +1145,14 @@ export class Game {
       }
     );
 
-    // Respawn queued dummies
+    // Respawn queued dummies with 500 HP
     for (let i = this.testDummyRespawnQueue.length - 1; i >= 0; i--) {
       const item = this.testDummyRespawnQueue[i];
       item.timer--;
       if (item.timer <= 0) {
-        this.enemyManager.spawn(item.type, item.x, item.y, item.pattern);
+        const spawned = this.enemyManager.spawn(item.type, item.x, item.y, item.pattern, undefined, 500);
+        spawned.collisionType = item.collisionType;
+        spawned.mass = item.mass;
         this.addExplosion(item.x, item.y, 16, false);
         this.testDummyRespawnQueue.splice(i, 1);
       }
@@ -1114,21 +1216,8 @@ export class Game {
     const w = this.canvas.width;
 
     if (this.state === 'TEST_STAGE') {
-      // 1. [MODE: SLING / ORBIT] button (x: 144 to 220, y: 4 to 20)
-      if (x >= 142 && x <= 222 && y >= 2 && y <= 22) {
-        const isOrbit = this.geminiManager.toggleOrbit(this.player.state.x, this.player.state.y);
-        this.audio.playGeminiBounce();
-        this.addFloatingText(
-          this.player.state.x,
-          this.player.state.y - 30,
-          isOrbit ? '⚡ ORBIT LOCK (公転紐)' : '🚀 SLING MODE (反発ヨーヨー)',
-          isOrbit ? '#38bdf8' : '#fde047'
-        );
-        return true;
-      }
-
-      // 2. [LV UP(L)] button (x: 224 to 268, y: 4 to 20)
-      if (x >= 222 && x <= 270 && y >= 2 && y <= 22) {
+      // 1. [Lv.UP(L)] button (x: 236 to 284, y: 2 to 18)
+      if (x >= 234 && x <= 286 && y >= 2 && y <= 18) {
         for (const orb of this.geminiManager.orbs) {
           this.geminiManager.levelUpOrb(orb);
         }
@@ -1137,14 +1226,56 @@ export class Game {
         return true;
       }
 
-      // 3. [EXIT(T)] button (x: 272 to 354, y: 4 to 20)
-      if (x >= 270 && x <= 356 && y >= 2 && y <= 22) {
+      // 2. [✕戻る(T)] button (x: 288 to 354, y: 2 to 18)
+      if (x >= 286 && x <= 356 && y >= 2 && y <= 18) {
         this.exitTestStage();
         return true;
       }
 
-      // 4. Preset Tabs (y: 22 to 44)
-      if (y >= 22 && y <= 44) {
+      // 3. Row 2 Buttons (y: 20 to 37)
+      if (y >= 19 && y <= 37) {
+        // [攻撃①: ヨーヨー] / [攻撃②: 旋回] (x: 8 to 118)
+        if (x >= 6 && x <= 120) {
+          const isOrbit = this.geminiManager.toggleOrbit(this.player.state.x, this.player.state.y);
+          this.audio.playGeminiBounce();
+          this.addFloatingText(
+            this.player.state.x,
+            this.player.state.y - 30,
+            isOrbit ? '⚡ 攻撃②: 旋回シールド (公転)' : '🚀 攻撃①: ヨーヨー投擲 (スリング)',
+            isOrbit ? '#38bdf8' : '#fde047'
+          );
+          return true;
+        }
+
+        // [ジェミニ: 貫通 / 反射] (x: 124 to 234)
+        if (x >= 122 && x <= 236) {
+          const col = this.geminiManager.toggleCollisionMode();
+          this.audio.playGeminiBounce();
+          this.addFloatingText(
+            this.player.state.x,
+            this.player.state.y - 30,
+            col === 'PENETRATE' ? '⚔️ 属性: 貫通 (すり抜け多段削り)' : '🛡️ 属性: 反射 (跳ね返りピンボール)',
+            col === 'PENETRATE' ? '#22c55e' : '#f97316'
+          );
+          return true;
+        }
+
+        // [ボス: 貫通 / 反射] (x: 240 to 352)
+        if (x >= 238 && x <= 354) {
+          this.testBossCollisionMode = this.testBossCollisionMode === 'PENETRATE' ? 'REFLECT' : 'PENETRATE';
+          this.audio.playGeminiBounce();
+          this.addFloatingText(
+            this.canvas.width / 2,
+            110,
+            `ボス属性: ${this.testBossCollisionMode === 'PENETRATE' ? '貫通' : '反射'}`,
+            this.testBossCollisionMode === 'PENETRATE' ? '#22c55e' : '#f97316'
+          );
+          return true;
+        }
+      }
+
+      // 4. Row 3: Preset Tabs (y: 38 to 53)
+      if (y >= 37 && y <= 53) {
         const tabW = 64;
         for (let i = 0; i < PRESET_ORDER.length; i++) {
           const tabX = 10 + i * (tabW + 5);
@@ -1156,32 +1287,68 @@ export class Game {
           }
         }
       }
+
+      // 5. Row 4: Dummy Layout Switcher (y: 54 to 71)
+      if (y >= 53 && y <= 71) {
+        if (x >= 6 && x <= 120) {
+          this.spawnTestDummies('DUAL');
+          this.audio.playGeminiBounce();
+          this.addFloatingText(this.canvas.width / 2, 140, '敵配置: 半々 (貫通/反射)', '#38bdf8');
+          return true;
+        }
+        if (x >= 122 && x <= 236) {
+          this.spawnTestDummies('ALL_PENETRATE');
+          this.audio.playGeminiBounce();
+          this.addFloatingText(this.canvas.width / 2, 140, '敵配置: 全員貫通！', '#22c55e');
+          return true;
+        }
+        if (x >= 238 && x <= 354) {
+          this.spawnTestDummies('ALL_REFLECT');
+          this.audio.playGeminiBounce();
+          this.addFloatingText(this.canvas.width / 2, 140, '敵配置: 全員反射！', '#f97316');
+          return true;
+        }
+      }
+
       return false;
     } else {
       // Normal HUD buttons
-      // [LAB(T)] button
-      if (x >= w - 50 && x <= w - 6 && y >= 4 && y <= 22) {
+      // Row 1: [LAB(T)] button (x: w - 46 to w - 6, y: 3 to 20)
+      if (x >= w - 48 && x <= w - 4 && y >= 3 && y <= 20) {
         this.enterTestStage();
         return true;
       }
 
-      // [1-5:PRESET] button
-      if (x >= w - 136 && x <= w - 54 && y >= 4 && y <= 22) {
+      // Row 1: [1-5: PRESET] button (x: w - 134 to w - 50, y: 3 to 20)
+      if (x >= w - 136 && x <= w - 48 && y >= 3 && y <= 20) {
         const p = this.geminiManager.cyclePreset();
         this.addFloatingText(this.player.state.x, this.player.state.y - 30, `MODE: ${p.nameJa}`, '#fde047');
         this.audio.playGeminiBounce();
         return true;
       }
 
-      // [SLING/ORBIT] button
-      if (x >= w - 206 && x <= w - 140 && y >= 4 && y <= 22) {
+      // Row 2: [攻撃: ヨーヨー / 旋回] button (x: w - 176 to w - 92, y: 22 to 40)
+      if (x >= w - 178 && x <= w - 90 && y >= 22 && y <= 40) {
         const isOrbit = this.geminiManager.toggleOrbit(this.player.state.x, this.player.state.y);
         this.audio.playGeminiBounce();
         this.addFloatingText(
           this.player.state.x,
           this.player.state.y - 30,
-          isOrbit ? '⚡ ORBIT LOCK (公転紐)' : '🚀 SLING MODE (反発ヨーヨー)',
+          isOrbit ? '⚡ 攻撃②: 旋回シールド (公転)' : '🚀 攻撃①: ヨーヨー投擲 (スリング)',
           isOrbit ? '#38bdf8' : '#fde047'
+        );
+        return true;
+      }
+
+      // Row 2: [属性: 貫通 / 反射] button (x: w - 88 to w - 6, y: 22 to 40)
+      if (x >= w - 90 && x <= w - 4 && y >= 22 && y <= 40) {
+        const col = this.geminiManager.toggleCollisionMode();
+        this.audio.playGeminiBounce();
+        this.addFloatingText(
+          this.player.state.x,
+          this.player.state.y - 30,
+          col === 'PENETRATE' ? '⚔️ 属性: 貫通 (すり抜け多段削り)' : '🛡️ 属性: 反射 (跳ね返りピンボール)',
+          col === 'PENETRATE' ? '#22c55e' : '#f97316'
         );
         return true;
       }

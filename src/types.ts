@@ -16,6 +16,8 @@ export interface PhysicsPresetConfig {
   orbitTransfer: number;   // 自機移動から公転スピンへの加速度伝達
 }
 
+export type GeminiCollisionMode = 'PENETRATE' | 'REFLECT';
+
 export interface InputState {
   x: number;
   y: number;
@@ -28,6 +30,7 @@ export interface InputState {
   testStageTogglePressed?: boolean;
   levelUpPressed?: boolean;
   orbitTogglePressed?: boolean;
+  collisionTogglePressed?: boolean;
 }
 
 export interface PlayerState {
@@ -82,6 +85,7 @@ export interface GeminiOrb {
   orbitAngularVel: number;
   apexDwellTimer: number;
   isHoveringApex: boolean;
+  collisionMode?: GeminiCollisionMode;
 }
 
 export type EnemyType = 
