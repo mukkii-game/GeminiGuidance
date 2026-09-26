@@ -839,7 +839,15 @@ export class Game {
               this.addExplosion(e.x, e.y, orb.isCharged ? 20 : 14, false);
               this.player.addScore(50 * effectiveDmg);
               if (orb.mode === 'ORBIT') {
-                this.addFloatingText(e.x, e.y - 14, `🛡️公転弾き! -${effectiveDmg}`, '#38bdf8');
+                if (orb.spinLevel === 2) {
+                  this.renderer.triggerShake(12, 6);
+                  this.addFloatingText(e.x, e.y - 14, `🔥室伏剛撃!! -${effectiveDmg}`, '#ff3b00');
+                } else if (orb.spinLevel === 1) {
+                  this.renderer.triggerShake(6, 3);
+                  this.addFloatingText(e.x, e.y - 14, `⚡遠心剛撃! -${effectiveDmg}`, '#fde047');
+                } else {
+                  this.addFloatingText(e.x, e.y - 14, `🛡️分銅打撃 -${effectiveDmg}`, '#38bdf8');
+                }
               } else if (orb.isCharged) {
                 this.addFloatingText(e.x, e.y - 14, `🔥大突撃BOUNCE! -${effectiveDmg}`, '#ff3b00');
               } else {
@@ -941,7 +949,15 @@ export class Game {
                 this.audio.playGeminiBounce();
                 this.addExplosion(orb.x, orb.y, 22, false);
                 if (orb.mode === 'ORBIT') {
-                  this.addFloatingText(orb.x, orb.y - 16, `🛡️公転弾き! -${effectiveDmg}`, '#38bdf8');
+                  if (orb.spinLevel === 2) {
+                    this.renderer.triggerShake(14, 7);
+                    this.addFloatingText(orb.x, orb.y - 16, `🔥室伏剛撃!! -${effectiveDmg}`, '#ff3b00');
+                  } else if (orb.spinLevel === 1) {
+                    this.renderer.triggerShake(7, 3.5);
+                    this.addFloatingText(orb.x, orb.y - 16, `⚡遠心剛撃! -${effectiveDmg}`, '#fde047');
+                  } else {
+                    this.addFloatingText(orb.x, orb.y - 16, `🛡️分銅打撃 -${effectiveDmg}`, '#38bdf8');
+                  }
                 } else {
                   this.addFloatingText(orb.x, orb.y - 16, `BOUNCE! -${effectiveDmg}`, '#f97316');
                 }

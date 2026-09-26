@@ -413,11 +413,11 @@ export class ArcadeRenderer {
       ctx.textAlign = 'center';
       if (mode === 'ORBIT') {
         ctx.fillStyle = '#38bdf8';
-        ctx.fillText('⚡分銅[Hammerfight/弾消し]', player.x, player.y - 18);
+        ctx.fillText('⚡分銅[室伏スピン/弾消し]', player.x, player.y - 18);
       } else {
         ctx.fillStyle = '#fde047';
         const colLabel = colMode === 'REFLECT' ? '[反射]' : '[貫通]';
-        ctx.fillText(`🚀ヨーヨー${colLabel}`, player.x, player.y - 18);
+        ctx.fillText(`🚀ヨーヨー槍${colLabel}`, player.x, player.y - 18);
       }
       ctx.restore();
     }
@@ -428,7 +428,6 @@ export class ArcadeRenderer {
     const ctx = this.ctx;
 
     for (const orb of orbs) {
-      const dist = Math.hypot(orb.x - playerX, orb.y - playerY);
       const speed = Math.hypot(orb.vx, orb.vy);
       const isFast = speed > 1.25;
       const isCharged = !!orb.isCharged;
@@ -439,13 +438,21 @@ export class ArcadeRenderer {
       // 0. Energy Tether (Mode ② 光のロープ vs Mode ① 自由ホーミング)
       ctx.save();
       if (orb.mode === 'ORBIT') {
-        // --- MODE ②: 光のロープ (Laser Tether & Flail Constrained Orbit) ---
+        // --- MODE ②: 室伏スピン＆物理スチールチェーン (Hammerfight Flail & Heavy Chain) ---
         const tier = orb.orbitTier || (orb.orbitRadius < 65 ? 'SHORT' : orb.orbitRadius >= 125 ? 'LONG' : 'MEDIUM');
-        const glowColor = tier === 'SHORT' ? 'rgba(56, 189, 248, 0.45)' : tier === 'LONG' ? 'rgba(239, 68, 68, 0.55)' : 'rgba(253, 224, 71, 0.45)';
-        const coreColor = tier === 'SHORT' ? '#38bdf8' : tier === 'LONG' ? '#f87171' : '#fde047';
+        const isGigaSpin = orb.spinLevel === 2;
+        const isHighSpin = orb.spinLevel === 1;
 
-        // Orbital track guideline (dashed ring)
-        ctx.strokeStyle = glowColor;
+        const chainGlow = isGigaSpin
+          ? 'rgba(239, 68, 68, 0.75)'
+          : isHighSpin
+          ? 'rgba(253, 224, 71, 0.65)'
+          : tier === 'SHORT' ? 'rgba(56, 189, 248, 0.45)' : tier === 'LONG' ? 'rgba(239, 68, 68, 0.55)' : 'rgba(253, 224, 71, 0.45)';
+
+        const chainCore = isGigaSpin ? '#ff3b00' : isHighSpin ? '#fde047' : '#94a3b8';
+
+        // 1. Orbital track guideline (dashed ring showing orbit envelope)
+        ctx.strokeStyle = chainGlow;
         ctx.lineWidth = 1;
         ctx.setLineDash([3, 4]);
         ctx.beginPath();
@@ -453,78 +460,87 @@ export class ArcadeRenderer {
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Taut Laser Rope (Outer Glowing Aura)
-        ctx.strokeStyle = glowColor;
-        ctx.lineWidth = tier === 'LONG' ? 5.5 : tier === 'SHORT' ? 3.0 : 4.0;
-        ctx.beginPath();
-        ctx.moveTo(playerX, playerY);
-        ctx.lineTo(orb.x, orb.y);
-        ctx.stroke();
-
-        // Taut Laser Rope (Inner Solid Core)
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1.8;
-        ctx.beginPath();
-        ctx.moveTo(playerX, playerY);
-        ctx.lineTo(orb.x, orb.y);
-        ctx.stroke();
-
-        // Sliding energy pulse beads along rope
-        const beadCount = tier === 'LONG' ? 5 : tier === 'SHORT' ? 2 : 3;
-        for (let s = 1; s <= beadCount; s++) {
-          const ratio = s / (beadCount + 1);
-          const kx = playerX + (orb.x - playerX) * ratio;
-          const ky = playerY + (orb.y - playerY) * ratio;
-          ctx.fillStyle = '#ffffff';
+        // 2. High Spin Whirlwind Vortex Arc behind flail
+        if (isGigaSpin || isHighSpin) {
+          ctx.strokeStyle = isGigaSpin ? 'rgba(255, 69, 0, 0.55)' : 'rgba(253, 224, 71, 0.35)';
+          ctx.lineWidth = isGigaSpin ? 8 : 4;
           ctx.beginPath();
-          ctx.arc(kx, ky, 2.2, 0, Math.PI * 2);
-          ctx.fill();
+          const trailSweep = isGigaSpin ? 1.4 : 0.8;
+          const startAngle = orb.orbitAngle - (orb.vx * -Math.sin(orb.orbitAngle) + orb.vy * Math.cos(orb.orbitAngle) >= 0 ? trailSweep : -trailSweep);
+          ctx.arc(playerX, playerY, orb.orbitRadius, startAngle, orb.orbitAngle, false);
+          ctx.stroke();
         }
 
-        // Anchor ring on player and orb
-        ctx.strokeStyle = coreColor;
-        ctx.lineWidth = 1.5;
+        // 3. Heavy Segmented Steel Chain Links connecting player to flail
+        const chainDist = Math.hypot(orb.x - playerX, orb.y - playerY) || 1;
+        const chainAngle = Math.atan2(orb.y - playerY, orb.x - playerX);
+        const linkStep = 10;
+        const numLinks = Math.max(3, Math.floor(chainDist / linkStep));
+
+        for (let s = 1; s <= numLinks; s++) {
+          const ratio = s / (numLinks + 1);
+          const lx = playerX + (orb.x - playerX) * ratio;
+          const ly = playerY + (orb.y - playerY) * ratio;
+
+          ctx.save();
+          ctx.translate(lx, ly);
+          // Alternate rotation angle slightly for authentic 3D interlocking chain effect
+          const linkTilt = chainAngle + (s % 2 === 0 ? 0.35 : -0.35);
+          ctx.rotate(linkTilt);
+
+          // Outer chain link loop
+          ctx.strokeStyle = isGigaSpin ? '#ff4500' : isHighSpin ? '#f59e0b' : '#334155';
+          ctx.lineWidth = isGigaSpin ? 3.5 : 2.5;
+          ctx.strokeRect(-5, -3, 10, 6);
+
+          // Metallic / glowing link core
+          ctx.fillStyle = isGigaSpin ? '#fde047' : isHighSpin ? '#ffffff' : (s % 2 === 0 ? '#94a3b8' : '#cbd5e1');
+          ctx.fillRect(-3.5, -1.8, 7, 3.6);
+
+          ctx.restore();
+        }
+
+        // 4. Electric sparks leaping along chain in GIGA SPIN
+        if (isGigaSpin) {
+          const sparkCount = 3;
+          for (let sp = 0; sp < sparkCount; sp++) {
+            const sRatio = 0.2 + (sp * 0.3) + (Math.sin(Date.now() * 0.02 + sp) * 0.1);
+            const sx = playerX + (orb.x - playerX) * sRatio + (Math.random() - 0.5) * 6;
+            const sy = playerY + (orb.y - playerY) * sRatio + (Math.random() - 0.5) * 6;
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(sx, sy, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+
+        // Anchor ring on player
+        ctx.strokeStyle = chainCore;
+        ctx.lineWidth = 2.0;
         ctx.beginPath();
         ctx.arc(playerX, playerY, 14, 0, Math.PI * 2);
         ctx.stroke();
 
-        // Tier text badge near tether midpoint
+        // Status text badge near chain midpoint
         const midX = (playerX + orb.x) / 2;
         const midY = (playerY + orb.y) / 2;
         ctx.font = '7px "DotGothic16", monospace';
-        ctx.fillStyle = coreColor;
+        ctx.fillStyle = isGigaSpin ? '#ff3b00' : isHighSpin ? '#fde047' : chainCore;
         ctx.textAlign = 'center';
-        const tierLabel = tier === 'SHORT' ? '⚡近距離バリア' : tier === 'LONG' ? '⚡遠距離ギガ分銅' : '⚡中距離スイング';
-        ctx.fillText(`${tierLabel}(${Math.round(orb.orbitRadius)}px)`, midX, midY - 6);
+        if (isGigaSpin) {
+          ctx.fillText(`🔥室伏GIGAスピン!!(${Math.round(orb.orbitRadius)}px)`, midX, midY - 6);
+        } else if (isHighSpin) {
+          ctx.fillText(`⚡室伏遠心加速(${Math.round(orb.orbitRadius)}px)`, midX, midY - 6);
+        } else {
+          const tierLabel = tier === 'SHORT' ? '⚡近距離バリア' : tier === 'LONG' ? '⚡遠距離ギガ分銅' : '⚡中距離スイング';
+          ctx.fillText(`${tierLabel}(${Math.round(orb.orbitRadius)}px)`, midX, midY - 6);
+        }
 
       } else {
         // --- MODE ①: ヨーヨー突き攻撃 (自由ホーミング ＆ 火の玉チャージ) ---
-        if (isCharged) {
-          // Blazing Fireball Propulsion Trail behind Gemini
-          ctx.strokeStyle = 'rgba(239, 68, 68, 0.45)';
-          ctx.lineWidth = 3.5;
-          ctx.beginPath();
-          ctx.moveTo(playerX, playerY);
-          ctx.lineTo(orb.x, orb.y);
-          ctx.stroke();
-
-          ctx.strokeStyle = '#fde047';
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.moveTo(playerX, playerY);
-          ctx.lineTo(orb.x, orb.y);
-          ctx.stroke();
-        } else if (dist > 50) {
-          // Faint magnetic homing guideline
-          ctx.strokeStyle = 'rgba(56, 189, 248, 0.18)';
-          ctx.lineWidth = 1;
-          ctx.setLineDash([2, 5]);
-          ctx.beginPath();
-          ctx.moveTo(playerX, playerY);
-          ctx.lineTo(orb.x, orb.y);
-          ctx.stroke();
-          ctx.setLineDash([]);
-        }
+        // ユーザー指示: 「ひもをつけていないときは、もともとジェミニがホーミングで向かってくるのを
+        // 利用するものなので、ヒモは非表示に」
+        // -> ヒモ・ガイドライン等の接続線は一切描画しない！完全フリーなホーミング飛翔！
       }
       ctx.restore();
 
@@ -563,7 +579,11 @@ export class ArcadeRenderer {
         ctx.font = '7px "DotGothic16", monospace';
         ctx.fillStyle = '#ffea00';
         ctx.textAlign = 'center';
-        ctx.fillText('🔥猛突撃!!', orb.x, orb.y - effectiveR - 8);
+        if (orb.mode === 'ORBIT') {
+          ctx.fillText('🔥室伏GIGAスピン!!', orb.x, orb.y - effectiveR - 8);
+        } else {
+          ctx.fillText('🔥猛突撃!!', orb.x, orb.y - effectiveR - 8);
+        }
 
       } else {
         // Standard or Flail Aura
@@ -593,6 +613,11 @@ export class ArcadeRenderer {
           ctx.moveTo(orb.x, orb.y - effectiveR - 6);
           ctx.lineTo(orb.x, orb.y + effectiveR + 6);
           ctx.stroke();
+        } else if (orb.mode === 'ORBIT' && orb.spinLevel === 1) {
+          ctx.font = '7px "DotGothic16", monospace';
+          ctx.fillStyle = '#38bdf8';
+          ctx.textAlign = 'center';
+          ctx.fillText('⚡室伏遠心加速!', orb.x, orb.y - effectiveR - 8);
         }
       }
       ctx.restore();
@@ -1121,7 +1146,7 @@ export class ArcadeRenderer {
     ctx.fillStyle = isOrbit ? '#38bdf8' : '#fde047';
     ctx.font = '8px "DotGothic16", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(isOrbit ? '⚡分銅ハンマー' : '🚀ヨーヨー突撃', btnModeX + btnModeW / 2, 34);
+    ctx.fillText(isOrbit ? '⚡室伏分銅[Z]' : '🚀ヨーヨー槍[Z]', btnModeX + btnModeW / 2, 34);
 
     const curCol = telemetry?.collisionMode || 'PENETRATE';
     const isPen = curCol === 'PENETRATE';
@@ -1237,6 +1262,10 @@ export class ArcadeRenderer {
       screenEdgeBounce?: boolean;
       orbCount?: number;
       tuning?: PhysicsTuningState;
+      isCharged?: boolean;
+      chargeRatio?: number;
+      orbitTier?: 'SHORT' | 'MEDIUM' | 'LONG';
+      spinLevel?: number;
     },
     testBossDamage: number = 0,
     testEnemySetup: TestEnemySetup = 'SWARM_PENETRATE',
@@ -1353,7 +1382,7 @@ export class ArcadeRenderer {
     ctx.fillStyle = isOrbit ? '#38bdf8' : '#fde047';
     ctx.font = '8px "DotGothic16", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(isOrbit ? '⚡攻撃②:分銅ハンマー' : '🚀攻撃①:ヨーヨー突撃', 8 + btnAtkW / 2, 30);
+    ctx.fillText(isOrbit ? '⚡攻撃②:室伏分銅[Z]' : '🚀攻撃①:ヨーヨー槍[Z]', 8 + btnAtkW / 2, 30);
 
     const curCol = telemetry?.collisionMode || 'PENETRATE';
     const isPen = curCol === 'PENETRATE';
@@ -1463,7 +1492,10 @@ export class ArcadeRenderer {
     ctx.textAlign = 'left';
     ctx.fillText(`DIST:${telemetry?.dist || 0}px SPD:${telemetry?.speed || 0}`, 8, btmY + 15);
 
-    if (telemetry?.isApex) {
+    if (curMode === 'ORBIT') {
+      ctx.fillStyle = telemetry?.spinLevel === 2 ? '#ff3b00' : telemetry?.spinLevel === 1 ? '#fde047' : '#38bdf8';
+      ctx.fillText(telemetry?.spinLevel === 2 ? '🔥GIGA SPIN' : telemetry?.spinLevel === 1 ? '⚡HIGH SPIN' : 'FLAIL', 156, btmY + 15);
+    } else if (telemetry?.isApex) {
       ctx.fillStyle = '#fde047';
       ctx.fillText('★APEX DWELL★', 160, btmY + 15);
     }

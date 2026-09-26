@@ -126,6 +126,8 @@ export interface GeminiOrb {
   returnGoalX?: number;
   returnGoalY?: number;
   tetherLength?: number;
+  strokeElapsed?: number;
+  spinLevel?: number; // 0 = idle, 1 = active spin, 2 = MUROFUSHI GIGA SPIN
 }
 
 export type EnemyType = 

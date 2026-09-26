@@ -292,14 +292,17 @@ export class GeminiOrbManager {
   public getEffectiveDamage(orb: GeminiOrb): number {
     const baseDamage = orb.level === 1 ? 1 : orb.level === 2 ? 3 : 8;
     if (orb.mode === 'ORBIT') {
-      // ② Tethered Flail
-      if (orb.orbitTier === 'SHORT') {
-        return Math.max(1, Math.round(baseDamage * 0.75));
-      } else if (orb.orbitTier === 'LONG') {
-        return Math.round(baseDamage * 3.5);
-      } else {
-        return Math.round(baseDamage * 1.5);
+      // ② Tethered Flail (Hammerfight / Murofushi kinetic scaling: E = 1/2 m v^2)
+      const speed = Math.hypot(orb.vx, orb.vy);
+      const kineticFactor = Math.pow(speed / 1.10, 2);
+      let multiplier = 1.0 + kineticFactor * 1.4;
+      if (orb.spinLevel === 2) {
+        multiplier += 2.2; // Massive bonus for Murofushi Giga Spin!
       }
+      let tierBase = baseDamage * 1.5;
+      if (orb.orbitTier === 'SHORT') tierBase = baseDamage * 0.9;
+      else if (orb.orbitTier === 'LONG') tierBase = baseDamage * 2.4;
+      return Math.max(1, Math.round(tierBase * multiplier));
     } else {
       // ① Mode: Yo-yo / Spear Thrust
       if (orb.isCharged) {
@@ -317,12 +320,17 @@ export class GeminiOrbManager {
   public getEffectiveRadius(orb: GeminiOrb): number {
     const baseR = orb.level === 1 ? 16 : orb.level === 2 ? 24 : 32;
     if (orb.mode === 'ORBIT') {
+      const speed = Math.hypot(orb.vx, orb.vy);
+      const expandBonus = Math.min(1.4, 1.0 + (speed / 3.0) * 0.4);
+      if (orb.spinLevel === 2) {
+        return baseR * 1.35 * expandBonus;
+      }
       if (orb.orbitTier === 'SHORT') {
-        return baseR * 0.75;
+        return baseR * 0.75 * expandBonus;
       } else if (orb.orbitTier === 'LONG') {
-        return baseR * 1.65;
+        return baseR * 1.65 * expandBonus;
       } else {
-        return baseR * 1.0;
+        return baseR * 1.0 * expandBonus;
       }
     } else {
       if (orb.isCharged) {
@@ -350,6 +358,7 @@ export class GeminiOrbManager {
     isCharged: boolean;
     chargeRatio: number;
     orbitTier?: 'SHORT' | 'MEDIUM' | 'LONG';
+    spinLevel?: number;
   } {
     if (this.orbs.length === 0) {
       return {
@@ -366,6 +375,7 @@ export class GeminiOrbManager {
         tuning: this.tuning,
         isCharged: false,
         chargeRatio: 0,
+        spinLevel: 0,
       };
     }
     const orb = this.orbs[0];
@@ -393,6 +403,7 @@ export class GeminiOrbManager {
       isCharged: !!orb.isCharged,
       chargeRatio: orb.chargeRatio || 0,
       orbitTier: orb.orbitTier,
+      spinLevel: orb.spinLevel || 0,
     };
   }
 
@@ -436,7 +447,6 @@ export class GeminiOrbManager {
   ): void {
     const cfg = PHYSICS_PRESETS[this.currentPresetId];
     const springK = cfg.springK * this.tuning.tensionMultiplier;
-    const springNonlinear = cfg.springNonlinear * this.tuning.tensionMultiplier;
     const apexThreshold = cfg.apexThreshold * this.tuning.apexDwellMultiplier;
 
     for (let i = 0; i < this.orbs.length; i++) {
@@ -457,40 +467,67 @@ export class GeminiOrbManager {
       }
 
       if (orb.mode === 'ORBIT') {
-        // --- MODE ②: HAMMERFIGHT TETHERED FLAIL (物理ロープ＆分銅スイング) ---
-        orb.isCharged = false;
-        orb.chargeRatio = 0;
+        // --- MODE ②: HAMMERFIGHT TETHERED FLAIL (物理チェーン＆室伏分銅スイング) ---
         orb.isHoveringApex = false;
         orb.apexDwellTimer = 0;
 
         const fDx = orb.x - playerX;
         const fDy = orb.y - playerY;
         const fDist = Math.hypot(fDx, fDy) || 1;
-        const fUx = fDx / fDist; // unit vector pointing outward from ship to flail
+        const fUx = fDx / fDist; // unit vector outward from ship to flail
         const fUy = fDy / fDist;
-        const fTx = -fUy; // tangent unit vector
+        const fTx = -fUy; // tangent unit vector (counter-clockwise)
         const fTy = fUx;
 
-        const maxL = (orb.tetherLength || orb.orbitRadius || 75) * (this.tuning.orbitRadius / 75);
         const relVx = orb.vx - playerVx;
         const relVy = orb.vy - playerVy;
         const radialVel = relVx * fUx + relVy * fUy;
+        const tangentialVel = relVx * fTx + relVy * fTy;
 
-        // Rope tension constraint (Hammerfight rope tension)
+        // Current rotation direction (1: CCW, -1: CW)
+        const spinSign = tangentialVel >= 0 ? 1 : -1;
+        const fSpinTx = fTx * spinSign;
+        const fSpinTy = fTy * spinSign;
+
+        // 1. 室伏スピンターン（円運動による遠心加速・ワインドアップ）:
+        // 自機が分銅の回転方向に先行して小さく円を描くと、ロープ張力を通じて角運動量が急激に注入される！
+        const playerTangential = playerVx * fSpinTx + playerVy * fSpinTy;
+        if (playerTangential > 0) {
+          const spinTransfer = playerTangential * 0.62;
+          orb.vx += fSpinTx * spinTransfer;
+          orb.vy += fSpinTy * spinTransfer;
+        }
+
+        // 2. スナップ引き戻し急加速（Hammerfight Lash Strike / 鞭撃）:
+        // 敵に向かって振れている瞬間に、自機を逆方向（分銅から離れる方向）へ急激に引くと、
+        // 張力急増と角運動量保存により先端が鞭のように爆発的急加速して叩きつける！
+        const playerRadial = playerVx * fUx + playerVy * fUy;
+        if (playerRadial < -0.32) {
+          const whipBoost = Math.abs(playerRadial) * 0.85;
+          orb.vx += fSpinTx * whipBoost;
+          orb.vy += fSpinTy * whipBoost;
+        }
+
+        // 3. 鋼鉄チェーン張力拘束 ＆ 遠心伸長（Stiff Steel Cable & Centrifugal Stretch）:
+        const baseL = (orb.tetherLength || orb.orbitRadius || 75) * (this.tuning.orbitRadius / 75);
+        const curSpd = Math.hypot(orb.vx, orb.vy);
+        // 高速回転ほど遠心力で半径がわずかに拡大（最大+24px）
+        const centrifugalStretch = Math.min(24, Math.pow(curSpd / 1.5, 2) * 3.8);
+        const maxL = baseL + centrifugalStretch;
+
         if (fDist > maxL) {
           const stretch = fDist - maxL;
-          const kRope = 0.22;
-          const springForce = stretch * kRope;
-          const damperForce = Math.max(0, radialVel) * 0.70;
-          const tension = springForce + damperForce;
+          const kRope = 0.42 * this.tuning.tensionMultiplier; // 鋼鉄チェーンのしっかりした剛性感
+          const damperForce = Math.max(0, radialVel) * 0.85;
+          const tension = stretch * kRope + damperForce;
 
           orb.vx -= fUx * tension;
           orb.vy -= fUy * tension;
 
-          // Hard position constraint clamp
-          if (fDist > maxL * 1.22) {
-            orb.x = playerX + fUx * (maxL * 1.22);
-            orb.y = playerY + fUy * (maxL * 1.22);
+          // ハードクランプ（ゴムのように伸びすぎないよう剛体制御）
+          if (fDist > maxL * 1.15) {
+            orb.x = playerX + fUx * (maxL * 1.15);
+            orb.y = playerY + fUy * (maxL * 1.15);
             if (radialVel > 0) {
               orb.vx -= radialVel * fUx;
               orb.vy -= radialVel * fUy;
@@ -498,27 +535,38 @@ export class GeminiOrbManager {
           }
         }
 
-        // Whip momentum transfer: player ship motion adds directly to tangential swing
-        const playerTangential = playerVx * fTx + playerVy * fTy;
-        orb.vx += fTx * (playerTangential * 0.28);
-        orb.vy += fTy * (playerTangential * 0.28);
-
-        // Hammerfight rotational persistence (subtle momentum retention)
-        const curTangential = orb.vx * fTx + orb.vy * fTy;
-        const spinSign = curTangential >= 0 ? 1 : -1;
-        const targetBaseSpeed = orb.orbitTier === 'SHORT' ? 1.3 : orb.orbitTier === 'LONG' ? 0.85 : 1.05;
-        if (Math.abs(curTangential) < targetBaseSpeed) {
-          orb.vx += fTx * spinSign * 0.032;
-          orb.vy += fTy * spinSign * 0.032;
+        // 4. 回転慣性の維持（Hammerfight Inertia Persistence）:
+        const spinSpeed = Math.abs(tangentialVel);
+        const targetBaseSpeed = orb.orbitTier === 'SHORT' ? 1.4 : orb.orbitTier === 'LONG' ? 0.95 : 1.15;
+        if (spinSpeed < targetBaseSpeed) {
+          orb.vx += fSpinTx * 0.045;
+          orb.vy += fSpinTy * 0.045;
         }
 
-        // Air drag
-        orb.vx *= 0.993;
-        orb.vy *= 0.993;
+        // 微小な空気抵抗
+        orb.vx *= 0.994;
+        orb.vy *= 0.994;
 
-        // Speed limit
-        const maxSpd = (cfg.maxSpeed * 1.2) * this.tuning.maxSpeedMultiplier;
-        const curSpd = Math.hypot(orb.vx, orb.vy);
+        // 5. 室伏スピンレベル分類（Spin Level Classification）:
+        // レベル0: 通常旋回 (< 1.35)
+        // レベル1: ⚡室伏遠心加速 (1.35 <= speed < 2.35)
+        // レベル2: 🔥室伏GIGAスピン!! (speed >= 2.35)
+        if (curSpd >= 2.35) {
+          orb.spinLevel = 2;
+          orb.isCharged = true;
+          orb.chargeRatio = Math.min(1.0, (curSpd - 2.35) / 1.4);
+        } else if (curSpd >= 1.35) {
+          orb.spinLevel = 1;
+          orb.isCharged = false;
+          orb.chargeRatio = 0.5;
+        } else {
+          orb.spinLevel = 0;
+          orb.isCharged = false;
+          orb.chargeRatio = 0;
+        }
+
+        // 速度リミット（室伏の豪快なスイングを許容する高上限）
+        const maxSpd = (cfg.maxSpeed * 1.6) * this.tuning.maxSpeedMultiplier;
         if (curSpd > maxSpd) {
           orb.vx = (orb.vx / curSpd) * maxSpd;
           orb.vy = (orb.vy / curSpd) * maxSpd;
@@ -533,10 +581,10 @@ export class GeminiOrbManager {
         // Screen bounce in orbit mode if enabled
         if (this.screenEdgeBounce) {
           let bounced = false;
-          if (orb.x < 14) { orb.x = 14; orb.vx = Math.abs(orb.vx) * 0.9; bounced = true; }
-          if (orb.x > 346) { orb.x = 346; orb.vx = -Math.abs(orb.vx) * 0.9; bounced = true; }
-          if (orb.y < 24) { orb.y = 24; orb.vy = Math.abs(orb.vy) * 0.9; bounced = true; }
-          if (orb.y > 516) { orb.y = 516; orb.vy = -Math.abs(orb.vy) * 0.9; bounced = true; }
+          if (orb.x < 14) { orb.x = 14; orb.vx = Math.abs(orb.vx) * 0.95; bounced = true; }
+          if (orb.x > 346) { orb.x = 346; orb.vx = -Math.abs(orb.vx) * 0.95; bounced = true; }
+          if (orb.y < 24) { orb.y = 24; orb.vy = Math.abs(orb.vy) * 0.95; bounced = true; }
+          if (orb.y > 516) { orb.y = 516; orb.vy = -Math.abs(orb.vy) * 0.95; bounced = true; }
           if (bounced && onWallHit) onWallHit(orb.x, orb.y);
         }
 
@@ -565,6 +613,7 @@ export class GeminiOrbManager {
           orb.apexDwellTimer = 0;
           orb.returnGoalX = undefined;
           orb.returnGoalY = undefined;
+          orb.strokeElapsed = 0;
         }
 
         // Advance target anchor if player continues pushing in the throw direction
@@ -623,6 +672,7 @@ export class GeminiOrbManager {
             // 一度自機に向かい始めた時にゴール地点を確定！（自機についていきすぎず、直進コミット）
             orb.returnGoalX = playerX;
             orb.returnGoalY = playerY;
+            orb.strokeElapsed = 0;
             orb.isHoveringApex = false;
           }
 
@@ -632,7 +682,12 @@ export class GeminiOrbManager {
           if (orb.returnGoalX === undefined || orb.returnGoalY === undefined) {
             orb.returnGoalX = playerX;
             orb.returnGoalY = playerY;
+            orb.strokeElapsed = 0;
           }
+          if (orb.strokeElapsed === undefined) {
+            orb.strokeElapsed = 0;
+          }
+          orb.strokeElapsed++;
 
           // Vector towards the fixed return goal
           const gDx = orb.returnGoalX - orb.x;
@@ -641,13 +696,15 @@ export class GeminiOrbManager {
           const gUx = gDx / gDist;
           const gUy = gDy / gDist;
 
-          const stretch = Math.max(0, gDist - 8);
-          const linearForce = stretch * springK;
-          const nonlinearForce = springNonlinear * Math.pow(stretch / 65, 2);
-          const totalAccel = Math.min(0.85, linearForce + nonlinearForce);
+          // 「二次曲線的な加速感にしてください ばねであり加速減速感なので」
+          // 時間経過に対する二次曲線 (t/22)^2 で滑らかに始動し、放物線状に急加速して超音速へ！
+          const timeRamp = Math.min(1.0, Math.pow(orb.strokeElapsed / 22, 2));
+          const stretch = Math.max(0, gDist - 6);
+          const springPull = (stretch * springK * this.tuning.tensionMultiplier) * 0.45;
+          const quadAccel = timeRamp * Math.min(1.20, 0.08 + springPull);
 
-          orb.vx += gUx * totalAccel;
-          orb.vy += gUy * totalAccel;
+          orb.vx += gUx * quadAccel;
+          orb.vy += gUy * quadAccel;
           orb.vx *= cfg.damping;
           orb.vy *= cfg.damping;
 
@@ -662,10 +719,11 @@ export class GeminiOrbManager {
           // Check if reached the locked return goal
           const distToPlayer = Math.hypot(playerX - orb.x, playerY - orb.y);
           if (gDist < 20) {
-            if (distToPlayer > 30) {
+            if (distToPlayer > 28) {
               // Player moved away in the meantime! Now update goal to player's new position:
               orb.returnGoalX = playerX;
               orb.returnGoalY = playerY;
+              orb.strokeElapsed = 0; // 新しい目標へ向けて再び二次曲線加速！
             }
           }
 
@@ -686,6 +744,7 @@ export class GeminiOrbManager {
                 orb.apexDwellTimer = 0;
                 orb.returnGoalX = undefined;
                 orb.returnGoalY = undefined;
+                orb.strokeElapsed = 0;
               }
             } else {
               // 「自機が動いていなくても減衰せずに往復運動しているけど、バネ減衰してくださいじょじょに」
@@ -694,15 +753,15 @@ export class GeminiOrbManager {
               const pDx = playerX - orb.x;
               const pDy = playerY - orb.y;
               if (distToPlayer > 1) {
-                const dampSpring = Math.min(0.22, distToPlayer * 0.015);
+                const dampSpring = Math.min(0.20, distToPlayer * 0.015);
                 orb.vx += (pDx / distToPlayer) * dampSpring;
                 orb.vy += (pDy / distToPlayer) * dampSpring;
               }
-              orb.vx *= 0.88;
-              orb.vy *= 0.88;
+              orb.vx *= 0.85;
+              orb.vy *= 0.85;
               orb.isCharged = false;
 
-              if (distToPlayer < 10 && Math.hypot(orb.vx, orb.vy) < 0.20) {
+              if (distToPlayer < 12 && Math.hypot(orb.vx, orb.vy) < 0.16) {
                 orb.vx = 0;
                 orb.vy = 0;
                 orb.returnGoalX = playerX;
