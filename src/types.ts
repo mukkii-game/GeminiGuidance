@@ -18,6 +18,15 @@ export interface PhysicsPresetConfig {
 
 export type GeminiCollisionMode = 'PENETRATE' | 'REFLECT';
 
+export type TestEnemySetup = 'NONE' | 'SWARM_PENETRATE' | 'BOSS_PENETRATE' | 'MIDBOSS_REFLECT';
+
+export interface PhysicsTuningState {
+  tensionMultiplier: number;   // 0.5 (弱), 1.0 (標準), 1.8 (強), 3.0 (猛烈)
+  apexDwellMultiplier: number; // 0.0 (なし), 0.5 (短), 1.0 (標準), 2.5 (長)
+  maxSpeedMultiplier: number;  // 0.7 (低速), 1.0 (標準), 1.4 (高速), 2.0 (超光速)
+  orbitRadius: number;         // 55 (短), 75 (標準), 110 (長)
+}
+
 export interface InputState {
   x: number;
   y: number;
@@ -32,6 +41,13 @@ export interface InputState {
   orbitTogglePressed?: boolean;
   collisionTogglePressed?: boolean;
   enterPressed?: boolean;
+  wallTogglePressed?: boolean;
+  enemySetupCyclePressed?: boolean;
+  tuningTensionPressed?: boolean;
+  tuningApexPressed?: boolean;
+  tuningSpeedPressed?: boolean;
+  tuningResetPressed?: boolean;
+  orbCountPressed?: boolean;
 }
 
 export interface PlayerState {

@@ -14,6 +14,8 @@ import {
   PhysicsPresetConfig,
   PhysicsPresetId,
   GeminiCollisionMode,
+  TestEnemySetup,
+  PhysicsTuningState,
 } from '../types';
 import { SpriteSheet } from './Sprites';
 import { TerrainEngine } from './Terrain';
@@ -84,9 +86,12 @@ export class ArcadeRenderer {
       isApex?: boolean;
       orbitRadius?: number;
       effectiveDamage?: number;
+      screenEdgeBounce?: boolean;
+      orbCount?: number;
+      tuning?: PhysicsTuningState;
     },
     testBossDamage: number = 0,
-    testDummyLayout: 'DUAL' | 'ALL_PENETRATE' | 'ALL_REFLECT' = 'DUAL',
+    testEnemySetup: TestEnemySetup = 'SWARM_PENETRATE',
     testBossCollisionMode: 'PENETRATE' | 'REFLECT' = 'PENETRATE',
     pointerPos?: { x: number; y: number }
   ): void {
@@ -155,7 +160,7 @@ export class ArcadeRenderer {
 
     // 13. Arcade HUD
     if (state === 'TEST_STAGE') {
-      this.renderTestStageHUD(player, geminiOrbs, boss, presetConfig, telemetry, testBossDamage, testDummyLayout, testBossCollisionMode);
+      this.renderTestStageHUD(player, geminiOrbs, boss, presetConfig, telemetry, testBossDamage, testEnemySetup, testBossCollisionMode);
     } else {
       this.renderHUD(player, stage, geminiOrbs, boss, presetConfig, telemetry);
     }
@@ -1090,9 +1095,12 @@ export class ArcadeRenderer {
       isApex?: boolean;
       orbitRadius?: number;
       effectiveDamage?: number;
+      screenEdgeBounce?: boolean;
+      orbCount?: number;
+      tuning?: PhysicsTuningState;
     },
     testBossDamage: number = 0,
-    testDummyLayout: 'DUAL' | 'ALL_PENETRATE' | 'ALL_REFLECT' = 'DUAL',
+    testEnemySetup: TestEnemySetup = 'SWARM_PENETRATE',
     testBossCollisionMode: 'PENETRATE' | 'REFLECT' = 'PENETRATE'
   ): void {
     const ctx = this.ctx;
@@ -1100,82 +1108,113 @@ export class ArcadeRenderer {
 
     ctx.save();
 
-    // 1. Top Lab Header Bar (Height: 88px)
-    ctx.fillStyle = 'rgba(2, 6, 23, 0.95)';
-    ctx.fillRect(0, 0, w, 88);
+    // 0. Neon Screen Boundary Laser Walls (when screenEdgeBounce is true)
+    if (telemetry?.screenEdgeBounce) {
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(10, 20, w - 20, this.canvas.height - 46);
+
+      // Corner brackets (gold arcade style)
+      ctx.strokeStyle = '#fde047';
+      ctx.lineWidth = 3;
+      // Top-left
+      ctx.beginPath(); ctx.moveTo(10, 36); ctx.lineTo(10, 20); ctx.lineTo(26, 20); ctx.stroke();
+      // Top-right
+      ctx.beginPath(); ctx.moveTo(w - 26, 20); ctx.lineTo(w - 10, 20); ctx.lineTo(w - 10, 36); ctx.stroke();
+      // Bottom-left
+      ctx.beginPath(); ctx.moveTo(10, this.canvas.height - 42); ctx.lineTo(10, this.canvas.height - 26); ctx.lineTo(26, this.canvas.height - 26); ctx.stroke();
+      // Bottom-right
+      ctx.beginPath(); ctx.moveTo(w - 26, this.canvas.height - 26); ctx.lineTo(w - 10, this.canvas.height - 26); ctx.lineTo(w - 10, this.canvas.height - 42); ctx.stroke();
+    }
+
+    // 1. Top Lab Header Bar (Height: 89px)
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.96)';
+    ctx.fillRect(0, 0, w, 89);
     ctx.strokeStyle = '#38bdf8';
     ctx.lineWidth = 1.5;
-    ctx.strokeRect(0, 0, w, 88);
+    ctx.strokeRect(0, 0, w, 89);
 
-    // Row 1: Title, Shield, Lv, Return
+    // Row 1: Title, Shield, Wall Bounce Toggle, Lv, Return (y: 2 to 18)
     ctx.font = '8px "Press Start 2P", monospace';
     ctx.fillStyle = '#38bdf8';
     ctx.textAlign = 'left';
-    ctx.fillText('⚡LAB', 10, 14);
+    ctx.fillText('⚡LAB', 8, 14);
 
     ctx.fillStyle = player.hp > 30 ? '#22c55e' : '#ef4444';
     ctx.font = '7px "Press Start 2P", monospace';
-    ctx.fillText(`SHLD:${player.hp}%`, 54, 14);
+    ctx.fillText(`SHLD:${player.hp}%`, 48, 14);
+
+    // [壁: 反射ON] / [画面端: 通過]
+    const isWallBounce = !!telemetry?.screenEdgeBounce;
+    ctx.fillStyle = isWallBounce ? 'rgba(56, 189, 248, 0.45)' : 'rgba(30, 41, 59, 0.85)';
+    ctx.fillRect(98, 2, 112, 15);
+    ctx.strokeStyle = isWallBounce ? '#38bdf8' : '#64748b';
+    ctx.lineWidth = isWallBounce ? 1.5 : 1;
+    ctx.strokeRect(98, 2, 112, 15);
+    ctx.fillStyle = isWallBounce ? '#38bdf8' : '#94a3b8';
+    ctx.font = '7px "DotGothic16", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(isWallBounce ? '🧱壁:反射ON[W]' : '🚪画面端:通過[W]', 98 + 56, 13);
 
     const lv = geminiOrbs[0]?.level || 1;
     ctx.fillStyle = 'rgba(236, 72, 153, 0.25)';
-    ctx.fillRect(236, 3, 48, 15);
+    ctx.fillRect(216, 2, 62, 15);
     ctx.strokeStyle = '#ec4899';
     ctx.lineWidth = 1;
-    ctx.strokeRect(236, 3, 48, 15);
+    ctx.strokeRect(216, 2, 62, 15);
     ctx.fillStyle = '#ec4899';
     ctx.font = '6px "Press Start 2P", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(`Lv.${lv}[L]`, 260, 13);
+    ctx.fillText(`Lv.${lv}[L]`, 247, 12);
 
     ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
-    ctx.fillRect(288, 3, 66, 15);
+    ctx.fillRect(282, 2, 70, 15);
     ctx.strokeStyle = '#ef4444';
     ctx.lineWidth = 1;
-    ctx.strokeRect(288, 3, 66, 15);
+    ctx.strokeRect(282, 2, 70, 15);
     ctx.fillStyle = '#f87171';
-    ctx.fillText('✕戻る(T)', 321, 13);
+    ctx.fillText('✕戻る(T)', 317, 12);
 
-    // Row 2: Attack Mode (ヨーヨー / 公転), Gemini Attribute (貫通 / 反射), Boss Attribute (貫通 / 反射)
+    // Row 2: Attack Mode, Gemini Attribute, Orb Count (y: 19 to 35)
     const curMode = telemetry?.mode || 'SLING';
     const isOrbit = curMode === 'ORBIT';
-    const btnAtkW = 110;
+    const btnAtkW = 112;
     ctx.fillStyle = isOrbit ? 'rgba(56, 189, 248, 0.50)' : 'rgba(234, 179, 8, 0.45)';
-    ctx.fillRect(8, 20, btnAtkW, 16);
+    ctx.fillRect(8, 19, btnAtkW, 16);
     ctx.strokeStyle = isOrbit ? '#38bdf8' : '#fde047';
     ctx.lineWidth = 1.5;
-    ctx.strokeRect(8, 20, btnAtkW, 16);
+    ctx.strokeRect(8, 19, btnAtkW, 16);
     ctx.fillStyle = isOrbit ? '#38bdf8' : '#fde047';
     ctx.font = '8px "DotGothic16", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(isOrbit ? '⚡攻撃②:旋回(Space)' : '🚀攻撃①:ヨーヨー', 8 + btnAtkW / 2, 31);
+    ctx.fillText(isOrbit ? '⚡攻撃②:旋回(Space)' : '🚀攻撃①:ヨーヨー', 8 + btnAtkW / 2, 30);
 
     const curCol = telemetry?.collisionMode || 'PENETRATE';
     const isPen = curCol === 'PENETRATE';
-    const btnColW = 110;
+    const btnColW = 112;
     ctx.fillStyle = isPen ? 'rgba(34, 197, 94, 0.45)' : 'rgba(249, 115, 22, 0.45)';
-    ctx.fillRect(124, 20, btnColW, 16);
+    ctx.fillRect(124, 19, btnColW, 16);
     ctx.strokeStyle = isPen ? '#22c55e' : '#f97316';
     ctx.lineWidth = 1.5;
-    ctx.strokeRect(124, 20, btnColW, 16);
+    ctx.strokeRect(124, 19, btnColW, 16);
     ctx.fillStyle = isPen ? '#22c55e' : '#f97316';
     ctx.font = '8px "DotGothic16", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(isPen ? '⚔️ジェミニ:貫通[X]' : '🛡️ジェミニ:反射[X]', 124 + btnColW / 2, 31);
+    ctx.fillText(isPen ? '⚔️ジェミニ:貫通[X]' : '🛡️ジェミニ:反射[X]', 124 + btnColW / 2, 30);
 
-    const isBossPen = testBossCollisionMode === 'PENETRATE';
-    const btnBossW = 112;
-    ctx.fillStyle = isBossPen ? 'rgba(34, 197, 94, 0.35)' : 'rgba(249, 115, 22, 0.35)';
-    ctx.fillRect(240, 20, btnBossW, 16);
-    ctx.strokeStyle = isBossPen ? '#22c55e' : '#f97316';
+    const orbCnt = telemetry?.orbCount || geminiOrbs.length || 1;
+    const btnOrbW = 112;
+    ctx.fillStyle = 'rgba(236, 72, 153, 0.35)';
+    ctx.fillRect(240, 19, btnOrbW, 16);
+    ctx.strokeStyle = '#ec4899';
     ctx.lineWidth = 1.2;
-    ctx.strokeRect(240, 20, btnBossW, 16);
-    ctx.fillStyle = isBossPen ? '#22c55e' : '#f97316';
+    ctx.strokeRect(240, 19, btnOrbW, 16);
+    ctx.fillStyle = '#f472b6';
     ctx.font = '8px "DotGothic16", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(isBossPen ? 'ボス属性:貫通' : 'ボス属性:反射', 240 + btnBossW / 2, 31);
+    ctx.fillText(`ジェミニ:${orbCnt}機[O]`, 240 + btnOrbW / 2, 30);
 
-    // Row 3: 5 Preset Switcher Tabs (y: 38 to 53, width 64 each, gap 5)
+    // Row 3: 5 Preset Switcher Tabs (y: 37 to 51)
     const tabs: Array<{ id: PhysicsPresetId; label: string; num: string }> = [
       { id: 'SNAP_SLING', label: 'スリング', num: '1' },
       { id: 'HYPER_BOOMERANG', label: 'ブーメラン', num: '2' },
@@ -1185,7 +1224,7 @@ export class ArcadeRenderer {
     ];
     const tabW = 64;
     const tabH = 14;
-    const tabY = 38;
+    const tabY = 37;
     for (let i = 0; i < tabs.length; i++) {
       const t = tabs[i];
       const tabX = 10 + i * (tabW + 5);
@@ -1201,50 +1240,50 @@ export class ArcadeRenderer {
       ctx.fillText(`[${t.num}]${t.label}`, tabX + tabW / 2, tabY + 10);
     }
 
-    // Row 4: Enemy Dummy Layout Switcher (y: 54 to 70)
-    const dBtnW = 110;
-    const dBtnH = 15;
-    const dBtnY = 54;
+    // Row 4: 4 Enemy Setup Switcher (y: 53 to 69)
+    const enemyTabs: Array<{ id: TestEnemySetup; label: string; x: number; w: number; color: string }> = [
+      { id: 'NONE', label: '①敵なし', x: 8, w: 78, color: '#38bdf8' },
+      { id: 'SWARM_PENETRATE', label: '②貫通ザコ群', x: 90, w: 84, color: '#22c55e' },
+      { id: 'BOSS_PENETRATE', label: '③貫通大ボス', x: 178, w: 84, color: '#22c55e' },
+      { id: 'MIDBOSS_REFLECT', label: '④反射中ボス', x: 266, w: 86, color: '#f97316' },
+    ];
+    for (const et of enemyTabs) {
+      const isAct = testEnemySetup === et.id;
+      ctx.fillStyle = isAct ? `${et.color}55` : 'rgba(30, 41, 59, 0.85)';
+      ctx.fillRect(et.x, 53, et.w, 16);
+      ctx.strokeStyle = isAct ? et.color : '#475569';
+      ctx.lineWidth = isAct ? 1.8 : 1;
+      ctx.strokeRect(et.x, 53, et.w, 16);
+      ctx.fillStyle = isAct ? '#ffffff' : '#94a3b8';
+      ctx.font = '7px "DotGothic16", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(et.label, et.x + et.w / 2, 64);
+    }
 
-    const isDual = testDummyLayout === 'DUAL';
-    ctx.fillStyle = isDual ? 'rgba(56, 189, 248, 0.40)' : 'rgba(30, 41, 59, 0.85)';
-    ctx.fillRect(8, dBtnY, dBtnW, dBtnH);
-    ctx.strokeStyle = isDual ? '#38bdf8' : '#475569';
-    ctx.lineWidth = isDual ? 1.5 : 1;
-    ctx.strokeRect(8, dBtnY, dBtnW, dBtnH);
-    ctx.fillStyle = isDual ? '#ffffff' : '#94a3b8';
-    ctx.font = '7px "DotGothic16", monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('敵:半々(貫通/反射)', 8 + dBtnW / 2, dBtnY + 11);
+    // Row 5: Real-time Physics Parameter Tuning (y: 71 to 86)
+    const tng = telemetry?.tuning || { tensionMultiplier: 1.0, apexDwellMultiplier: 1.0, maxSpeedMultiplier: 1.0, orbitRadius: 75 };
+    const tuningBtns = [
+      { label: `バネ:x${tng.tensionMultiplier}[J]`, x: 8, w: 68 },
+      { label: `滞空:x${tng.apexDwellMultiplier}[K]`, x: 79, w: 68 },
+      { label: `速度:x${tng.maxSpeedMultiplier}[U]`, x: 150, w: 64 },
+      { label: `半径:${tng.orbitRadius}`, x: 217, w: 64 },
+      { label: '↺初期値[R]', x: 284, w: 68 },
+    ];
+    for (const tb of tuningBtns) {
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+      ctx.fillRect(tb.x, 71, tb.w, 15);
+      ctx.strokeStyle = '#fde047';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(tb.x, 71, tb.w, 15);
+      ctx.fillStyle = '#fde047';
+      ctx.font = '6px "DotGothic16", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(tb.label, tb.x + tb.w / 2, 82);
+    }
 
-    const isAllPen = testDummyLayout === 'ALL_PENETRATE';
-    ctx.fillStyle = isAllPen ? 'rgba(34, 197, 94, 0.45)' : 'rgba(30, 41, 59, 0.85)';
-    ctx.fillRect(124, dBtnY, dBtnW, dBtnH);
-    ctx.strokeStyle = isAllPen ? '#22c55e' : '#475569';
-    ctx.lineWidth = isAllPen ? 1.5 : 1;
-    ctx.strokeRect(124, dBtnY, dBtnW, dBtnH);
-    ctx.fillStyle = isAllPen ? '#ffffff' : '#94a3b8';
-    ctx.fillText('★敵:全員貫通', 124 + dBtnW / 2, dBtnY + 11);
-
-    const isAllRef = testDummyLayout === 'ALL_REFLECT';
-    const dBtnW3 = 112;
-    ctx.fillStyle = isAllRef ? 'rgba(249, 115, 22, 0.45)' : 'rgba(30, 41, 59, 0.85)';
-    ctx.fillRect(240, dBtnY, dBtnW3, dBtnH);
-    ctx.strokeStyle = isAllRef ? '#f97316' : '#475569';
-    ctx.lineWidth = isAllRef ? 1.5 : 1;
-    ctx.strokeRect(240, dBtnY, dBtnW3, dBtnH);
-    ctx.fillStyle = isAllRef ? '#ffffff' : '#94a3b8';
-    ctx.fillText('★敵:全員反射', 240 + dBtnW3 / 2, dBtnY + 11);
-
-    // Row 5: Preset Description & Controls Guide (y: 72 to 85)
-    ctx.font = '7px "DotGothic16", monospace';
-    ctx.fillStyle = '#fde047';
-    ctx.textAlign = 'left';
-    ctx.fillText(`【${presetConfig?.nameJa || ''}】 [Space/右クリック]攻撃 [X]貫通/反射 [1-5]物理`, 8, 81);
-
-    // 4. Real-time Telemetry Bar at Screen Bottom
+    // 4. Real-time Telemetry Bar at Screen Bottom (y: height - 24 to height)
     const btmY = this.canvas.height - 24;
-    ctx.fillStyle = 'rgba(2, 6, 23, 0.92)';
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.94)';
     ctx.fillRect(0, btmY, w, 24);
     ctx.strokeStyle = '#38bdf8';
     ctx.lineWidth = 1;
@@ -1253,28 +1292,32 @@ export class ArcadeRenderer {
     ctx.font = '7px "Press Start 2P", monospace';
     ctx.fillStyle = '#38bdf8';
     ctx.textAlign = 'left';
-    ctx.fillText(`DIST:${telemetry?.dist || 0}px SPD:${telemetry?.speed || 0} [${curMode}]`, 8, btmY + 15);
+    ctx.fillText(`DIST:${telemetry?.dist || 0}px SPD:${telemetry?.speed || 0}`, 8, btmY + 15);
 
     if (telemetry?.isApex) {
       ctx.fillStyle = '#fde047';
-      ctx.fillText('★APEX DWELL★', 188, btmY + 15);
+      ctx.fillText('★APEX DWELL★', 160, btmY + 15);
     }
+
+    ctx.fillStyle = isWallBounce ? '#38bdf8' : '#64748b';
+    ctx.fillText(`[壁:${isWallBounce ? '反射' : 'なし'}]`, 236, btmY + 15);
 
     ctx.fillStyle = '#22c55e';
     ctx.textAlign = 'right';
-    ctx.fillText(`DMG:${testBossDamage}`, w - 10, btmY + 15);
+    ctx.fillText(`DMG:${testBossDamage}`, w - 8, btmY + 15);
 
-    // Boss HP Bar in Test Stage if boss active (y = 94)
+    // Boss HP Bar in Test Stage if boss active (y = 96)
     if (boss && boss.y > 0) {
       const bossBarW = 160;
       const bossBarH = 6;
       const bossBarX = (w - bossBarW) / 2;
-      const bossBarY = 94;
+      const bossBarY = 96;
 
       ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
       ctx.fillRect(bossBarX - 2, bossBarY - 2, bossBarW + 4, bossBarH + 4);
 
       const bossHpPercent = Math.max(0, boss.hp / boss.maxHp);
+      const isBossPen = testBossCollisionMode === 'PENETRATE';
       ctx.fillStyle = isBossPen ? '#22c55e' : '#f97316';
       ctx.fillRect(bossBarX, bossBarY, bossBarW * bossHpPercent, bossBarH);
 

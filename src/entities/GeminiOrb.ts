@@ -1,4 +1,4 @@
-import { GeminiCollisionMode, GeminiOrb, PhysicsPresetConfig, PhysicsPresetId } from '../types';
+import { GeminiCollisionMode, GeminiOrb, PhysicsPresetConfig, PhysicsPresetId, PhysicsTuningState } from '../types';
 
 export const PHYSICS_PRESETS: Record<PhysicsPresetId, PhysicsPresetConfig> = {
   SNAP_SLING: {
@@ -80,7 +80,87 @@ export class GeminiOrbManager {
   public orbs: GeminiOrb[] = [];
   public currentPresetId: PhysicsPresetId = 'SNAP_SLING';
   public collisionMode: GeminiCollisionMode = 'PENETRATE';
+  public screenEdgeBounce: boolean = false; // 画面端当たり判定: false = 通過, true = 跳ね返る
+  public tuning: PhysicsTuningState = {
+    tensionMultiplier: 1.0,
+    apexDwellMultiplier: 1.0,
+    maxSpeedMultiplier: 1.0,
+    orbitRadius: 75,
+  };
   private orbCounter: number = 0;
+
+  public toggleScreenEdgeBounce(): boolean {
+    this.screenEdgeBounce = !this.screenEdgeBounce;
+    return this.screenEdgeBounce;
+  }
+
+  public setScreenEdgeBounce(enabled: boolean): void {
+    this.screenEdgeBounce = enabled;
+  }
+
+  public cycleTension(): number {
+    const steps = [1.0, 1.8, 3.0, 0.5];
+    const curIdx = steps.findIndex(s => Math.abs(s - this.tuning.tensionMultiplier) < 0.05);
+    const nextIdx = (curIdx + 1) % steps.length;
+    this.tuning.tensionMultiplier = steps[nextIdx];
+    return this.tuning.tensionMultiplier;
+  }
+
+  public cycleApexDwell(): number {
+    const steps = [1.0, 2.5, 0.0, 0.5];
+    const curIdx = steps.findIndex(s => Math.abs(s - this.tuning.apexDwellMultiplier) < 0.05);
+    const nextIdx = (curIdx + 1) % steps.length;
+    this.tuning.apexDwellMultiplier = steps[nextIdx];
+    return this.tuning.apexDwellMultiplier;
+  }
+
+  public cycleMaxSpeed(): number {
+    const steps = [1.0, 1.4, 2.0, 0.7];
+    const curIdx = steps.findIndex(s => Math.abs(s - this.tuning.maxSpeedMultiplier) < 0.05);
+    const nextIdx = (curIdx + 1) % steps.length;
+    this.tuning.maxSpeedMultiplier = steps[nextIdx];
+    return this.tuning.maxSpeedMultiplier;
+  }
+
+  public cycleOrbitRadius(): number {
+    const steps = [75, 110, 55];
+    const curIdx = steps.indexOf(this.tuning.orbitRadius);
+    const nextIdx = (curIdx + 1) % steps.length;
+    this.tuning.orbitRadius = steps[nextIdx];
+    for (const orb of this.orbs) {
+      orb.orbitRadius = this.tuning.orbitRadius;
+    }
+    return this.tuning.orbitRadius;
+  }
+
+  public resetTuning(): void {
+    this.tuning = {
+      tensionMultiplier: 1.0,
+      apexDwellMultiplier: 1.0,
+      maxSpeedMultiplier: 1.0,
+      orbitRadius: 75,
+    };
+    for (const orb of this.orbs) {
+      orb.orbitRadius = 75;
+    }
+  }
+
+  public setOrbCount(count: number, playerX: number, playerY: number): number {
+    const targetCount = Math.max(1, Math.min(3, count));
+    while (this.orbs.length < targetCount) {
+      const offset = this.orbs.length * 35;
+      this.spawn(playerX + (Math.random() - 0.5) * 40, playerY - 60 - offset);
+    }
+    while (this.orbs.length > targetCount) {
+      this.orbs.pop();
+    }
+    return this.orbs.length;
+  }
+
+  public cycleOrbCount(playerX: number, playerY: number): number {
+    const next = (this.orbs.length % 3) + 1;
+    return this.setOrbCount(next, playerX, playerY);
+  }
 
   public toggleCollisionMode(): GeminiCollisionMode {
     this.collisionMode = this.collisionMode === 'PENETRATE' ? 'REFLECT' : 'PENETRATE';
@@ -188,9 +268,24 @@ export class GeminiOrbManager {
     isApex: boolean;
     orbitRadius: number;
     effectiveDamage: number;
+    screenEdgeBounce: boolean;
+    orbCount: number;
+    tuning: PhysicsTuningState;
   } {
     if (this.orbs.length === 0) {
-      return { dist: 0, speed: 0, tangentSpeed: 0, mode: 'SLING', collisionMode: this.collisionMode, isApex: false, orbitRadius: 0, effectiveDamage: 1 };
+      return {
+        dist: 0,
+        speed: 0,
+        tangentSpeed: 0,
+        mode: 'SLING',
+        collisionMode: this.collisionMode,
+        isApex: false,
+        orbitRadius: this.tuning.orbitRadius,
+        effectiveDamage: 1,
+        screenEdgeBounce: this.screenEdgeBounce,
+        orbCount: 0,
+        tuning: this.tuning,
+      };
     }
     const orb = this.orbs[0];
     const dx = orb.x - playerX;
@@ -211,6 +306,9 @@ export class GeminiOrbManager {
       isApex: orb.isHoveringApex,
       orbitRadius: Math.round(orb.orbitRadius),
       effectiveDamage: this.getEffectiveDamage(orb),
+      screenEdgeBounce: this.screenEdgeBounce,
+      orbCount: this.orbs.length,
+      tuning: this.tuning,
     };
   }
 
@@ -228,7 +326,7 @@ export class GeminiOrbManager {
       fuseTimer: 20,
       mode: 'SLING',
       collisionMode: this.collisionMode,
-      orbitRadius: 75,
+      orbitRadius: this.tuning.orbitRadius,
       orbitAngle: -Math.PI / 2,
       orbitAngularVel: 0.065,
       apexDwellTimer: 0,
@@ -243,9 +341,13 @@ export class GeminiOrbManager {
     playerY: number,
     playerVx: number = 0,
     playerVy: number = 0,
-    onMerge?: (level: number, x: number, y: number) => void
+    onMerge?: (level: number, x: number, y: number) => void,
+    onWallHit?: (x: number, y: number) => void
   ): void {
     const cfg = PHYSICS_PRESETS[this.currentPresetId];
+    const springK = cfg.springK * this.tuning.tensionMultiplier;
+    const springNonlinear = cfg.springNonlinear * this.tuning.tensionMultiplier;
+    const apexThreshold = cfg.apexThreshold * this.tuning.apexDwellMultiplier;
 
     for (let i = 0; i < this.orbs.length; i++) {
       const orb = this.orbs[i];
@@ -273,26 +375,20 @@ export class GeminiOrbManager {
 
       if (orb.mode === 'ORBIT') {
         // --- MODE ②: TETHERED ORBIT / WHIRLING FLAIL (公転紐ロック旋回) ---
-        // Tangential unit vector (counter-clockwise)
         const tx = -Math.sin(orb.orbitAngle);
         const ty = Math.cos(orb.orbitAngle);
 
-        // Player ship movement transferred into orbit spin
         const playerTangential = playerVx * tx + playerVy * ty;
         orb.orbitAngularVel += (playerTangential / orb.orbitRadius) * cfg.orbitTransfer;
 
-        // Air damping + baseline automatic spin
         orb.orbitAngularVel = orb.orbitAngularVel * 0.985 + (cfg.orbitBaseSpeed * 0.015);
         orb.orbitAngularVel = Math.max(-0.25, Math.min(0.25, orb.orbitAngularVel));
 
-        // Advance angle
         orb.orbitAngle += orb.orbitAngularVel;
 
-        // Position strictly on tether radius
         orb.x = playerX + Math.cos(orb.orbitAngle) * orb.orbitRadius;
         orb.y = playerY + Math.sin(orb.orbitAngle) * orb.orbitRadius;
 
-        // Tangential velocity for damage and fling release
         orb.vx = playerVx + tx * (orb.orbitRadius * orb.orbitAngularVel);
         orb.vy = playerVy + ty * (orb.orbitRadius * orb.orbitAngularVel);
 
@@ -300,37 +396,32 @@ export class GeminiOrbManager {
         orb.apexDwellTimer = 0;
 
       } else {
-        // --- MODE ①: YO-YO & BOOMERANG SLING PHYSICS (スリング＆ヨーヨー・ブーメラン) ---
-        // Rubber band tension accelerates Gemini toward the ship:
+        // --- MODE ①: YO-YO & BOOMERANG SLING PHYSICS ---
         const stretch = Math.max(0, dist - 16);
-        const linearForce = stretch * cfg.springK;
-        const nonlinearForce = cfg.springNonlinear * Math.pow(stretch / 100, 2);
-        const totalAccel = Math.min(1.4, linearForce + nonlinearForce);
+        const linearForce = stretch * springK;
+        const nonlinearForce = springNonlinear * Math.pow(stretch / 100, 2);
+        const totalAccel = Math.min(1.8, linearForce + nonlinearForce);
 
         orb.vx += ux * totalAccel;
         orb.vy += uy * totalAccel;
 
-        // Momentum damping
         orb.vx *= cfg.damping;
         orb.vy *= cfg.damping;
 
-        // When resting near ship with low speed, smoothly settle
         if (dist < 32 && Math.hypot(orb.vx, orb.vy) < 1.2) {
           orb.vx *= 0.92;
           orb.vy *= 0.92;
         }
 
-        // Terminal speed limit
         const curSpeed = Math.hypot(orb.vx, orb.vy);
-        const maxSpd = cfg.maxSpeed + (orb.level - 1) * 1.5;
+        const maxSpd = (cfg.maxSpeed + (orb.level - 1) * 1.5) * this.tuning.maxSpeedMultiplier;
         if (curSpeed > maxSpd) {
           orb.vx = (orb.vx / curSpeed) * maxSpd;
           orb.vy = (orb.vy / curSpeed) * maxSpd;
         }
 
-        // Apex Dwell Detection (折り返し地点での減速・停止判定)
-        // When Gemini has flown out (dist > 50px) and speed drops below apexThreshold:
-        if (dist > 50 && curSpeed < cfg.apexThreshold) {
+        // Apex Dwell Detection
+        if (dist > 50 && curSpeed < apexThreshold) {
           orb.isHoveringApex = true;
           orb.apexDwellTimer++;
         } else {
@@ -338,19 +429,30 @@ export class GeminiOrbManager {
           orb.apexDwellTimer = 0;
         }
 
-        // Update position
         orb.x += orb.vx;
         orb.y += orb.vy;
 
-        // Soft screen edge bounce
-        if (orb.x < 14) { orb.x = 14; orb.vx = Math.abs(orb.vx) * 0.92; }
-        if (orb.x > 346) { orb.x = 346; orb.vx = -Math.abs(orb.vx) * 0.92; }
-        if (orb.y < 24) { orb.y = 24; orb.vy = Math.abs(orb.vy) * 0.92; }
-        if (orb.y > 516) { orb.y = 516; orb.vy = -Math.abs(orb.vy) * 0.92; }
+        // Screen boundary collision behavior
+        if (this.screenEdgeBounce) {
+          let bounced = false;
+          if (orb.x < 14) { orb.x = 14; orb.vx = Math.abs(orb.vx) * 0.95; bounced = true; }
+          if (orb.x > 346) { orb.x = 346; orb.vx = -Math.abs(orb.vx) * 0.95; bounced = true; }
+          if (orb.y < 24) { orb.y = 24; orb.vy = Math.abs(orb.vy) * 0.95; bounced = true; }
+          if (orb.y > 516) { orb.y = 516; orb.vy = -Math.abs(orb.vy) * 0.95; bounced = true; }
+          if (bounced && onWallHit) {
+            onWallHit(orb.x, orb.y);
+          }
+        } else {
+          // 画面端に当たり判定がない: pass-through beyond screen, gentle containment far offscreen
+          if (orb.x < -120) { orb.x = -120; orb.vx *= 0.5; }
+          if (orb.x > 480) { orb.x = 480; orb.vx *= 0.5; }
+          if (orb.y < -120) { orb.y = -120; orb.vy *= 0.5; }
+          if (orb.y > 640) { orb.y = 640; orb.vy *= 0.5; }
+        }
       }
     }
 
-    // Check for Gemini Fusion (合体)
+    // Check for Gemini Fusion
     this.checkFusion(onMerge);
   }
 

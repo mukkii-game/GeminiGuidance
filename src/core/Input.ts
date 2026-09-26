@@ -122,14 +122,35 @@ export class InputManager {
       if (e.code === 'KeyP') {
         this.cyclePresetPressed = true;
       }
-      if (e.code === 'Space' || e.code === 'KeyZ' || e.code === 'KeyO') {
+      if (e.code === 'Space' || e.code === 'KeyZ') {
         this.state.orbitTogglePressed = true;
+      }
+      if (e.code === 'KeyO') {
+        this.state.orbCountPressed = true;
       }
       if (e.code === 'Enter') {
         this.state.enterPressed = true;
       }
       if (e.code === 'KeyX') {
         this.state.collisionTogglePressed = true;
+      }
+      if (e.code === 'KeyW' || e.code === 'KeyB') {
+        this.state.wallTogglePressed = true;
+      }
+      if (e.code === 'KeyE') {
+        this.state.enemySetupCyclePressed = true;
+      }
+      if (e.code === 'KeyJ') {
+        this.state.tuningTensionPressed = true;
+      }
+      if (e.code === 'KeyK') {
+        this.state.tuningApexPressed = true;
+      }
+      if (e.code === 'KeyU') {
+        this.state.tuningSpeedPressed = true;
+      }
+      if (e.code === 'KeyR') {
+        this.state.tuningResetPressed = true;
       }
       if (e.code === 'Digit1') {
         this.state.presetSelectPressed = 'SNAP_SLING';
@@ -224,6 +245,48 @@ export class InputManager {
     }
     const val = this.state.presetSelectPressed || null;
     this.state.presetSelectPressed = undefined;
+    return val;
+  }
+
+  public consumeWallToggle(): boolean {
+    const val = !!this.state.wallTogglePressed;
+    this.state.wallTogglePressed = false;
+    return val;
+  }
+
+  public consumeEnemySetupCycle(): boolean {
+    const val = !!this.state.enemySetupCyclePressed;
+    this.state.enemySetupCyclePressed = false;
+    return val;
+  }
+
+  public consumeTuningTension(): boolean {
+    const val = !!this.state.tuningTensionPressed;
+    this.state.tuningTensionPressed = false;
+    return val;
+  }
+
+  public consumeTuningApex(): boolean {
+    const val = !!this.state.tuningApexPressed;
+    this.state.tuningApexPressed = false;
+    return val;
+  }
+
+  public consumeTuningSpeed(): boolean {
+    const val = !!this.state.tuningSpeedPressed;
+    this.state.tuningSpeedPressed = false;
+    return val;
+  }
+
+  public consumeTuningReset(): boolean {
+    const val = !!this.state.tuningResetPressed;
+    this.state.tuningResetPressed = false;
+    return val;
+  }
+
+  public consumeOrbCount(): boolean {
+    const val = !!this.state.orbCountPressed;
+    this.state.orbCountPressed = false;
     return val;
   }
 }
