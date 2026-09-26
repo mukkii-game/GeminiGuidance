@@ -241,6 +241,8 @@ export class GeminiOrbManager {
         orb.mode = 'SLING';
         orb.orbitTier = undefined;
         orb.strokePhase = 'RETURN';
+        orb.returnGoalX = playerX;
+        orb.returnGoalY = playerY;
         orb.isCharged = false;
       }
     }
@@ -279,6 +281,8 @@ export class GeminiOrbManager {
           orb.mode = 'SLING';
           orb.orbitTier = undefined;
           orb.strokePhase = 'RETURN';
+          orb.returnGoalX = playerX;
+          orb.returnGoalY = playerY;
           orb.isCharged = false;
         }
       }
@@ -414,6 +418,8 @@ export class GeminiOrbManager {
       strokePhase: 'OUTWARD',
       castTargetX: x,
       castTargetY: y - 80,
+      returnGoalX: undefined,
+      returnGoalY: undefined,
       tetherLength: this.tuning.orbitRadius,
     };
     this.orbs.push(orb);
@@ -544,7 +550,7 @@ export class GeminiOrbManager {
         const pSpeed = Math.hypot(playerVx, playerVy);
 
         // 1. Throw / Thrust Launch Detection:
-        // When orb is near player and player pushes forward / darts:
+        // When orb is near player and player actively pushes forward / darts:
         if (dist < 44 && pSpeed > 0.40) {
           const pUx = playerVx / pSpeed;
           const pUy = playerVy / pSpeed;
@@ -557,6 +563,8 @@ export class GeminiOrbManager {
           orb.isCharged = true;
           orb.chargeRatio = 1.0;
           orb.apexDwellTimer = 0;
+          orb.returnGoalX = undefined;
+          orb.returnGoalY = undefined;
         }
 
         // Advance target anchor if player continues pushing in the throw direction
@@ -612,55 +620,94 @@ export class GeminiOrbManager {
           orb.apexDwellTimer--;
           if (orb.apexDwellTimer <= 0) {
             orb.strokePhase = 'RETURN';
+            // 一度自機に向かい始めた時にゴール地点を確定！（自機についていきすぎず、直進コミット）
+            orb.returnGoalX = playerX;
+            orb.returnGoalY = playerY;
             orb.isHoveringApex = false;
           }
 
         } else {
-          // RETURN: Accelerates toward player's current position!
-          const rDx = playerX - orb.x;
-          const rDy = playerY - orb.y;
-          const rDist = Math.hypot(rDx, rDy) || 1;
-          const rUx = rDx / rDist;
-          const rUy = rDy / rDist;
+          // RETURN:
+          // 「よーよーは、一度自機に向かい始めた時にもうゴール機を決めて、ごーるまではとにかくうごく、ごーるについたら、じきにむかってまたすすむ」
+          if (orb.returnGoalX === undefined || orb.returnGoalY === undefined) {
+            orb.returnGoalX = playerX;
+            orb.returnGoalY = playerY;
+          }
 
-          const stretch = Math.max(0, rDist - 10);
+          // Vector towards the fixed return goal
+          const gDx = orb.returnGoalX - orb.x;
+          const gDy = orb.returnGoalY - orb.y;
+          const gDist = Math.hypot(gDx, gDy) || 1;
+          const gUx = gDx / gDist;
+          const gUy = gDy / gDist;
+
+          const stretch = Math.max(0, gDist - 8);
           const linearForce = stretch * springK;
           const nonlinearForce = springNonlinear * Math.pow(stretch / 65, 2);
-          const totalAccel = Math.min(0.90, linearForce + nonlinearForce);
+          const totalAccel = Math.min(0.85, linearForce + nonlinearForce);
 
-          orb.vx += rUx * totalAccel;
-          orb.vy += rUy * totalAccel;
+          orb.vx += gUx * totalAccel;
+          orb.vy += gUy * totalAccel;
           orb.vx *= cfg.damping;
           orb.vy *= cfg.damping;
 
           // Charge detection on return
-          const dotTowardPlayer = orb.vx * rUx + orb.vy * rUy;
-          if (rDist > 45 && dotTowardPlayer > 0.35) {
+          const dotTowardGoal = orb.vx * gUx + orb.vy * gUy;
+          if (gDist > 45 && dotTowardGoal > 0.35) {
             orb.isCharged = true;
-            orb.chargeRatio = Math.min(1.0, (rDist - 30) / 75);
+            orb.chargeRatio = Math.min(1.0, (gDist - 30) / 75);
           }
 
-          // Crossing / approaching player
-          if (rDist < 36) {
-            const curSpd = Math.hypot(orb.vx, orb.vy);
-            if (pSpeed > 0.35 || curSpd > 0.7) {
-              // RHYTHMIC MOMENTUM TRANSFER! Player pumps the swing like a swing / yo-yo!
+          // 「ごーるまではとにかくうごく、ごーるについたら、じきにむかってまたすすむ」
+          // Check if reached the locked return goal
+          const distToPlayer = Math.hypot(playerX - orb.x, playerY - orb.y);
+          if (gDist < 20) {
+            if (distToPlayer > 30) {
+              // Player moved away in the meantime! Now update goal to player's new position:
+              orb.returnGoalX = playerX;
+              orb.returnGoalY = playerY;
+            }
+          }
+
+          // Crossing / arriving at player ship
+          if (distToPlayer < 36) {
+            if (pSpeed > 0.40) {
+              // ACTIVE PUMPING: Player rhythmically pumps ship forward/outward
+              // Momentum transfer! Amplify the swing like a swing / yo-yo!
               orb.vx += playerVx * 1.35;
               orb.vy += playerVy * 1.35;
               const newSpd = Math.hypot(orb.vx, orb.vy);
-              if (newSpd > 0.5) {
+              if (newSpd > 0.4) {
                 const throwReach = Math.min(250, 95 + newSpd * 50);
                 orb.castTargetX = orb.x + (orb.vx / newSpd) * throwReach;
                 orb.castTargetY = orb.y + (orb.vy / newSpd) * throwReach;
                 orb.strokePhase = 'OUTWARD';
                 orb.isCharged = true;
                 orb.apexDwellTimer = 0;
+                orb.returnGoalX = undefined;
+                orb.returnGoalY = undefined;
               }
             } else {
-              // Gentle hover near ship
+              // 「自機が動いていなくても減衰せずに往復運動しているけど、バネ減衰してくださいじょじょに」
+              // Player is stationary / not pumping: DO NOT relaunch into OUTWARD!
+              // Apply harmonic spring pull and strong gradual velocity damping (バネ減衰):
+              const pDx = playerX - orb.x;
+              const pDy = playerY - orb.y;
+              if (distToPlayer > 1) {
+                const dampSpring = Math.min(0.22, distToPlayer * 0.015);
+                orb.vx += (pDx / distToPlayer) * dampSpring;
+                orb.vy += (pDy / distToPlayer) * dampSpring;
+              }
               orb.vx *= 0.88;
               orb.vy *= 0.88;
               orb.isCharged = false;
+
+              if (distToPlayer < 10 && Math.hypot(orb.vx, orb.vy) < 0.20) {
+                orb.vx = 0;
+                orb.vy = 0;
+                orb.returnGoalX = playerX;
+                orb.returnGoalY = playerY;
+              }
             }
           }
         }

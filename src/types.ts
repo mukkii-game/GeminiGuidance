@@ -123,6 +123,8 @@ export interface GeminiOrb {
   strokePhase?: 'OUTWARD' | 'APEX' | 'RETURN';
   castTargetX?: number;
   castTargetY?: number;
+  returnGoalX?: number;
+  returnGoalY?: number;
   tetherLength?: number;
 }
 
