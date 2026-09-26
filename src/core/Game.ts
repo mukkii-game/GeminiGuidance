@@ -128,6 +128,36 @@ export class Game {
     return on;
   }
 
+  public toggleOrbitWithFeedback(): boolean {
+    const res = this.geminiManager.toggleOrbit(this.player.state.x, this.player.state.y);
+    this.audio.playGeminiBounce();
+    if (res.isOrbit) {
+      const tier = res.tier || 'MEDIUM';
+      const r = Math.round(res.radius || 90);
+      let tierLabel = '';
+      let tierColor = '#38bdf8';
+      if (tier === 'SHORT') {
+        tierLabel = `⚡公転【短距離バリア】(R=${r}px)`;
+        tierColor = '#38bdf8';
+      } else if (tier === 'MEDIUM') {
+        tierLabel = `⚡公転【中距離スイング】(R=${r}px)`;
+        tierColor = '#facc15';
+      } else {
+        tierLabel = `⚡公転【巨大分銅ハンマー】(R=${r}px)`;
+        tierColor = '#ef4444';
+      }
+      this.addFloatingText(this.player.state.x, this.player.state.y - 30, tierLabel, tierColor);
+    } else {
+      this.addFloatingText(
+        this.player.state.x,
+        this.player.state.y - 30,
+        '🚀攻撃①: ヨーヨー突撃 (スリング解除)',
+        '#fde047'
+      );
+    }
+    return res.isOrbit;
+  }
+
   private updateAudioButtonsUi(): void {
     const btnBgm = document.getElementById('btn-bgm');
     const btnSe = document.getElementById('btn-se');
@@ -418,14 +448,7 @@ export class Game {
 
     // Handle Orbit / Sling Mode toggle hotkey (Space / KeyZ / KeyO / Right-Click)
     if (this.input.consumeOrbitToggle()) {
-      const isOrbit = this.geminiManager.toggleOrbit(this.player.state.x, this.player.state.y);
-      this.audio.playGeminiBounce();
-      this.addFloatingText(
-        this.player.state.x,
-        this.player.state.y - 30,
-        isOrbit ? '⚡ 攻撃②: 旋回シールド (公転)' : '🚀 攻撃①: ヨーヨー投擲 (スリング)',
-        isOrbit ? '#38bdf8' : '#fde047'
-      );
+      this.toggleOrbitWithFeedback();
     }
 
     // Handle Collision Mode toggle hotkey (KeyX)
@@ -463,10 +486,13 @@ export class Game {
       this.addFloatingText(this.player.state.x, this.player.state.y - 30, 'GEMINI LEVEL UP!', '#ec4899');
     }
 
-    // Handle Click/Touch on HUD Buttons
+    // Handle Click/Touch on HUD Buttons or Field Toggle
     const click = this.input.consumeClick();
     if (click) {
-      this.handlePointerClick(click.x, click.y);
+      const handled = this.handlePointerClick(click.x, click.y);
+      if (!handled && this.state !== 'STAGE_CLEAR') {
+        this.toggleOrbitWithFeedback();
+      }
     }
 
     // Test Stage Update Dispatch
@@ -795,22 +821,38 @@ export class Game {
 
             if (e.hp > 0) {
               this.audio.playGeminiBounce();
-              this.addExplosion(e.x, e.y, 14, false);
+              this.addExplosion(e.x, e.y, orb.isCharged ? 20 : 14, false);
               this.player.addScore(50 * effectiveDmg);
-              this.addFloatingText(e.x, e.y - 14, `BOUNCE! -${effectiveDmg}`, '#f97316');
+              if (orb.isCharged) {
+                this.addFloatingText(e.x, e.y - 14, `🔥大突撃BOUNCE! -${effectiveDmg}`, '#ff3b00');
+              } else {
+                this.addFloatingText(e.x, e.y - 14, `BOUNCE! -${effectiveDmg}`, '#f97316');
+              }
             }
           } else {
             // PENETRATE: Gemini DOES NOT BOUNCE! Passes straight through enemy!
             if (e.hp > 0) {
               this.audio.playAirExplosion();
-              this.addExplosion(e.x, e.y, 14, false);
+              this.addExplosion(e.x, e.y, orb.isCharged ? 22 : 14, false);
               this.player.addScore(50 * effectiveDmg);
-              if (orb.isHoveringApex) {
+              if (orb.isCharged) {
+                this.addFloatingText(e.x, e.y - 14, `🔥大突撃HIT! -${effectiveDmg}`, '#ff3b00');
+              } else if (orb.isHoveringApex) {
                 this.addFloatingText(e.x, e.y - 14, `★APEX SHRED!! -${effectiveDmg}`, '#fde047');
               } else {
                 this.addFloatingText(e.x, e.y - 14, `貫通HIT! -${effectiveDmg}`, '#38bdf8');
               }
             }
+          }
+
+          // Charged Mode 1 thrust knockback on any enemy (if mass < 100)
+          if (orb.isCharged && (e.mass || 2) < 100) {
+            const pDx = e.x - this.player.state.x;
+            const pDy = e.y - this.player.state.y;
+            const pDist = Math.hypot(pDx, pDy) || 1;
+            const kPower = Math.min(2.4, 2.4 / (e.mass || 1.0));
+            e.knockbackVx = ((pDx / pDist) * 3.8 + orb.vx * 0.25) * kPower;
+            e.knockbackVy = Math.min(-3.6, ((pDy / pDist) * 3.8 + orb.vy * 0.25) * kPower);
           }
 
           if (e.hp <= 0) {
@@ -899,8 +941,10 @@ export class Game {
                 }
               } else {
                 // Boss Penetration: NO bounce! Glides or hovers inside!
-                this.addExplosion(orb.x, orb.y, 16, false);
-                if (orb.isHoveringApex) {
+                this.addExplosion(orb.x, orb.y, orb.isCharged ? 24 : 16, false);
+                if (orb.isCharged) {
+                  this.addFloatingText(b.x, b.y - 20, `🔥火の玉大突撃!! -${effectiveDmg}`, '#ff3b00');
+                } else if (orb.isHoveringApex) {
                   this.addFloatingText(b.x, b.y - 20, `★APEX SHRED!! -${effectiveDmg * 2}`, '#fde047');
                 } else {
                   this.addFloatingText(b.x, b.y - 20, `貫通HIT! -${effectiveDmg}`, '#38bdf8');
@@ -1465,16 +1509,9 @@ export class Game {
 
       // 3. Row 2 Buttons (y: 19 to 36)
       if (y >= 19 && y <= 36) {
-        // [攻撃①: ヨーヨー] / [攻撃②: 旋回] (x: 6 to 122)
+        // [攻撃①: ヨーヨー突撃] / [攻撃②: 光ロープ分銅] (x: 6 to 122)
         if (x >= 6 && x <= 122) {
-          const isOrbit = this.geminiManager.toggleOrbit(this.player.state.x, this.player.state.y);
-          this.audio.playGeminiBounce();
-          this.addFloatingText(
-            this.player.state.x,
-            this.player.state.y - 30,
-            isOrbit ? '⚡ 攻撃②: 旋回シールド (公転)' : '🚀 攻撃①: ヨーヨー投擲 (スリング)',
-            isOrbit ? '#38bdf8' : '#fde047'
-          );
+          this.toggleOrbitWithFeedback();
           return true;
         }
 
@@ -1610,16 +1647,9 @@ export class Game {
         return true;
       }
 
-      // Row 2: [攻撃: ヨーヨー / 旋回] button (x: w - 176 to w - 92, y: 22 to 40)
+      // Row 2: [攻撃: ヨーヨー突撃 / 光ロープ分銅] button (x: w - 176 to w - 92, y: 22 to 40)
       if (x >= w - 178 && x <= w - 90 && y >= 22 && y <= 40) {
-        const isOrbit = this.geminiManager.toggleOrbit(this.player.state.x, this.player.state.y);
-        this.audio.playGeminiBounce();
-        this.addFloatingText(
-          this.player.state.x,
-          this.player.state.y - 30,
-          isOrbit ? '⚡ 攻撃②: 旋回シールド (公転)' : '🚀 攻撃①: ヨーヨー投擲 (スリング)',
-          isOrbit ? '#38bdf8' : '#fde047'
-        );
+        this.toggleOrbitWithFeedback();
         return true;
       }
 

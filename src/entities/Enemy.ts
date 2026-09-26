@@ -69,8 +69,8 @@ export class EnemyManager {
       formationId,
       x,
       y,
-      vx: pattern === 'UFO_FLYBY' ? 1.3 : 0,
-      vy: pattern === 'ROCKET_ASCENT' ? -0.75 : pattern === 'INVADER' || pattern === 'UFO_FLYBY' ? 0 : 0.60,
+      vx: pattern === 'UFO_FLYBY' ? 0.70 : 0,
+      vy: pattern === 'ROCKET_ASCENT' ? -0.42 : pattern === 'INVADER' || pattern === 'UFO_FLYBY' ? 0 : 0.32,
       width,
       height,
       hp,
@@ -208,7 +208,7 @@ export class EnemyManager {
           const bdx = playerX - e.x;
           const bdy = playerY - e.y;
           const bdist = Math.hypot(bdx, bdy) || 1;
-          const bspeed = 0.65;
+          const bspeed = 0.35;
           onSpawnBullet(e.x, e.y, (bdx / bdist) * bspeed, (bdy / bdist) * bspeed);
         }
       }
@@ -241,7 +241,7 @@ export class EnemyManager {
     if (invaders.length === 0) return;
 
     // Classic Invaders acceleration: fewer enemies -> faster tempo!
-    const stepInterval = Math.max(5, Math.floor((invaders.length / this.invaderTotal) * 22));
+    const stepInterval = Math.max(8, Math.floor((invaders.length / this.invaderTotal) * 36));
     this.invaderStepTimer++;
 
     if (this.invaderStepTimer >= stepInterval) {
@@ -267,12 +267,12 @@ export class EnemyManager {
       if (shouldDrop) {
         // Drop down a row!
         for (const inv of invaders) {
-          inv.y += 14;
+          inv.y += 12;
         }
       } else {
         // Step horizontally!
         for (const inv of invaders) {
-          inv.x += this.invaderMarchDir * 7;
+          inv.x += this.invaderMarchDir * 4;
         }
       }
     }
@@ -314,30 +314,30 @@ export class EnemyManager {
 
       case 'TOROID_SWOOP': {
         if (t < 70) {
-          e.vy = 0.70;
+          e.vy = 0.38;
           e.vx = 0;
         } else if (t < 130) {
           const progress = (t - 70) / 60;
           const angle = progress * Math.PI;
           const dir = e.x < canvasWidth / 2 ? -1 : 1;
-          e.vx = Math.sin(angle) * dir * 1.2;
-          e.vy = Math.cos(angle) * 0.7;
+          e.vx = Math.sin(angle) * dir * 0.65;
+          e.vy = Math.cos(angle) * 0.38;
         } else {
-          e.vy = -0.85;
-          e.vx = e.x < canvasWidth / 2 ? -0.4 : 0.4;
+          e.vy = -0.45;
+          e.vx = e.x < canvasWidth / 2 ? -0.22 : 0.22;
         }
         break;
       }
 
       case 'TORKAN_TRACK_DASH': {
         if (t < 65) {
-          e.vy = 0.45;
-          e.vx = (playerX - e.x) * 0.022;
+          e.vy = 0.25;
+          e.vx = (playerX - e.x) * 0.012;
         } else if (t < 120) {
-          e.vy = 1.35;
+          e.vy = 0.70;
           e.vx = 0;
         } else {
-          e.vy = 0.85;
+          e.vy = 0.45;
         }
         break;
       }
@@ -345,26 +345,26 @@ export class EnemyManager {
       case 'ZOSHI_REACTIVE_SWOOP': {
         if (t < 50) {
           const dir = e.x < canvasWidth / 2 ? 1 : -1;
-          e.vx = dir * 1.3;
-          e.vy = 0.55;
+          e.vx = dir * 0.70;
+          e.vy = 0.30;
         } else {
           e.vx *= 0.98;
-          e.vy = 0.80;
+          e.vy = 0.42;
         }
         break;
       }
 
       case 'GALAGA_LOOP': {
         if (t < 50) {
-          e.vy = 0.65;
-          e.vx = (canvasWidth / 2 - e.x) * 0.015;
+          e.vy = 0.35;
+          e.vx = (canvasWidth / 2 - e.x) * 0.008;
         } else if (t < 140) {
-          const loopAngle = (t - 50) * 0.07;
-          e.vx = Math.cos(loopAngle) * 1.2;
-          e.vy = Math.sin(loopAngle) * 0.8 + 0.3;
+          const loopAngle = (t - 50) * 0.045;
+          e.vx = Math.cos(loopAngle) * 0.65;
+          e.vy = Math.sin(loopAngle) * 0.42 + 0.18;
         } else {
           e.vx = 0;
-          e.vy = 0.65;
+          e.vy = 0.35;
         }
         break;
       }

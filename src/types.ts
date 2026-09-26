@@ -110,6 +110,9 @@ export interface GeminiOrb {
   apexDwellTimer: number;
   isHoveringApex: boolean;
   collisionMode?: GeminiCollisionMode;
+  isCharged?: boolean;
+  chargeRatio?: number;
+  orbitTier?: 'SHORT' | 'MEDIUM' | 'LONG';
 }
 
 export type EnemyType = 

@@ -65,6 +65,10 @@ export class InputManager {
     // Touch Events: Relative Delta Dragging (Ergonomic 1-finger control)
     this.canvas.addEventListener('touchstart', (e) => {
       e.preventDefault();
+      if (e.touches.length > 1) {
+        // Multi-finger tap: Second finger taps while moving -> toggle orbit flail!
+        this.state.orbitTogglePressed = true;
+      }
       if (e.touches.length > 0) {
         const touch = e.touches[0];
         const rect = this.canvas.getBoundingClientRect();

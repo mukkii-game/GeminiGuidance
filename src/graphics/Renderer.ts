@@ -394,14 +394,22 @@ export class ArcadeRenderer {
     for (const orb of orbs) {
       const dist = Math.hypot(orb.x - playerX, orb.y - playerY);
       const speed = Math.hypot(orb.vx, orb.vy);
-      const isFast = speed > 4.5;
-      const effectiveR = isFast ? orb.radius * 1.3 : orb.isHoveringApex ? orb.radius * 1.25 : orb.radius;
+      const isFast = speed > 2.5;
+      const isCharged = !!orb.isCharged;
+      const effectiveR = orb.mode === 'ORBIT'
+        ? (orb.orbitTier === 'SHORT' ? orb.radius * 0.75 : orb.orbitTier === 'LONG' ? orb.radius * 1.65 : orb.radius)
+        : (isCharged ? orb.radius * 1.4 : orb.isHoveringApex ? orb.radius * 1.25 : orb.radius);
 
-      // 0. Energy Tether (Rubber sling vs locked orbit cable)
+      // 0. Energy Tether (Mode ② 光のロープ vs Mode ① 自由ホーミング)
       ctx.save();
       if (orb.mode === 'ORBIT') {
-        // --- MODE ②: Locked Orbital Ring & Energy Cable ---
-        ctx.strokeStyle = 'rgba(56, 189, 248, 0.22)';
+        // --- MODE ②: 光のロープ (Laser Tether & Flail Constrained Orbit) ---
+        const tier = orb.orbitTier || (orb.orbitRadius < 65 ? 'SHORT' : orb.orbitRadius >= 125 ? 'LONG' : 'MEDIUM');
+        const glowColor = tier === 'SHORT' ? 'rgba(56, 189, 248, 0.45)' : tier === 'LONG' ? 'rgba(239, 68, 68, 0.55)' : 'rgba(253, 224, 71, 0.45)';
+        const coreColor = tier === 'SHORT' ? '#38bdf8' : tier === 'LONG' ? '#f87171' : '#fde047';
+
+        // Orbital track guideline (dashed ring)
+        ctx.strokeStyle = glowColor;
         ctx.lineWidth = 1;
         ctx.setLineDash([3, 4]);
         ctx.beginPath();
@@ -409,92 +417,158 @@ export class ArcadeRenderer {
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Direct laser chain
-        ctx.strokeStyle = '#38bdf8';
-        ctx.lineWidth = 2.4;
+        // Taut Laser Rope (Outer Glowing Aura)
+        ctx.strokeStyle = glowColor;
+        ctx.lineWidth = tier === 'LONG' ? 5.5 : tier === 'SHORT' ? 3.0 : 4.0;
         ctx.beginPath();
         ctx.moveTo(playerX, playerY);
         ctx.lineTo(orb.x, orb.y);
         ctx.stroke();
 
+        // Taut Laser Rope (Inner Solid Core)
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1.0;
+        ctx.lineWidth = 1.8;
         ctx.beginPath();
         ctx.moveTo(playerX, playerY);
         ctx.lineTo(orb.x, orb.y);
         ctx.stroke();
 
-        for (let s = 1; s <= 3; s++) {
-          const ratio = s / 4;
+        // Sliding energy pulse beads along rope
+        const beadCount = tier === 'LONG' ? 5 : tier === 'SHORT' ? 2 : 3;
+        for (let s = 1; s <= beadCount; s++) {
+          const ratio = s / (beadCount + 1);
           const kx = playerX + (orb.x - playerX) * ratio;
           const ky = playerY + (orb.y - playerY) * ratio;
-          ctx.fillStyle = '#ec4899';
+          ctx.fillStyle = '#ffffff';
           ctx.beginPath();
-          ctx.arc(kx, ky, 2.5, 0, Math.PI * 2);
+          ctx.arc(kx, ky, 2.2, 0, Math.PI * 2);
           ctx.fill();
         }
 
-      } else {
-        // --- MODE ①: Yo-Yo & Boomerang Rubber Sling ---
-        const tensionRatio = Math.min(1.0, dist / 220);
-        const tetherAlpha = 0.25 + tensionRatio * 0.65;
-        const tetherColor = tensionRatio > 0.6 ? `rgba(254, 240, 138, ${tetherAlpha})` : `rgba(56, 189, 248, ${tetherAlpha})`;
-        ctx.strokeStyle = tetherColor;
-        ctx.lineWidth = 1.0 + tensionRatio * 2.0;
+        // Anchor ring on player and orb
+        ctx.strokeStyle = coreColor;
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.moveTo(playerX, playerY);
-        ctx.lineTo(orb.x, orb.y);
+        ctx.arc(playerX, playerY, 14, 0, Math.PI * 2);
         ctx.stroke();
 
-        if (dist > 40) {
-          ctx.fillStyle = '#ffffff';
-          const beadCount = Math.floor(dist / 40);
-          for (let b = 1; b <= beadCount; b++) {
-            const ratio = b / (beadCount + 1);
-            const bx = playerX + (orb.x - playerX) * ratio;
-            const by = playerY + (orb.y - playerY) * ratio;
-            ctx.beginPath();
-            ctx.arc(bx, by, 1.8, 0, Math.PI * 2);
-            ctx.fill();
-          }
+        // Tier text badge near tether midpoint
+        const midX = (playerX + orb.x) / 2;
+        const midY = (playerY + orb.y) / 2;
+        ctx.font = '7px "DotGothic16", monospace';
+        ctx.fillStyle = coreColor;
+        ctx.textAlign = 'center';
+        const tierLabel = tier === 'SHORT' ? '⚡近距離バリア' : tier === 'LONG' ? '⚡遠距離ギガ分銅' : '⚡中距離スイング';
+        ctx.fillText(`${tierLabel}(${Math.round(orb.orbitRadius)}px)`, midX, midY - 6);
+
+      } else {
+        // --- MODE ①: ヨーヨー突き攻撃 (自由ホーミング ＆ 火の玉チャージ) ---
+        if (isCharged) {
+          // Blazing Fireball Propulsion Trail behind Gemini
+          ctx.strokeStyle = 'rgba(239, 68, 68, 0.45)';
+          ctx.lineWidth = 3.5;
+          ctx.beginPath();
+          ctx.moveTo(playerX, playerY);
+          ctx.lineTo(orb.x, orb.y);
+          ctx.stroke();
+
+          ctx.strokeStyle = '#fde047';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(playerX, playerY);
+          ctx.lineTo(orb.x, orb.y);
+          ctx.stroke();
+        } else if (dist > 50) {
+          // Faint magnetic homing guideline
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.18)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([2, 5]);
+          ctx.beginPath();
+          ctx.moveTo(playerX, playerY);
+          ctx.lineTo(orb.x, orb.y);
+          ctx.stroke();
+          ctx.setLineDash([]);
         }
       }
       ctx.restore();
 
-      // 1. Shimmering Energy Aura & Apex Flare
+      // 1. Shimmering Energy Aura & Apex Flare / Fireball Burst
       ctx.save();
-      const auraColor = orb.level === 3 ? 'rgba(236, 72, 153, 0.32)' : orb.level === 2 ? 'rgba(168, 85, 247, 0.28)' : 'rgba(56, 189, 248, 0.25)';
-      const strokeColor = orb.isHoveringApex ? '#fde047' : isFast ? '#ffffff' : orb.level === 3 ? '#f472b6' : orb.level === 2 ? '#c084fc' : '#38bdf8';
-      
-      ctx.fillStyle = auraColor;
-      ctx.beginPath();
-      ctx.arc(orb.x, orb.y, effectiveR + 4, 0, Math.PI * 2);
-      ctx.fill();
+      if (isCharged) {
+        // 🔥 FIREBALL / SUPER CHARGED PLASMA FLAME AURA
+        const fireGrad = ctx.createRadialGradient(orb.x, orb.y, 2, orb.x, orb.y, effectiveR + 10);
+        fireGrad.addColorStop(0, '#ffffff');
+        fireGrad.addColorStop(0.3, '#fde047');
+        fireGrad.addColorStop(0.7, '#ff3b00');
+        fireGrad.addColorStop(1, 'rgba(239, 68, 68, 0)');
 
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = isFast ? 2.5 : 1.5;
-      ctx.beginPath();
-      ctx.arc(orb.x, orb.y, effectiveR + 2, 0, Math.PI * 2);
-      ctx.stroke();
+        ctx.fillStyle = fireGrad;
+        ctx.beginPath();
+        ctx.arc(orb.x, orb.y, effectiveR + 10, 0, Math.PI * 2);
+        ctx.fill();
 
-      if (orb.isHoveringApex) {
+        // Fire spikes / solar corona flares
         ctx.strokeStyle = '#fde047';
+        ctx.lineWidth = 2.0;
+        const spikes = 6;
+        for (let sp = 0; sp < spikes; sp++) {
+          const ang = (sp / spikes) * Math.PI * 2 + (Date.now() * 0.008);
+          const sx1 = orb.x + Math.cos(ang) * (effectiveR + 2);
+          const sy1 = orb.y + Math.sin(ang) * (effectiveR + 2);
+          const sx2 = orb.x + Math.cos(ang) * (effectiveR + 9);
+          const sy2 = orb.y + Math.sin(ang) * (effectiveR + 9);
+          ctx.beginPath();
+          ctx.moveTo(sx1, sy1);
+          ctx.lineTo(sx2, sy2);
+          ctx.stroke();
+        }
+
+        // Floating indicator
+        ctx.font = '7px "DotGothic16", monospace';
+        ctx.fillStyle = '#ffea00';
+        ctx.textAlign = 'center';
+        ctx.fillText('🔥猛突撃!!', orb.x, orb.y - effectiveR - 8);
+
+      } else {
+        // Standard or Flail Aura
+        const auraColor = orb.mode === 'ORBIT'
+          ? (orb.orbitTier === 'LONG' ? 'rgba(239, 68, 68, 0.40)' : orb.orbitTier === 'SHORT' ? 'rgba(56, 189, 248, 0.35)' : 'rgba(253, 224, 71, 0.35)')
+          : (orb.level === 3 ? 'rgba(236, 72, 153, 0.32)' : orb.level === 2 ? 'rgba(168, 85, 247, 0.28)' : 'rgba(56, 189, 248, 0.25)');
+
+        const strokeColor = orb.isHoveringApex ? '#fde047' : orb.level === 3 ? '#f472b6' : orb.level === 2 ? '#c084fc' : '#38bdf8';
+
+        ctx.fillStyle = auraColor;
+        ctx.beginPath();
+        ctx.arc(orb.x, orb.y, effectiveR + 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 1.8;
         ctx.beginPath();
-        ctx.moveTo(orb.x - effectiveR - 6, orb.y);
-        ctx.lineTo(orb.x + effectiveR + 6, orb.y);
-        ctx.moveTo(orb.x, orb.y - effectiveR - 6);
-        ctx.lineTo(orb.x, orb.y + effectiveR + 6);
+        ctx.arc(orb.x, orb.y, effectiveR + 2, 0, Math.PI * 2);
         ctx.stroke();
+
+        if (orb.isHoveringApex) {
+          ctx.strokeStyle = '#fde047';
+          ctx.lineWidth = 2.0;
+          ctx.beginPath();
+          ctx.moveTo(orb.x - effectiveR - 6, orb.y);
+          ctx.lineTo(orb.x + effectiveR + 6, orb.y);
+          ctx.moveTo(orb.x, orb.y - effectiveR - 6);
+          ctx.lineTo(orb.x, orb.y + effectiveR + 6);
+          ctx.stroke();
+        }
       }
       ctx.restore();
 
       // 2. Motion Trail
       for (let i = 0; i < orb.trail.length; i++) {
         const pt = orb.trail[i];
-        ctx.fillStyle = orb.level === 3 ? `rgba(255, 120, 255, ${pt.alpha * 0.4})` : `rgba(56, 189, 248, ${pt.alpha * 0.35})`;
+        ctx.fillStyle = isCharged
+          ? `rgba(255, 110, 0, ${pt.alpha * 0.55})`
+          : orb.level === 3 ? `rgba(255, 120, 255, ${pt.alpha * 0.4})` : `rgba(56, 189, 248, ${pt.alpha * 0.35})`;
         ctx.beginPath();
-        ctx.arc(pt.x, pt.y, (orb.radius * 0.5) * (1 - i / orb.trail.length), 0, Math.PI * 2);
+        ctx.arc(pt.x, pt.y, (effectiveR * 0.5) * (1 - i / orb.trail.length), 0, Math.PI * 2);
         ctx.fill();
       }
 
@@ -504,7 +578,7 @@ export class ArcadeRenderer {
       if (sprite) {
         ctx.save();
         ctx.translate(orb.x, orb.y);
-        const scale = isFast ? 1.25 : orb.isHoveringApex ? 1.15 : 1.0;
+        const scale = isCharged ? 1.35 : isFast ? 1.25 : orb.isHoveringApex ? 1.15 : 1.0;
         ctx.scale(scale, scale);
         ctx.drawImage(sprite, -sprite.width / 2, -sprite.height / 2);
         ctx.restore();
@@ -1011,7 +1085,7 @@ export class ArcadeRenderer {
     ctx.fillStyle = isOrbit ? '#38bdf8' : '#fde047';
     ctx.font = '8px "DotGothic16", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(isOrbit ? '⚡攻撃:旋回' : '🚀攻撃:ヨーヨー', btnModeX + btnModeW / 2, 34);
+    ctx.fillText(isOrbit ? '⚡光ロープ分銅' : '🚀ヨーヨー突撃', btnModeX + btnModeW / 2, 34);
 
     const curCol = telemetry?.collisionMode || 'PENETRATE';
     const isPen = curCol === 'PENETRATE';
@@ -1243,7 +1317,7 @@ export class ArcadeRenderer {
     ctx.fillStyle = isOrbit ? '#38bdf8' : '#fde047';
     ctx.font = '8px "DotGothic16", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(isOrbit ? '⚡攻撃②:旋回(Space)' : '🚀攻撃①:ヨーヨー', 8 + btnAtkW / 2, 30);
+    ctx.fillText(isOrbit ? '⚡攻撃②:光ロープ分銅' : '🚀攻撃①:ヨーヨー突撃', 8 + btnAtkW / 2, 30);
 
     const curCol = telemetry?.collisionMode || 'PENETRATE';
     const isPen = curCol === 'PENETRATE';
