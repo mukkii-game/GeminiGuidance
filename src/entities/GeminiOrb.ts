@@ -601,92 +601,78 @@ export class GeminiOrbManager {
         const playerDist = Math.hypot(orb.x - playerX, orb.y - playerY);
         const curSpd = Math.hypot(orb.vx, orb.vy);
 
-        // ストローク発進・折り返し判定
-        const isTurnaround = curSpd < (cfg.apexThreshold * 1.5) && playerDist > 30;
-
-        if (isTurnaround || !orb.castTargetX || !orb.returnGoalX) {
-          // 「さあ行くぞ」のストローク初期化！
-          const originDist = Math.max(40, playerDist);
-          orb.tetherLength = originDist; // 元の距離 D0（例: 140px = 10m）
-          const overshootRatio = this.tuning.overshootRatio || 0.5; // 突き抜け率（初期値50%=5m）
-          const overshootDist = originDist * overshootRatio;
-
-          // 発進時の自機方向への単位ベクトル
-          const pDirX = (playerX - orb.x) / originDist;
-          const pDirY = (playerY - orb.y) / originDist;
-
-          // 通過基準点（発進時の自機位置）
+        // 仮想支点（通過基準点）の初期化
+        if (orb.castTargetX === undefined || orb.castTargetY === undefined) {
           orb.castTargetX = playerX;
           orb.castTargetY = playerY;
-          // 目標突き抜け点（自機を挟んで反対側へ +5m 突き抜けた地点）
-          orb.returnGoalX = playerX + pDirX * overshootDist;
-          orb.returnGoalY = playerY + pDirY * overshootDist;
-          orb.isHoveringApex = false;
+          orb.tetherLength = Math.max(50, playerDist);
+        }
+
+        // 通過点（今回のストロークの通過基準点）へのベクトル
+        const dx = orb.castTargetX - orb.x;
+        const dy = orb.castTargetY - orb.y;
+        const distToAnchor = Math.hypot(dx, dy) || 1;
+        const ux = dx / distToAnchor;
+        const uy = dy / distToAnchor;
+
+        // 通過点に向かって接近中か、通過点を突き抜けて離脱中か
+        // 速度ベクトルと通過点ベクトルの内積（正=接近中、負=突き抜けて離脱中）
+        const radialVel = orb.vx * ux + orb.vy * uy;
+        const isApproaching = radialVel >= -0.05;
+
+        // 1. ストロークの折り返し（頂点 Apex）判定:
+        // 【重要バグ修正】: 自機に向かっている途中や通過直後に誤爆しないよう、
+        // 必ず「自機を突き抜けた離脱区間（!isApproaching）」で、かつ「通過点から十分離れて速度が落ちた時」だけ折り返す！
+        const isApexTurnaround = !isApproaching && curSpd < (cfg.apexThreshold * 1.5) && distToAnchor > 20;
+
+        if (isApexTurnaround) {
+          // 頂点に到達した！次のストロークのために、最新の自機位置を新しい通過目標にセット！
+          orb.castTargetX = playerX;
+          orb.castTargetY = playerY;
+          orb.tetherLength = Math.max(50, playerDist); // 次のストロークの基準距離 D0
+          orb.isHoveringApex = true;
           orb.apexDwellTimer = 0;
         }
 
-        // 通過点（発進時の自機位置）へのベクトル
-        const passDx = (orb.castTargetX || playerX) - orb.x;
-        const passDy = (orb.castTargetY || playerY) - orb.y;
-        const distToPass = Math.hypot(passDx, passDy) || 1;
-        const passUx = passDx / distToPass;
-        const passUy = passDy / distToPass;
+        // 2. 引力計算:
+        // 接近フェーズ: 通過点に向かってパチンコ加速
+        // 離脱フェーズ: overshootRatio（50%）に合わせた復元力でブレーキ
+        const linearForce = distToAnchor * cfg.springK * this.tuning.tensionMultiplier;
+        const slingshotBonus = distToAnchor > 50 ? Math.pow((distToAnchor - 50) / 70, 1.7) * 0.038 * this.tuning.tensionMultiplier : 0;
+        let pullMagnitude = linearForce + slingshotBonus;
 
-        // 通過点を通過したか？（進行方向と通過点ベクトルの内積が負 = 自機通過後）
-        const dotPass = orb.vx * passUx + orb.vy * passUy;
-        const passedCenter = dotPass < 0 && distToPass > 12;
-
-        // 1. 引力計算（紐がたるんでいる間の慣性推進 vs ゴール到達・紐張り時のブレーキ）
-        let pullAx = 0;
-        let pullAy = 0;
-
-        const D0 = orb.tetherLength || 100;
-        // 自機から「元の距離と同じかそれ以上」離れた場合のみ紐が張る
-        const isTautByPlayer = playerDist > D0 * 1.05;
-
-        if (!passedCenter) {
-          // 【通過前: 加速フェーズ】
-          // 通過点に向かって、距離に応じた力強いパチンコ加速！
-          const linearF = distToPass * cfg.springK * this.tuning.tensionMultiplier;
-          const slingshotF = distToPass > 50 ? Math.pow((distToPass - 50) / 70, 1.7) * 0.04 * this.tuning.tensionMultiplier : 0;
-          const pullF = Math.min(1.2, linearF + slingshotF);
-          pullAx = passUx * pullF;
-          pullAy = passUy * pullF;
-        } else {
-          // 【通過後: 突き抜けオーバーランフェーズ】
-          // 紐はたるんでいる！自機の動きによる減衰は起きない！
-          // 通過点から離れるほど復元力（ブレーキ）が滑らかにかかり、目標地点（+5m）で止まる
+        if (!isApproaching) {
+          // 離脱中（自機を通過した後の区間）:
+          // 10m離れた位置から来たら、さらに5m進んで止まるブレーキ比率
           const ratio = Math.max(0.2, this.tuning.overshootRatio || 0.5);
-          const brakeK = (cfg.springK * this.tuning.tensionMultiplier) / (ratio * ratio);
-          const brakeF = Math.min(1.4, distToPass * brakeK);
-          pullAx = passUx * brakeF; // 通過点へ引き戻す（進行方向逆向き）
-          pullAy = passUy * brakeF;
+          const brakeMultiplier = 1.0 / (ratio * ratio);
+          pullMagnitude *= brakeMultiplier;
         }
 
-        // 自機が極端に離れた場合（「元の距離と同じかそれ以上の距離が改めて離れた時」）のみ紐が張る
-        if (isTautByPlayer) {
-          const tautDx = playerX - orb.x;
-          const tautDy = playerY - orb.y;
-          const tautDist = Math.hypot(tautDx, tautDy) || 1;
+        let totalPull = Math.min(1.2, pullMagnitude);
+
+        // 自機が極端に離れた場合（「元の距離と同じかそれ以上改めて離れた時」）のみ、紐が張って自機への引力が加算
+        const D0 = orb.tetherLength || 100;
+        if (playerDist > D0 * 1.1) {
           const tautF = Math.min(0.8, (playerDist - D0) * 0.018 * this.tuning.tensionMultiplier);
-          pullAx += (tautDx / tautDist) * tautF;
-          pullAy += (tautDy / tautDist) * tautF;
+          const tdx = (playerX - orb.x) / playerDist;
+          const tdy = (playerY - orb.y) / playerDist;
+          orb.vx += tdx * tautF;
+          orb.vy += tdy * tautF;
         }
 
-        // 2. 加速度の適用
-        orb.vx += pullAx;
-        orb.vy += pullAy;
+        // 通過点へ向けて引力を加算
+        orb.vx += ux * totalPull;
+        orb.vy += uy * totalPull;
 
         // 3. 直線ヨーヨー整流（横滑り・公転成分の減衰）:
         if (curSpd > 0.15) {
-          const targetDirX = passedCenter ? -passUx : passUx;
-          const targetDirY = passedCenter ? -passUy : passUy;
-          const alongV = orb.vx * targetDirX + orb.vy * targetDirY;
-          const perpVx = orb.vx - alongV * targetDirX;
-          const perpVy = orb.vy - alongV * targetDirY;
+          const alongV = orb.vx * ux + orb.vy * uy;
+          const perpVx = orb.vx - alongV * ux;
+          const perpVy = orb.vy - alongV * uy;
           // 横方向のブレを減衰してまっすぐ突き抜ける
-          orb.vx = alongV * targetDirX + perpVx * 0.88;
-          orb.vy = alongV * targetDirY + perpVy * 0.88;
+          orb.vx = alongV * ux + perpVx * 0.88;
+          orb.vy = alongV * uy + perpVy * 0.88;
         }
 
         // 4. 自機の移動によるポンピング・共鳴:
