@@ -446,8 +446,6 @@ export class GeminiOrbManager {
     onWallHit?: (x: number, y: number) => void
   ): void {
     const cfg = PHYSICS_PRESETS[this.currentPresetId];
-    const springK = cfg.springK * this.tuning.tensionMultiplier;
-    const apexThreshold = cfg.apexThreshold * this.tuning.apexDwellMultiplier;
 
     for (let i = 0; i < this.orbs.length; i++) {
       const orb = this.orbs[i];
@@ -467,7 +465,7 @@ export class GeminiOrbManager {
       }
 
       if (orb.mode === 'ORBIT') {
-        // --- MODE ②: HAMMERFIGHT TETHERED FLAIL (物理チェーン＆室伏分銅スイング) ---
+        // --- MODE ②: のびのある細いゴム紐分銅 (Stretchy Rubber Cord Flail) ---
         orb.isHoveringApex = false;
         orb.apexDwellTimer = 0;
 
@@ -489,73 +487,64 @@ export class GeminiOrbManager {
         const fSpinTx = fTx * spinSign;
         const fSpinTy = fTy * spinSign;
 
-        // 1. 室伏スピンターン（円運動による遠心加速・ワインドアップ）:
-        // 自機が分銅の回転方向に先行して小さく円を描くと、ロープ張力を通じて角運動量が急激に注入される！
-        const playerTangential = playerVx * fSpinTx + playerVy * fSpinTy;
-        if (playerTangential > 0) {
-          const spinTransfer = playerTangential * 0.62;
-          orb.vx += fSpinTx * spinTransfer;
-          orb.vy += fSpinTy * spinTransfer;
-        }
+        // 1. のびのあるゴム紐の張力（Elastic Rubber Band Tension）:
+        // 自然長 L0: 通常 68px (ユーザー指示: 「たしょうのびちじみのもうすこしするように のびのあるゴムで繋いで回している感じに」)
+        const baseL0 = (orb.tetherLength || orb.orbitRadius || 68) * (this.tuning.orbitRadius / 75);
+        if (fDist > baseL0) {
+          const stretch = fDist - baseL0;
+          // しなやかに伸びるゴム弾性定数 (kRubber = 0.055)
+          const kRubber = 0.055 * this.tuning.tensionMultiplier;
+          // ゴムの伸び縮み感を生かす軽やかな減衰
+          const damper = Math.max(0, radialVel) * 0.18;
+          const rubberTension = stretch * kRubber + damper;
 
-        // 2. スナップ引き戻し急加速（Hammerfight Lash Strike / 鞭撃）:
-        // 敵に向かって振れている瞬間に、自機を逆方向（分銅から離れる方向）へ急激に引くと、
-        // 張力急増と角運動量保存により先端が鞭のように爆発的急加速して叩きつける！
-        const playerRadial = playerVx * fUx + playerVy * fUy;
-        if (playerRadial < -0.32) {
-          const whipBoost = Math.abs(playerRadial) * 0.85;
-          orb.vx += fSpinTx * whipBoost;
-          orb.vy += fSpinTy * whipBoost;
-        }
+          orb.vx -= fUx * rubberTension;
+          orb.vy -= fUy * rubberTension;
 
-        // 3. 鋼鉄チェーン張力拘束 ＆ 遠心伸長（Stiff Steel Cable & Centrifugal Stretch）:
-        const baseL = (orb.tetherLength || orb.orbitRadius || 75) * (this.tuning.orbitRadius / 75);
-        const curSpd = Math.hypot(orb.vx, orb.vy);
-        // 高速回転ほど遠心力で半径がわずかに拡大（最大+24px）
-        const centrifugalStretch = Math.min(24, Math.pow(curSpd / 1.5, 2) * 3.8);
-        const maxL = baseL + centrifugalStretch;
-
-        if (fDist > maxL) {
-          const stretch = fDist - maxL;
-          const kRope = 0.42 * this.tuning.tensionMultiplier; // 鋼鉄チェーンのしっかりした剛性感
-          const damperForce = Math.max(0, radialVel) * 0.85;
-          const tension = stretch * kRope + damperForce;
-
-          orb.vx -= fUx * tension;
-          orb.vy -= fUy * tension;
-
-          // ハードクランプ（ゴムのように伸びすぎないよう剛体制御）
-          if (fDist > maxL * 1.15) {
-            orb.x = playerX + fUx * (maxL * 1.15);
-            orb.y = playerY + fUy * (maxL * 1.15);
+          // 画面外への飛び出し防止ソフトクランプ (自然長の2.2倍)
+          const maxClamp = baseL0 * 2.2;
+          if (fDist > maxClamp) {
+            orb.x = playerX + fUx * maxClamp;
+            orb.y = playerY + fUy * maxClamp;
             if (radialVel > 0) {
-              orb.vx -= radialVel * fUx;
-              orb.vy -= radialVel * fUy;
+              orb.vx -= radialVel * fUx * 0.5;
+              orb.vy -= radialVel * fUy * 0.5;
             }
           }
         }
 
-        // 4. 回転慣性の維持（Hammerfight Inertia Persistence）:
-        const spinSpeed = Math.abs(tangentialVel);
-        const targetBaseSpeed = orb.orbitTier === 'SHORT' ? 1.4 : orb.orbitTier === 'LONG' ? 0.95 : 1.15;
-        if (spinSpeed < targetBaseSpeed) {
-          orb.vx += fSpinTx * 0.045;
-          orb.vy += fSpinTy * 0.045;
+        // 2. 自機の旋回運動からの運動量伝達（回すほどゴムが伸びて遠心加速！）:
+        const playerTangential = playerVx * fSpinTx + playerVy * fSpinTy;
+        if (playerTangential > 0) {
+          const transfer = playerTangential * 0.45;
+          orb.vx += fSpinTx * transfer;
+          orb.vy += fSpinTy * transfer;
         }
 
-        // 微小な空気抵抗
-        orb.vx *= 0.994;
-        orb.vy *= 0.994;
+        // 3. スナップ引き戻し加速:
+        const playerRadial = playerVx * fUx + playerVy * fUy;
+        if (playerRadial < -0.30) {
+          const whip = Math.abs(playerRadial) * 0.55;
+          orb.vx += fSpinTx * whip;
+          orb.vy += fSpinTy * whip;
+        }
 
-        // 5. 室伏スピンレベル分類（Spin Level Classification）:
-        // レベル0: 通常旋回 (< 1.35)
-        // レベル1: ⚡室伏遠心加速 (1.35 <= speed < 2.35)
-        // レベル2: 🔥室伏GIGAスピン!! (speed >= 2.35)
-        if (curSpd >= 2.35) {
+        // 4. 自然な回転維持と空気抵抗:
+        const spinSpeed = Math.abs(tangentialVel);
+        if (spinSpeed < 1.0) {
+          orb.vx += fSpinTx * 0.035;
+          orb.vy += fSpinTy * 0.035;
+        }
+        orb.vx *= 0.993;
+        orb.vy *= 0.993;
+
+        // 5. スピン状態分類:
+        const flailSpeed = Math.hypot(orb.vx, orb.vy);
+        if (flailSpeed >= 2.2) {
           orb.spinLevel = 2;
           orb.isCharged = true;
-          orb.chargeRatio = Math.min(1.0, (curSpd - 2.35) / 1.4);
-        } else if (curSpd >= 1.35) {
+          orb.chargeRatio = Math.min(1.0, (flailSpeed - 2.2) / 1.2);
+        } else if (flailSpeed >= 1.25) {
           orb.spinLevel = 1;
           orb.isCharged = false;
           orb.chargeRatio = 0.5;
@@ -565,11 +554,11 @@ export class GeminiOrbManager {
           orb.chargeRatio = 0;
         }
 
-        // 速度リミット（室伏の豪快なスイングを許容する高上限）
-        const maxSpd = (cfg.maxSpeed * 1.6) * this.tuning.maxSpeedMultiplier;
-        if (curSpd > maxSpd) {
-          orb.vx = (orb.vx / curSpd) * maxSpd;
-          orb.vy = (orb.vy / curSpd) * maxSpd;
+        // 速度制限
+        const maxSpd = (cfg.maxSpeed * 1.5) * this.tuning.maxSpeedMultiplier;
+        if (flailSpeed > maxSpd) {
+          orb.vx = (orb.vx / flailSpeed) * maxSpd;
+          orb.vy = (orb.vy / flailSpeed) * maxSpd;
         }
 
         orb.x += orb.vx;
@@ -578,7 +567,7 @@ export class GeminiOrbManager {
         orb.orbitAngle = Math.atan2(orb.y - playerY, orb.x - playerX);
         orb.orbitRadius = Math.hypot(orb.x - playerX, orb.y - playerY);
 
-        // Screen bounce in orbit mode if enabled
+        // 画面端反射（設定時）
         if (this.screenEdgeBounce) {
           let bounced = false;
           if (orb.x < 14) { orb.x = 14; orb.vx = Math.abs(orb.vx) * 0.95; bounced = true; }
@@ -589,189 +578,46 @@ export class GeminiOrbManager {
         }
 
       } else {
-        // --- MODE ①: YO-YO SPEAR THRUST & ANALOG RHYTHM SWING ---
-        if (!orb.strokePhase) {
-          orb.strokePhase = 'RETURN';
-        }
+        // --- MODE ①: 振り子・バネ・ヨーヨー物理 (自然な調和振動＆自機通過オーバーシュート) ---
+        // ユーザー指示:
+        // 「ふりこだとおもってくれ １０m先にいて静止しているジェミニがプレイヤーに向かってくる
+        //  さあどこでとまる？ 今プレイヤーのところで静止する 全然振り子でもヨーヨーでもないよね
+        //  プレイヤーを挟んで１０m逆側まで止まらずに行くよね？ほんとうは この処理にしてほしい
+        //  で、このプレイヤー方向へのベクトルの移動している時にプレイヤーが動いても、
+        //  ひもでひっぱられているわけではない体なので、そのままゴールを目指すよね これが基本
+        //  ただ、ホーミング感を出すために、多少プレイヤーの動きに合わせて補正してもいい」
 
-        const dist = Math.hypot(playerX - orb.x, playerY - orb.y) || 1;
+        const dx = playerX - orb.x;
+        const dy = playerY - orb.y;
+        const dist = Math.hypot(dx, dy) || 1;
+        const ux = dx / dist; // 自機へ向かう単位ベクトル
+        const uy = dy / dist;
+
+        // 1. バネ・引力によるプレイヤー方向への加速度:
+        // 10m離れた位置から自機へ向かって加速し、自機通過時に最高速に達する
+        const stretch = dist;
+        const springForce = (stretch * cfg.springK * 2.8) * this.tuning.tensionMultiplier;
+        const nonlinearForce = (stretch > 60 ? Math.pow((stretch - 60) / 90, 2) * 0.045 : 0) * this.tuning.tensionMultiplier;
+        const totalPull = Math.min(0.38, springForce + nonlinearForce);
+
+        // プレイヤーへ向けて加速（既存の慣性ベクトルを保ちつつ、滑らかに軌道を曲げるホーミング）
+        orb.vx += ux * totalPull;
+        orb.vy += uy * totalPull;
+
+        // 2. 自機の移動によるポンピング・共鳴（プレイヤーが自機を振ったときの勢い伝達）:
         const pSpeed = Math.hypot(playerVx, playerVy);
-
-        // 1. Throw / Thrust Launch Detection:
-        // When orb is near player and player actively pushes forward / darts:
-        if (dist < 44 && pSpeed > 0.40) {
-          const pUx = playerVx / pSpeed;
-          const pUy = playerVy / pSpeed;
-          const reach = Math.min(240, 95 + pSpeed * 55);
-          orb.castTargetX = playerX + pUx * reach;
-          orb.castTargetY = playerY + pUy * reach;
-          orb.vx += pUx * (pSpeed * 1.35 + 1.2);
-          orb.vy += pUy * (pSpeed * 1.35 + 1.2);
-          orb.strokePhase = 'OUTWARD';
-          orb.isCharged = true;
-          orb.chargeRatio = 1.0;
-          orb.apexDwellTimer = 0;
-          orb.returnGoalX = undefined;
-          orb.returnGoalY = undefined;
-          orb.strokeElapsed = 0;
+        if (pSpeed > 0.45 && dist < 55) {
+          // 自機が勢いよく動いてジェミニが近くを通過する瞬間、ブランコを漕ぐように運動量を上乗せ！
+          orb.vx += playerVx * 0.28;
+          orb.vy += playerVy * 0.28;
         }
 
-        // Advance target anchor if player continues pushing in the throw direction
-        if (orb.strokePhase === 'OUTWARD' && orb.castTargetX !== undefined && orb.castTargetY !== undefined) {
-          const advDx = orb.castTargetX - playerX;
-          const advDy = orb.castTargetY - playerY;
-          const dotAdv = playerVx * advDx + playerVy * advDy;
-          if (dotAdv > 0) {
-            orb.castTargetX += playerVx * 1.1;
-            orb.castTargetY += playerVy * 1.1;
-          }
-        }
+        // 3. 自然な空気抵抗（減衰）:
+        // 振り子のように何度も自機を行き来しながら、プレイヤーが静止していれば徐々に減衰
+        orb.vx *= cfg.damping;
+        orb.vy *= cfg.damping;
 
-        if (orb.strokePhase === 'OUTWARD') {
-          // OUTWARD: Commits to flying towards cast apex!
-          // Moving player backwards does NOT cancel this outward flight!
-          const tDx = (orb.castTargetX ?? playerX) - orb.x;
-          const tDy = (orb.castTargetY ?? (playerY - 90)) - orb.y;
-          const tDist = Math.hypot(tDx, tDy) || 1;
-          const tUx = tDx / tDist;
-          const tUy = tDy / tDist;
-          const forwardVel = orb.vx * tUx + orb.vy * tUy;
-
-          // Drag and target tracking
-          orb.vx *= cfg.damping;
-          orb.vy *= cfg.damping;
-          const toApexAccel = Math.min(0.20, tDist * 0.002);
-          orb.vx += tUx * toApexAccel;
-          orb.vy += tUy * toApexAccel;
-
-          // If player pulls back while orb is flying out, string tightens -> FIREBALL CHARGE!
-          const rDx = playerX - orb.x;
-          const rDy = playerY - orb.y;
-          const rDist = Math.hypot(rDx, rDy) || 1;
-          if (rDist > 45) {
-            orb.isCharged = true;
-            orb.chargeRatio = Math.min(1.0, (rDist - 30) / 75);
-          }
-
-          // Apex Reach Condition:
-          // Near destination OR forward speed dropped below threshold
-          if (tDist < 16 || forwardVel < apexThreshold) {
-            orb.strokePhase = 'APEX';
-            orb.apexDwellTimer = Math.max(8, Math.round(18 * this.tuning.apexDwellMultiplier));
-            orb.isHoveringApex = true;
-          }
-
-        } else if (orb.strokePhase === 'APEX') {
-          // APEX: Hover in place, spin and deliver multi-hit damage
-          orb.vx *= 0.82;
-          orb.vy *= 0.82;
-          orb.isHoveringApex = true;
-          orb.apexDwellTimer--;
-          if (orb.apexDwellTimer <= 0) {
-            orb.strokePhase = 'RETURN';
-            // 一度自機に向かい始めた時にゴール地点を確定！（自機についていきすぎず、直進コミット）
-            orb.returnGoalX = playerX;
-            orb.returnGoalY = playerY;
-            orb.strokeElapsed = 0;
-            orb.isHoveringApex = false;
-          }
-
-        } else {
-          // RETURN:
-          // 「よーよーは、一度自機に向かい始めた時にもうゴール機を決めて、ごーるまではとにかくうごく、ごーるについたら、じきにむかってまたすすむ」
-          if (orb.returnGoalX === undefined || orb.returnGoalY === undefined) {
-            orb.returnGoalX = playerX;
-            orb.returnGoalY = playerY;
-            orb.strokeElapsed = 0;
-          }
-          if (orb.strokeElapsed === undefined) {
-            orb.strokeElapsed = 0;
-          }
-          orb.strokeElapsed++;
-
-          // Vector towards the fixed return goal
-          const gDx = orb.returnGoalX - orb.x;
-          const gDy = orb.returnGoalY - orb.y;
-          const gDist = Math.hypot(gDx, gDy) || 1;
-          const gUx = gDx / gDist;
-          const gUy = gDy / gDist;
-
-          // 「二次曲線的な加速感にしてください ばねであり加速減速感なので」
-          // 時間経過に対する二次曲線 (t/22)^2 で滑らかに始動し、放物線状に急加速して超音速へ！
-          const timeRamp = Math.min(1.0, Math.pow(orb.strokeElapsed / 22, 2));
-          const stretch = Math.max(0, gDist - 6);
-          const springPull = (stretch * springK * this.tuning.tensionMultiplier) * 0.45;
-          const quadAccel = timeRamp * Math.min(1.20, 0.08 + springPull);
-
-          orb.vx += gUx * quadAccel;
-          orb.vy += gUy * quadAccel;
-          orb.vx *= cfg.damping;
-          orb.vy *= cfg.damping;
-
-          // Charge detection on return
-          const dotTowardGoal = orb.vx * gUx + orb.vy * gUy;
-          if (gDist > 45 && dotTowardGoal > 0.35) {
-            orb.isCharged = true;
-            orb.chargeRatio = Math.min(1.0, (gDist - 30) / 75);
-          }
-
-          // 「ごーるまではとにかくうごく、ごーるについたら、じきにむかってまたすすむ」
-          // Check if reached the locked return goal
-          const distToPlayer = Math.hypot(playerX - orb.x, playerY - orb.y);
-          if (gDist < 20) {
-            if (distToPlayer > 28) {
-              // Player moved away in the meantime! Now update goal to player's new position:
-              orb.returnGoalX = playerX;
-              orb.returnGoalY = playerY;
-              orb.strokeElapsed = 0; // 新しい目標へ向けて再び二次曲線加速！
-            }
-          }
-
-          // Crossing / arriving at player ship
-          if (distToPlayer < 36) {
-            if (pSpeed > 0.40) {
-              // ACTIVE PUMPING: Player rhythmically pumps ship forward/outward
-              // Momentum transfer! Amplify the swing like a swing / yo-yo!
-              orb.vx += playerVx * 1.35;
-              orb.vy += playerVy * 1.35;
-              const newSpd = Math.hypot(orb.vx, orb.vy);
-              if (newSpd > 0.4) {
-                const throwReach = Math.min(250, 95 + newSpd * 50);
-                orb.castTargetX = orb.x + (orb.vx / newSpd) * throwReach;
-                orb.castTargetY = orb.y + (orb.vy / newSpd) * throwReach;
-                orb.strokePhase = 'OUTWARD';
-                orb.isCharged = true;
-                orb.apexDwellTimer = 0;
-                orb.returnGoalX = undefined;
-                orb.returnGoalY = undefined;
-                orb.strokeElapsed = 0;
-              }
-            } else {
-              // 「自機が動いていなくても減衰せずに往復運動しているけど、バネ減衰してくださいじょじょに」
-              // Player is stationary / not pumping: DO NOT relaunch into OUTWARD!
-              // Apply harmonic spring pull and strong gradual velocity damping (バネ減衰):
-              const pDx = playerX - orb.x;
-              const pDy = playerY - orb.y;
-              if (distToPlayer > 1) {
-                const dampSpring = Math.min(0.20, distToPlayer * 0.015);
-                orb.vx += (pDx / distToPlayer) * dampSpring;
-                orb.vy += (pDy / distToPlayer) * dampSpring;
-              }
-              orb.vx *= 0.85;
-              orb.vy *= 0.85;
-              orb.isCharged = false;
-
-              if (distToPlayer < 12 && Math.hypot(orb.vx, orb.vy) < 0.16) {
-                orb.vx = 0;
-                orb.vy = 0;
-                orb.returnGoalX = playerX;
-                orb.returnGoalY = playerY;
-              }
-            }
-          }
-        }
-
-        // Max speed clamp
+        // 4. 最高速度クランプ:
         const curSpeed = Math.hypot(orb.vx, orb.vy);
         const maxSpd = (cfg.maxSpeed + (orb.level - 1) * 0.4) * this.tuning.maxSpeedMultiplier;
         if (curSpeed > maxSpd) {
@@ -779,25 +625,39 @@ export class GeminiOrbManager {
           orb.vy = (orb.vy / curSpeed) * maxSpd;
         }
 
+        // 5. 頂点（折り返し地点・Apex）検出:
+        // 自機から離れた場所（dist > 50）で速度が落ちた瞬間を頂点と判定
+        if (dist > 50 && curSpeed < (cfg.apexThreshold * 1.4)) {
+          orb.isHoveringApex = true;
+          orb.apexDwellTimer++;
+        } else {
+          orb.isHoveringApex = false;
+          orb.apexDwellTimer = 0;
+        }
+
+        // 6. 火の玉チャージ判定（自機から離れて勢いよく突進している時）:
+        if (dist > 55 && curSpeed > 1.1) {
+          orb.isCharged = true;
+          orb.chargeRatio = Math.min(1.0, (dist - 40) / 80);
+        } else {
+          orb.isCharged = false;
+          orb.chargeRatio = 0;
+        }
+
+        // 7. 位置更新
         orb.x += orb.vx;
         orb.y += orb.vy;
 
-        // Screen boundary collision behavior
+        // 画面端反射（設定時）
         if (this.screenEdgeBounce) {
           let bounced = false;
           if (orb.x < 14) { orb.x = 14; orb.vx = Math.abs(orb.vx) * 0.95; bounced = true; }
           if (orb.x > 346) { orb.x = 346; orb.vx = -Math.abs(orb.vx) * 0.95; bounced = true; }
           if (orb.y < 24) { orb.y = 24; orb.vy = Math.abs(orb.vy) * 0.95; bounced = true; }
           if (orb.y > 516) { orb.y = 516; orb.vy = -Math.abs(orb.vy) * 0.95; bounced = true; }
-          if (bounced) {
-            if (orb.strokePhase === 'OUTWARD') {
-              orb.strokePhase = 'APEX';
-              orb.apexDwellTimer = 10;
-            }
-            if (onWallHit) onWallHit(orb.x, orb.y);
-          }
+          if (bounced && onWallHit) onWallHit(orb.x, orb.y);
         } else {
-          // Offscreen gentle drag
+          // 画面外の緩やかなドラッグ
           if (orb.x < -120) { orb.x = -120; orb.vx *= 0.5; }
           if (orb.x > 480) { orb.x = 480; orb.vx *= 0.5; }
           if (orb.y < -120) { orb.y = -120; orb.vy *= 0.5; }
