@@ -86,6 +86,7 @@ export class GeminiOrbManager {
     apexDwellMultiplier: 1.0,
     maxSpeedMultiplier: 1.0,
     orbitRadius: 75,
+    overshootRatio: 0.5, // 10m離れていたら自機通過後+5m突き抜ける
   };
   private orbCounter: number = 0;
 
@@ -122,6 +123,14 @@ export class GeminiOrbManager {
     return this.tuning.maxSpeedMultiplier;
   }
 
+  public cycleOvershoot(): number {
+    const steps = [0.5, 0.75, 1.0, 0.3];
+    const curIdx = steps.findIndex(s => Math.abs(s - this.tuning.overshootRatio) < 0.05);
+    const nextIdx = (curIdx + 1) % steps.length;
+    this.tuning.overshootRatio = steps[nextIdx];
+    return this.tuning.overshootRatio;
+  }
+
   public cycleOrbitRadius(): number {
     const steps = [75, 110, 55];
     const curIdx = steps.indexOf(this.tuning.orbitRadius);
@@ -139,6 +148,7 @@ export class GeminiOrbManager {
       apexDwellMultiplier: 1.0,
       maxSpeedMultiplier: 1.0,
       orbitRadius: 75,
+      overshootRatio: 0.5,
     };
     for (const orb of this.orbs) {
       orb.orbitRadius = 75;
@@ -621,19 +631,55 @@ export class GeminiOrbManager {
         const ux = dx / dist; // 支点へ向かう単位ベクトル
         const uy = dy / dist;
 
-        // 1. バネ・引力による支点方向への加速度:
-        // 振り子の原理: F = -k * x （フックの法則）
-        // 10m離れたところから来たら、支点を通過して反対側10mまで行く！
-        // エネルギー保存: 減衰がなければ振幅は保存される
-        const springForce = dist * cfg.springK * this.tuning.tensionMultiplier;
-        const totalPull = Math.min(0.55, springForce);
+        // 1. 引力計算（接近フェーズ vs 離脱・突き抜けフェーズ）:
+        // 仮想支点へ向かうベクトル (ux, uy) と速度ベクトル (orb.vx, orb.vy) の内積で、
+        // 「自機に向かって接近中」か「自機を突き抜けて離脱中」かを判定
+        const dotApproach = orb.vx * ux + orb.vy * uy;
+        const isApproaching = dotApproach >= -0.05;
 
-        // 支点へ向けて加速（既存の慣性ベクトルを保ちつつ、滑らかに軌道を曲げるホーミング）
+        // 基本バネ力
+        const linearForce = dist * cfg.springK * this.tuning.tensionMultiplier;
+        // 【要望② 一気に距離を取ることで強い加速】: 離れるほど二次曲線的に引き絞られるパチンコ加速
+        const slingshotBonus = dist > 50 ? Math.pow((dist - 50) / 70, 1.7) * 0.038 * this.tuning.tensionMultiplier : 0;
+        let pullMagnitude = linearForce + slingshotBonus;
+
+        // 【要望③ 10m離れていたら自機通過後さらに5m進む突き抜け調整】:
+        // 離脱中（自機・仮想支点を通過した区間）は、overshootRatio（初期値0.5=50%）に合わせた復元力でブレーキ！
+        // 物理計算: 到達距離 D_over = D_in * overshootRatio となるよう復元力を 1/(ratio^2) 倍に調整
+        if (!isApproaching) {
+          const ratio = Math.max(0.2, this.tuning.overshootRatio || 0.5);
+          const brakeMultiplier = 1.0 / (ratio * ratio);
+          pullMagnitude *= brakeMultiplier;
+        }
+
+        let totalPull = Math.min(1.2, pullMagnitude);
+
+        // 【要望④ 最上部（Apex）で少しとどまる滯空感】:
+        // 球を真上に打ち上げた時、最高到達点でふわっと滞空してから落ちてくるようなタメ感
+        const isNearApex = dist > 40 && Math.hypot(orb.vx, orb.vy) < (cfg.apexThreshold * 1.6);
+        if (isNearApex) {
+          orb.isHoveringApex = true;
+          orb.apexDwellTimer++;
+        } else if (Math.hypot(orb.vx, orb.vy) > cfg.apexThreshold * 2.2 || dist < 35) {
+          orb.isHoveringApex = false;
+          orb.apexDwellTimer = 0;
+        }
+
+        // 滞空中のフワッとしたタメ効果（apexDwellMultiplier で滞空時間を調整可能）
+        const maxDwellFrames = Math.round(15 * this.tuning.apexDwellMultiplier);
+        if (orb.isHoveringApex && orb.apexDwellTimer < maxDwellFrames) {
+          // 頂点にとどまっている間は、自機への引き戻し引力を 85% カット！
+          totalPull *= 0.15;
+          // 速度も微小な余韻ドラッグでふわりと静止・漂わせる
+          orb.vx *= 0.92;
+          orb.vy *= 0.92;
+        }
+
+        // 支点へ向けて加速
         orb.vx += ux * totalPull;
         orb.vy += uy * totalPull;
 
         // 2. 自機の移動によるポンピング・共鳴（プレイヤーが自機を振ったときの勢い伝達）:
-        // 【重要バグ修正】: 自機をジェミニに向かって動かした時（対向衝突）にジェミニの速度を引いてブレーキをかけては絶対にダメ！
         // 自機の移動ベクトルがジェミニの進行方向と同じ向き（追撃・引っ張り）の時のみ運動量を上乗せする。
         const pSpeed = Math.hypot(playerVx, playerVy);
         const curSpeed = Math.hypot(orb.vx, orb.vy);
@@ -644,8 +690,8 @@ export class GeminiOrbManager {
           // 自機の移動をジェミニの進行方向に射影
           const forwardP = playerVx * gDirX + playerVy * gDirY;
           if (forwardP > 0) {
-            // 同方向（追撃）のときのみ運動量を上乗せ（最高2.0までクランプ）
-            const boost = Math.min(2.0, forwardP * 0.28);
+            // 同方向（追撃）のときのみ運動量を上乗せ（最高2.2までクランプ）
+            const boost = Math.min(2.2, forwardP * 0.28);
             orb.vx += gDirX * boost;
             orb.vy += gDirY * boost;
           }
@@ -653,30 +699,18 @@ export class GeminiOrbManager {
         }
 
         // 3. 空気抵抗（極めて小さい減衰）:
-        // 振り子のエネルギー保存を尊重！ 0.9995^60 ≈ 0.97 → 1秒で3%しか減衰しない
-        // プレイヤーが静止していれば10往復くらいかけてゆっくり収束する
         orb.vx *= 0.9995;
         orb.vy *= 0.9995;
 
-        // 4. 最高速度クランプ（大幅引き上げ — 振り子の自機通過時最高速を妨げない）:
+        // 4. 最高速度クランプ:
         const updatedSpeed = Math.hypot(orb.vx, orb.vy);
-        const maxSpd = (cfg.maxSpeed * 2.5 + (orb.level - 1) * 0.6) * this.tuning.maxSpeedMultiplier;
+        const maxSpd = (cfg.maxSpeed * 2.8 + (orb.level - 1) * 0.6) * this.tuning.maxSpeedMultiplier;
         if (updatedSpeed > maxSpd) {
           orb.vx = (orb.vx / updatedSpeed) * maxSpd;
           orb.vy = (orb.vy / updatedSpeed) * maxSpd;
         }
 
-        // 5. 頂点（折り返し地点・Apex）検出:
-        // 自機から離れた場所（playerDist > 50）で速度が落ちた瞬間を頂点と判定
-        if (playerDist > 50 && updatedSpeed < (cfg.apexThreshold * 1.4)) {
-          orb.isHoveringApex = true;
-          orb.apexDwellTimer++;
-        } else {
-          orb.isHoveringApex = false;
-          orb.apexDwellTimer = 0;
-        }
-
-        // 6. 火の玉チャージ判定（自機から離れて勢いよく突進している時）:
+        // 5. 火の玉チャージ判定（自機から離れて勢いよく突進している時）:
         if (playerDist > 55 && updatedSpeed > 1.1) {
           orb.isCharged = true;
           orb.chargeRatio = Math.min(1.0, (playerDist - 40) / 80);

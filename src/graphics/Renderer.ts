@@ -1532,13 +1532,15 @@ export class ArcadeRenderer {
     }
 
     // Row 5: Real-time Physics Parameter Tuning (y: 71 to 86)
-    const tng = telemetry?.tuning || { tensionMultiplier: 1.0, apexDwellMultiplier: 1.0, maxSpeedMultiplier: 1.0, orbitRadius: 75 };
+    const tng = telemetry?.tuning || { tensionMultiplier: 1.0, apexDwellMultiplier: 1.0, maxSpeedMultiplier: 1.0, orbitRadius: 75, overshootRatio: 0.5 };
+    const overshootPct = Math.round((tng.overshootRatio || 0.5) * 100);
     const tuningBtns = [
-      { label: `バネ:x${tng.tensionMultiplier}[J]`, x: 8, w: 68 },
-      { label: `滞空:x${tng.apexDwellMultiplier}[K]`, x: 79, w: 68 },
-      { label: `速度:x${tng.maxSpeedMultiplier}[U]`, x: 150, w: 64 },
-      { label: `半径:${tng.orbitRadius}`, x: 217, w: 64 },
-      { label: '↺初期値[R]', x: 284, w: 68 },
+      { label: `バネ:x${tng.tensionMultiplier}[J]`, x: 4, w: 56 },
+      { label: `滞空:x${tng.apexDwellMultiplier}[K]`, x: 62, w: 56 },
+      { label: `突き抜け:${overshootPct}%[Y]`, x: 120, w: 66 },
+      { label: `速度:x${tng.maxSpeedMultiplier}[U]`, x: 188, w: 56 },
+      { label: `半径:${tng.orbitRadius}`, x: 246, w: 48 },
+      { label: '↺初期[R]', x: 296, w: 58 },
     ];
     for (const tb of tuningBtns) {
       ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';

@@ -164,6 +164,9 @@ export class InputManager {
       if (e.code === 'KeyU') {
         this.state.tuningSpeedPressed = true;
       }
+      if (e.code === 'KeyY' || e.code === 'KeyH') {
+        this.state.tuningOvershootPressed = true;
+      }
       if (e.code === 'KeyR') {
         this.state.tuningResetPressed = true;
       }
@@ -302,6 +305,12 @@ export class InputManager {
   public consumeTuningSpeed(): boolean {
     const val = !!this.state.tuningSpeedPressed;
     this.state.tuningSpeedPressed = false;
+    return val;
+  }
+
+  public consumeTuningOvershoot(): boolean {
+    const val = !!this.state.tuningOvershootPressed;
+    this.state.tuningOvershootPressed = false;
     return val;
   }
 

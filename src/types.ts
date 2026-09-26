@@ -32,6 +32,7 @@ export interface PhysicsTuningState {
   apexDwellMultiplier: number; // 0.0 (なし), 0.5 (短), 1.0 (標準), 2.5 (長)
   maxSpeedMultiplier: number;  // 0.7 (低速), 1.0 (標準), 1.4 (高速), 2.0 (超光速)
   orbitRadius: number;         // 55 (短), 75 (標準), 110 (長)
+  overshootRatio: number;      // 0.3 (30%), 0.5 (50% 標準:10m離れて自機通過後+5m), 0.8 (80%), 1.0 (100% 往復)
 }
 
 export interface InputState {
@@ -55,6 +56,7 @@ export interface InputState {
   tuningTensionPressed?: boolean;
   tuningApexPressed?: boolean;
   tuningSpeedPressed?: boolean;
+  tuningOvershootPressed?: boolean;
   tuningResetPressed?: boolean;
   orbCountPressed?: boolean;
   playerControlTogglePressed?: boolean;
