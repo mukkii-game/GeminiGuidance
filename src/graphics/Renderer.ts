@@ -87,7 +87,8 @@ export class ArcadeRenderer {
     },
     testBossDamage: number = 0,
     testDummyLayout: 'DUAL' | 'ALL_PENETRATE' | 'ALL_REFLECT' = 'DUAL',
-    testBossCollisionMode: 'PENETRATE' | 'REFLECT' = 'PENETRATE'
+    testBossCollisionMode: 'PENETRATE' | 'REFLECT' = 'PENETRATE',
+    pointerPos?: { x: number; y: number }
   ): void {
     const ctx = this.ctx;
 
@@ -160,7 +161,7 @@ export class ArcadeRenderer {
     }
 
     // 14. State Overlays (Title, Stage Clear, Game Over, Game Clear)
-    this.renderStateOverlays(state, stage, stageTick, player.score);
+    this.renderStateOverlays(state, stage, stageTick, player.score, pointerPos);
 
     ctx.restore();
   }
@@ -1291,94 +1292,187 @@ export class ArcadeRenderer {
   }
 
   // --- State Overlays ---
-  private renderStateOverlays(state: GameState, stage: number, stageTick: number, score: number): void {
+  private renderStateOverlays(
+    state: GameState,
+    stage: number,
+    stageTick: number,
+    score: number,
+    pointerPos?: { x: number; y: number }
+  ): void {
     const ctx = this.ctx;
     const w = this.canvas.width;
     const h = this.canvas.height;
 
     if (state === 'TITLE') {
-      ctx.fillStyle = 'rgba(4, 7, 12, 0.90)';
+      ctx.fillStyle = 'rgba(4, 7, 12, 0.95)';
       ctx.fillRect(0, 0, w, h);
 
       // 1. Marquee Banner Image from Nano Banana
       if (this.titleLogoLoaded && this.titleLogoImg.complete) {
-        const logoW = 320;
-        const logoH = 178;
+        const logoW = 280;
+        const logoH = 80;
         const logoX = (w - logoW) / 2;
-        const logoY = 12;
+        const logoY = 6;
 
         ctx.strokeStyle = '#38bdf8';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.5;
         ctx.strokeRect(logoX - 1, logoY - 1, logoW + 2, logoH + 2);
         ctx.drawImage(this.titleLogoImg, logoX, logoY, logoW, logoH);
       }
 
       // 2. Subtitle / Version
       ctx.textAlign = 'center';
-      ctx.font = '14px "DotGothic16", monospace';
+      ctx.font = '12px "DotGothic16", monospace';
       ctx.fillStyle = '#67e8f9';
-      ctx.fillText('【 ジェミニ誘導 】', w / 2, 204);
+      ctx.fillText('【 ジェミニ誘導 - GEMINI GUIDANCE - 】', w / 2, 98);
       ctx.font = '8px "Press Start 2P", monospace';
       ctx.fillStyle = '#94a3b8';
-      ctx.fillText('- 1983 NAMCO STYLE STG -', w / 2, 220);
+      ctx.fillText('- 1983 NAMCO STYLE STG -', w / 2, 110);
 
-      // 3. Start Prompt (Blinking)
-      if (Math.floor(stageTick / 22) % 2 === 0) {
-        ctx.font = '10px "Press Start 2P", monospace';
-        ctx.fillStyle = '#fde047';
-        ctx.fillText('TOUCH / CLICK TO START', w / 2, 248);
-      } else {
-        ctx.font = '10px "Press Start 2P", monospace';
-        ctx.fillStyle = '#854d0e';
-        ctx.fillText('INSERT COIN / START', w / 2, 248);
+      // 3. Stage Select Section Header
+      ctx.font = '8px "Press Start 2P", monospace';
+      ctx.fillStyle = '#fde047';
+      ctx.fillText('== SELECT STAGE / MISSION ==', w / 2, 126);
+
+      // 4. Five Clickable Stage Select Buttons
+      const stageButtons = [
+        {
+          num: '1',
+          name: '１面：チャイナ・シンドローム',
+          sub: 'インベーダー軍団＆クジラUFO',
+          y: 134,
+          h: 26,
+          color: '#38bdf8',
+          isLab: false,
+        },
+        {
+          num: '2',
+          name: '２面：イーロンズ・ゲート',
+          sub: 'ブロック崩し＆帝王Grok',
+          y: 164,
+          h: 26,
+          color: '#f97316',
+          isLab: false,
+        },
+        {
+          num: '3',
+          name: '３面：ザ・ファブル',
+          sub: 'Claude Fable Apex 要塞決戦',
+          y: 194,
+          h: 26,
+          color: '#fbbf24',
+          isLab: false,
+        },
+        {
+          num: '4',
+          name: '４面：魔法使いチャッピー',
+          sub: 'GPT-6 Astra 最終決戦',
+          y: 224,
+          h: 26,
+          color: '#ef4444',
+          isLab: false,
+        },
+        {
+          num: 'T',
+          name: '🧪 物理テストステージ (PHYSICS LAB)',
+          sub: '貫通・反射・ヨーヨー・公転実験室',
+          y: 254,
+          h: 30,
+          color: '#22c55e',
+          isLab: true,
+        },
+      ];
+
+      const btnX = 16;
+      const btnW = w - 32; // 328px
+
+      for (const btn of stageButtons) {
+        const isHover = !!(pointerPos &&
+          pointerPos.x >= btnX && pointerPos.x <= btnX + btnW &&
+          pointerPos.y >= btn.y && pointerPos.y <= btn.y + btn.h);
+
+        // Button background
+        ctx.fillStyle = isHover
+          ? 'rgba(56, 189, 248, 0.40)'
+          : (btn.isLab ? 'rgba(34, 197, 94, 0.20)' : 'rgba(15, 23, 42, 0.88)');
+        ctx.fillRect(btnX, btn.y, btnW, btn.h);
+
+        // Border
+        ctx.strokeStyle = isHover ? '#fde047' : btn.color;
+        ctx.lineWidth = isHover ? 2 : (btn.isLab ? 1.5 : 1);
+        ctx.strokeRect(btnX, btn.y, btnW, btn.h);
+
+        // Key badge [1], [2], [T]
+        ctx.fillStyle = isHover ? '#fde047' : btn.color;
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(`[${btn.num}]`, btnX + 8, btn.y + (btn.isLab ? 17 : 16));
+
+        // Main Title
+        ctx.fillStyle = isHover ? '#ffffff' : '#f8fafc';
+        ctx.font = '10px "DotGothic16", monospace';
+        const prefix = isHover ? '▶ ' : '';
+        ctx.fillText(`${prefix}${btn.name}`, btnX + 40, btn.y + (btn.isLab ? 14 : 17));
+
+        // Subtext / description
+        ctx.fillStyle = isHover ? '#fde047' : '#94a3b8';
+        ctx.font = '7px "DotGothic16", monospace';
+        ctx.textAlign = 'right';
+        ctx.fillText(btn.sub, btnX + btnW - 8, btn.y + (btn.isLab ? 25 : 17));
       }
 
-      // 4. Instructions / Rules (Reflecting Latest Mechanics)
-      ctx.font = '9px "DotGothic16", monospace';
+      // 5. Instruction prompt
+      ctx.textAlign = 'center';
+      if (Math.floor(stageTick / 22) % 2 === 0) {
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.fillStyle = '#fde047';
+        ctx.fillText('CLICK BUTTON OR PRESS [1-4] / [T]', w / 2, 298);
+      } else {
+        ctx.font = '8px "Press Start 2P", monospace';
+        ctx.fillStyle = '#a16207';
+        ctx.fillText('CLICK BUTTON OR PRESS [1-4] / [T]', w / 2, 298);
+      }
+
+      // 6. Mechanics & Controls Guide
+      ctx.font = '8px "DotGothic16", monospace';
       ctx.fillStyle = '#22c55e';
-      ctx.fillText('★ 攻撃① ヨーヨー投擲: 引っ張って放つ！折り返し滞空で連続集中削り！', w / 2, 270);
+      ctx.fillText('★ 攻撃① ヨーヨー投擲: 引っ張り放ち＆折り返し滞空多段削り', w / 2, 316);
       ctx.fillStyle = '#38bdf8';
-      ctx.fillText('★ 攻撃② 旋回シールド: [Space / 右クリック]で紐ロック公転！', w / 2, 288);
+      ctx.fillText('★ 攻撃② 旋回シールド: [Space / 右クリック]で紐ロック公転', w / 2, 332);
       ctx.fillStyle = '#fef08a';
-      ctx.fillText('★ [Xキー] 貫通モード(すり抜け多段)と反射モード(ピンボール)切替！', w / 2, 306);
+      ctx.fillText('★ [Xキー] 貫通モード(多段削り)と反射モード(ピンボール)切替', w / 2, 348);
       ctx.fillStyle = '#ec4899';
-      ctx.fillText('★ 敵の白弾は相殺消滅！編隊全滅でジェミニ出現＆シールド回復！', w / 2, 324);
+      ctx.fillText('★ 敵の白弾は相殺消滅！編隊全滅でジェミニ出現＆回復！', w / 2, 364);
       ctx.fillStyle = '#cbd5e1';
-      ctx.fillText('★ [1〜5キー] 物理切替 / [Tキー] いつでも【物理テストステージ】へ！', w / 2, 342);
+      ctx.fillText('★ [1〜5キー] 物理挙動切替 / [Tキー] いつでも物理テストへ！', w / 2, 380);
 
       // Separator Line
       ctx.strokeStyle = '#1e293b';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(20, 360);
-      ctx.lineTo(w - 20, 360);
+      ctx.moveTo(20, 394);
+      ctx.lineTo(w - 20, 394);
       ctx.stroke();
 
-      // 5. Asset Attribution (Required by User)
-      ctx.font = '10px "DotGothic16", monospace';
-      ctx.fillStyle = '#38bdf8';
-      ctx.fillText('【 アセット・素材提供クレジット 】', w / 2, 378);
-
-      ctx.fillStyle = '#cbd5e1';
-      ctx.fillText('■ BGM音源: 魔王魂 (maou.audio)', w / 2, 396);
-      ctx.fillText('■ 効果音: 効果音ラボ (soundeffect-lab.info)', w / 2, 414);
-      ctx.fillText('■ メインロゴ: NANO BANANA', w / 2, 432);
-      ctx.fillText('■ 敵対勢力: GenAI Official Logos (2026)', w / 2, 450);
-
-      // Legal disclaimer
+      // 7. Asset Attribution
       ctx.font = '8px "DotGothic16", monospace';
+      ctx.fillStyle = '#67e8f9';
+      ctx.fillText('【 音源・素材クレジット 】', w / 2, 408);
       ctx.fillStyle = '#94a3b8';
-      ctx.fillText('※本作は非営利的パロディ作品であり、各社商標は各権利者に帰属します。', w / 2, 474);
+      ctx.fillText('■ BGM: 魔王魂 (maou.audio) | 効果音: 効果音ラボ', w / 2, 422);
+      ctx.fillText('■ メインロゴ: NANO BANANA | 敵勢力: GenAI Official Logos', w / 2, 436);
+      ctx.fillStyle = '#64748b';
+      ctx.fillText('※本作は非営利的パロディ作品であり各社商標は各権利者に帰属します', w / 2, 452);
 
       // Controls guide
-      ctx.fillStyle = '#64748b';
-      ctx.fillText('📱 1本指ドラッグで移動・誘導スイング', w / 2, 498);
-      ctx.fillText('💻 PC: マウスまたはWASD / 矢印キー移動', w / 2, 514);
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText('📱 1本指ドラッグで移動・誘導スイング', w / 2, 474);
+      ctx.fillText('💻 PC: マウスまたはWASD / 矢印キー移動', w / 2, 490);
 
       // Copyright
       ctx.font = '8px "Press Start 2P", monospace';
       ctx.fillStyle = '#ef4444';
-      ctx.fillText('(C) 2026 MUKKII ARCADE SYSTEM', w / 2, 532);
+      ctx.fillText('(C) 2026 MUKKII ARCADE SYSTEM', w / 2, 520);
 
     } else if (state === 'STAGE_CLEAR') {
       ctx.font = '14px "Press Start 2P", monospace';

@@ -126,12 +126,11 @@ export class Game {
     requestAnimationFrame(loop);
   }
 
-  private startNewGame(): void {
+  private startNewGame(stageNum: number = 1): void {
     this.audio.resume();
     this.audio.playStartFanfare();
-    this.audio.startBgm();
 
-    this.stage = 1;
+    this.stage = Math.max(1, Math.min(4, stageNum));
     this.stageTick = 0;
     this.state = 'PLAYING';
     this.player.reset(this.canvas.width / 2, this.canvas.height - 90);
@@ -148,18 +147,26 @@ export class Game {
     this.particles = [];
     this.explosions = [];
     this.floatingTexts = [];
-    this.elonIntroTimer = 0;
     this.stage1InvadersSpawned = false;
     this.stage1BossTriggered = false;
 
-    this.terrain.setStage(1);
-    this.stageManager.loadStage(1);
+    this.terrain.setStage(this.stage);
+    this.stageManager.loadStage(this.stage);
+    this.audio.playStageBgm(this.stage);
 
     // Initial starter Gemini orb
     this.geminiManager.spawn(this.player.state.x, this.player.state.y - 70);
 
-    // Speak stage 1 title (No 一面 prefix)
-    this.voice.playStageTitle(1);
+    // Stage voice & intro
+    if (this.stage === 2) {
+      this.elonIntroTimer = 220;
+      setTimeout(() => {
+        this.voice.playElonIntro();
+      }, 400);
+    } else {
+      this.elonIntroTimer = 0;
+      this.voice.playStageTitle(this.stage);
+    }
   }
 
   private advanceStage(): void {
@@ -204,6 +211,76 @@ export class Game {
     }
   }
 
+  private updateTitleScreen(dtFactor: number): void {
+    // Slowly scroll background terrain for vibrant arcade ambiance
+    this.terrain.update(dtFactor * 0.5);
+
+    // 1. Hotkeys on Title Screen
+    if (this.input.consumeTestStageToggle()) {
+      this.enterTestStage();
+      return;
+    }
+
+    const presetChoice = this.input.consumePresetSelect();
+    if (presetChoice) {
+      if (presetChoice === 'SNAP_SLING') {
+        this.startNewGame(1);
+        return;
+      } else if (presetChoice === 'HYPER_BOOMERANG') {
+        this.startNewGame(2);
+        return;
+      } else if (presetChoice === 'GIGANTIC_SPRING') {
+        this.startNewGame(3);
+        return;
+      } else if (presetChoice === 'HEAVY_WRECKER') {
+        this.startNewGame(4);
+        return;
+      } else if (presetChoice === 'RAPID_ORBIT') {
+        this.enterTestStage();
+        return;
+      }
+    }
+
+    if (this.input.consumeEnter() || this.input.consumeOrbitToggle()) {
+      this.startNewGame(1);
+      return;
+    }
+
+    // 2. Click / Tap Stage Select
+    const click = this.input.consumeClick();
+    if (click) {
+      const x = click.x;
+      const y = click.y;
+      const btnX = 16;
+      const btnW = this.canvas.width - 32;
+
+      if (x >= btnX && x <= btnX + btnW) {
+        if (y >= 134 && y <= 160) {
+          this.startNewGame(1);
+          return;
+        } else if (y >= 164 && y <= 190) {
+          this.startNewGame(2);
+          return;
+        } else if (y >= 194 && y <= 220) {
+          this.startNewGame(3);
+          return;
+        } else if (y >= 224 && y <= 250) {
+          this.startNewGame(4);
+          return;
+        } else if (y >= 254 && y <= 284) {
+          this.enterTestStage();
+          return;
+        }
+      }
+
+      // If clicked anywhere else on title screen (e.g. prompt area)
+      if (y >= 90) {
+        this.startNewGame(1);
+        return;
+      }
+    }
+  }
+
   public update(dtFactor: number = 1.0): void {
     this.stageTick++;
 
@@ -222,6 +299,23 @@ export class Game {
       this.audio.resume();
       const enabled = this.audio.toggle();
       if (btnAudio) btnAudio.textContent = enabled ? 'SND: ON' : 'SND: OFF';
+    }
+
+    // Handle Title Screen
+    if (this.state === 'TITLE') {
+      this.updateTitleScreen(dtFactor);
+      return;
+    }
+
+    // Handle Game Over & Game Clear Screen (Click or Enter returns to Title)
+    if (this.state === 'GAME_OVER' || this.state === 'GAME_CLEAR') {
+      const click = this.input.consumeClick();
+      const enter = this.input.consumeEnter();
+      if (click || enter) {
+        this.state = 'TITLE';
+        this.audio.stopBgm();
+      }
+      return;
     }
 
     // Handle Lab / Test Stage toggle hotkey (KeyT)
@@ -282,24 +376,14 @@ export class Game {
     }
 
     // Handle Click/Touch on HUD Buttons
-    let clickedUI = false;
     const click = this.input.consumeClick();
     if (click) {
-      clickedUI = this.handlePointerClick(click.x, click.y);
+      this.handlePointerClick(click.x, click.y);
     }
 
     // Test Stage Update Dispatch
     if (this.state === 'TEST_STAGE') {
       this.updateTestStage(dtFactor);
-      return;
-    }
-
-    // State Dispatch
-    if (this.state === 'TITLE' || this.state === 'GAME_OVER' || this.state === 'GAME_CLEAR') {
-      if (this.input.state.active && !clickedUI) {
-        this.input.state.active = false;
-        this.startNewGame();
-      }
       return;
     }
 
@@ -979,7 +1063,8 @@ export class Game {
       telemetry,
       this.testBossTotalDamage,
       this.testDummyLayout,
-      this.testBossCollisionMode
+      this.testBossCollisionMode,
+      { x: this.input.state.x, y: this.input.state.y }
     );
   }
 

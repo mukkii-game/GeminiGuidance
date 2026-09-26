@@ -125,6 +125,9 @@ export class InputManager {
       if (e.code === 'Space' || e.code === 'KeyZ' || e.code === 'KeyO') {
         this.state.orbitTogglePressed = true;
       }
+      if (e.code === 'Enter') {
+        this.state.enterPressed = true;
+      }
       if (e.code === 'KeyX') {
         this.state.collisionTogglePressed = true;
       }
@@ -205,6 +208,12 @@ export class InputManager {
   public consumeCollisionToggle(): boolean {
     const val = !!this.state.collisionTogglePressed;
     this.state.collisionTogglePressed = false;
+    return val;
+  }
+
+  public consumeEnter(): boolean {
+    const val = !!this.state.enterPressed;
+    this.state.enterPressed = false;
     return val;
   }
 

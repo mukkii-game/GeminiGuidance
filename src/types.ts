@@ -31,6 +31,7 @@ export interface InputState {
   levelUpPressed?: boolean;
   orbitTogglePressed?: boolean;
   collisionTogglePressed?: boolean;
+  enterPressed?: boolean;
 }
 
 export interface PlayerState {
