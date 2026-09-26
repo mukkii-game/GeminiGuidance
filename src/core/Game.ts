@@ -158,6 +158,29 @@ export class Game {
     return res.isOrbit;
   }
 
+  public togglePlayerControlModeWithFeedback(): void {
+    const mode = this.player.toggleControlMode();
+    this.audio.playGeminiBounce();
+    const isDirect = mode === 'DIRECT';
+    this.addFloatingText(
+      this.player.state.x,
+      this.player.state.y - 30,
+      isDirect ? '自機移動: マウス直結 [DIRECT]' : `自機移動: 速度制限 [LIMITED ${this.player.speedMultiplier.toFixed(1)}x]`,
+      isDirect ? '#38bdf8' : '#fde047'
+    );
+  }
+
+  public cyclePlayerSpeedWithFeedback(): void {
+    const spd = this.player.cycleSpeedMultiplier();
+    this.audio.playGeminiBounce();
+    this.addFloatingText(
+      this.player.state.x,
+      this.player.state.y - 30,
+      `自機最高速度: x${spd.toFixed(1)}`,
+      '#fde047'
+    );
+  }
+
   private updateAudioButtonsUi(): void {
     const btnBgm = document.getElementById('btn-bgm');
     const btnSe = document.getElementById('btn-se');
@@ -484,6 +507,16 @@ export class Game {
       }
       this.audio.playGeminiLevelUp();
       this.addFloatingText(this.player.state.x, this.player.state.y - 30, 'GEMINI LEVEL UP!', '#ec4899');
+    }
+
+    // Handle Player Control Mode hotkey (KeyM)
+    if (this.input.consumePlayerControlToggle()) {
+      this.togglePlayerControlModeWithFeedback();
+    }
+
+    // Handle Player Speed Cycle hotkey (KeyV)
+    if (this.input.consumePlayerSpeedCycle()) {
+      this.cyclePlayerSpeedWithFeedback();
     }
 
     // Handle Click/Touch on HUD Buttons or Field Toggle
@@ -1484,6 +1517,12 @@ export class Game {
       this.audio.playGeminiBounce();
       this.addFloatingText(this.player.state.x, this.player.state.y - 30, `ジェミニ数: ${cnt}機`, '#ec4899');
     }
+    if (this.input.consumePlayerControlToggle()) {
+      this.togglePlayerControlModeWithFeedback();
+    }
+    if (this.input.consumePlayerSpeedCycle()) {
+      this.cyclePlayerSpeedWithFeedback();
+    }
 
     // Update Gemini Orbs (passing onWallHit callback)
     this.geminiManager.update(
@@ -1694,6 +1733,20 @@ export class Game {
           this.geminiManager.resetTuning();
           this.audio.playGeminiBounce();
           this.addFloatingText(this.player.state.x, this.player.state.y - 30, 'パラメータ初期化!', '#38bdf8');
+          return true;
+        }
+      }
+
+      // 7. Bottom Player Movement Control Bar (y: 494 to 514)
+      if (y >= 494 && y <= 514) {
+        // Left Button: [🖱️自機:直結[M]] / [🚀自機:制限[M]] (x: 8 to 178)
+        if (x >= 8 && x <= 178) {
+          this.togglePlayerControlModeWithFeedback();
+          return true;
+        }
+        // Right Button: [⚡自機最高速度: x..[V]] (x: 182 to 352)
+        if (x >= 182 && x <= 352) {
+          this.cyclePlayerSpeedWithFeedback();
           return true;
         }
       }

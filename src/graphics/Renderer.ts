@@ -1269,6 +1269,12 @@ export class ArcadeRenderer {
       }
     }
 
+    // Player Control Mode indicator in HUD
+    ctx.font = '6px "Press Start 2P", monospace';
+    ctx.fillStyle = player.controlMode === 'LIMITED' ? '#fde047' : '#38bdf8';
+    ctx.textAlign = 'left';
+    ctx.fillText(player.controlMode === 'LIMITED' ? `LIM(x${(player.speedMultiplier || 3).toFixed(1)})[M]` : 'DIR[M]', 68, btmY - 4);
+
     // Stage Display
     ctx.fillStyle = '#38bdf8';
     ctx.textAlign = 'center';
@@ -1545,6 +1551,33 @@ export class ArcadeRenderer {
       ctx.textAlign = 'center';
       ctx.fillText(tb.label, tb.x + tb.w / 2, 82);
     }
+
+    // 3.5. Player Movement Mode & Speed Bar (y: btmY - 22 to btmY - 4)
+    const ctrlBarY = this.canvas.height - 44;
+    const isDirect = player.controlMode !== 'LIMITED';
+    const speedMult = player.speedMultiplier || 3.0;
+
+    // Left Button: [🖱️自機移動: マウス直結[M]] / [🚀自機移動: 速度制限[M]] (x: 8 to 178, w: 170)
+    ctx.fillStyle = isDirect ? 'rgba(56, 189, 248, 0.45)' : 'rgba(234, 179, 8, 0.45)';
+    ctx.fillRect(8, ctrlBarY, 170, 18);
+    ctx.strokeStyle = isDirect ? '#38bdf8' : '#fde047';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(8, ctrlBarY, 170, 18);
+    ctx.fillStyle = isDirect ? '#38bdf8' : '#fde047';
+    ctx.font = '8px "DotGothic16", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(isDirect ? '🖱️自機移動: マウス直結[M]' : `🚀自機移動: 速度制限[M]`, 8 + 85, ctrlBarY + 12);
+
+    // Right Button: [⚡自機最高速度: x3.0 (切替)[V]] (x: 182 to 352, w: 170)
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.90)';
+    ctx.fillRect(182, ctrlBarY, 170, 18);
+    ctx.strokeStyle = '#fde047';
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(182, ctrlBarY, 170, 18);
+    ctx.fillStyle = '#fde047';
+    ctx.font = '8px "DotGothic16", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`⚡自機最高速度: x${speedMult.toFixed(1)} (切替)[V]`, 182 + 85, ctrlBarY + 12);
 
     // 4. Real-time Telemetry Bar at Screen Bottom (y: height - 24 to height)
     const btmY = this.canvas.height - 24;

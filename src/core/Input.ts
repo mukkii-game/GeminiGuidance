@@ -117,13 +117,16 @@ export class InputManager {
         this.state.crtTogglePressed = true;
       }
       if (e.code === 'KeyM') {
-        this.state.audioTogglePressed = true;
+        this.state.playerControlTogglePressed = true;
       }
       if (e.code === 'KeyB') {
         this.state.bgmTogglePressed = true;
       }
-      if (e.code === 'KeyN' || e.code === 'KeyV') {
+      if (e.code === 'KeyN') {
         this.state.seTogglePressed = true;
+      }
+      if (e.code === 'KeyV') {
+        this.state.playerSpeedCyclePressed = true;
       }
       if (e.code === 'KeyT') {
         this.state.testStageTogglePressed = true;
@@ -311,6 +314,18 @@ export class InputManager {
   public consumeOrbCount(): boolean {
     const val = !!this.state.orbCountPressed;
     this.state.orbCountPressed = false;
+    return val;
+  }
+
+  public consumePlayerControlToggle(): boolean {
+    const val = !!this.state.playerControlTogglePressed;
+    this.state.playerControlTogglePressed = false;
+    return val;
+  }
+
+  public consumePlayerSpeedCycle(): boolean {
+    const val = !!this.state.playerSpeedCyclePressed;
+    this.state.playerSpeedCyclePressed = false;
     return val;
   }
 }

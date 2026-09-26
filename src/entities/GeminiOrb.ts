@@ -240,10 +240,14 @@ export class GeminiOrbManager {
       } else {
         orb.mode = 'SLING';
         orb.orbitTier = undefined;
-        orb.strokePhase = 'RETURN';
-        orb.returnGoalX = playerX;
-        orb.returnGoalY = playerY;
-        orb.isCharged = false;
+        // エグゼリカ式アンカー投げ: その瞬間の接線速度ベクトルを保持してすっ飛ぶ！
+        const releaseSpeed = Math.hypot(orb.vx, orb.vy);
+        if (releaseSpeed > 1.3) {
+          orb.isCharged = true;
+          orb.chargeRatio = Math.min(1.0, releaseSpeed / 3.0);
+        } else {
+          orb.isCharged = false;
+        }
       }
     }
     return { isOrbit: willOrbit, tier: willOrbit ? lastTier : undefined, radius: lastRadius };
@@ -465,86 +469,76 @@ export class GeminiOrbManager {
       }
 
       if (orb.mode === 'ORBIT') {
-        // --- MODE ②: のびのある細いゴム紐分銅 (Stretchy Rubber Cord Flail) ---
+        // --- MODE ②: エグゼリカ式アンカー回転 ＆ のびのある細いゴム紐分銅 ---
+        // 参照: http://crueltear.web.fc2.com/anchor.html 『トリガーハート エグゼリカ』アンカーシュート基礎
+        // 「アンカーに対して90度の角度でレバー入れるほうが、強い回転加速度を得られる」
+        // 「敵が反時計回りに回りだすので、それに合わせて常に敵より90度先をいく感じで変えていきます。そうすると、ぐるんぐるんです。」
+        // 「敵と反対方向にレバー入れると、引き寄せられてくっついちゃうだけで回転してくれません」
         orb.isHoveringApex = false;
         orb.apexDwellTimer = 0;
 
-        const fDx = orb.x - playerX;
-        const fDy = orb.y - playerY;
-        const fDist = Math.hypot(fDx, fDy) || 1;
-        const fUx = fDx / fDist; // unit vector outward from ship to flail
-        const fUy = fDy / fDist;
-        const fTx = -fUy; // tangent unit vector (counter-clockwise)
-        const fTy = fUx;
+        // 1. 極座標系の角度と単位ベクトル
+        const curAngle = orb.orbitAngle;
+        const cosA = Math.cos(curAngle);
+        const sinA = Math.sin(curAngle);
 
-        const relVx = orb.vx - playerVx;
-        const relVy = orb.vy - playerVy;
-        const radialVel = relVx * fUx + relVy * fUy;
-        const tangentialVel = relVx * fTx + relVy * fTy;
+        // 反時計回りの接線単位ベクトル (90度 Tangent)
+        const tanX = -sinA;
+        const tanY = cosA;
 
-        // Current rotation direction (1: CCW, -1: CW)
-        const spinSign = tangentialVel >= 0 ? 1 : -1;
-        const fSpinTx = fTx * spinSign;
-        const fSpinTy = fTy * spinSign;
+        // 2. 自機の移動によるトルク入力 (エグゼリカ90度入力則)
+        // 自機の移動ベクトルを接線方向（90度）へ射影
+        const playerTangential = playerVx * tanX + playerVy * tanY;
+        const torqueK = 0.0072 * this.tuning.tensionMultiplier;
+        orb.orbitAngularVel += playerTangential * torqueK;
 
-        // 1. のびのあるゴム紐の張力（Elastic Rubber Band Tension）:
-        // 自然長 L0: 通常 68px (ユーザー指示: 「たしょうのびちじみのもうすこしするように のびのあるゴムで繋いで回している感じに」)
-        const baseL0 = (orb.tetherLength || orb.orbitRadius || 68) * (this.tuning.orbitRadius / 75);
-        if (fDist > baseL0) {
-          const stretch = fDist - baseL0;
-          // しなやかに伸びるゴム弾性定数 (kRubber = 0.055)
-          const kRubber = 0.055 * this.tuning.tensionMultiplier;
-          // ゴムの伸び縮み感を生かす軽やかな減衰
-          const damper = Math.max(0, radialVel) * 0.18;
-          const rubberTension = stretch * kRubber + damper;
+        // 3. 慣性保存（フライホイール効果）と空気抵抗
+        orb.orbitAngularVel *= 0.993;
 
-          orb.vx -= fUx * rubberTension;
-          orb.vy -= fUy * rubberTension;
-
-          // 画面外への飛び出し防止ソフトクランプ (自然長の2.2倍)
-          const maxClamp = baseL0 * 2.2;
-          if (fDist > maxClamp) {
-            orb.x = playerX + fUx * maxClamp;
-            orb.y = playerY + fUy * maxClamp;
-            if (radialVel > 0) {
-              orb.vx -= radialVel * fUx * 0.5;
-              orb.vy -= radialVel * fUy * 0.5;
-            }
-          }
+        // 微小回転の自然維持（停止せずゆっくり公転）
+        if (Math.abs(orb.orbitAngularVel) < 0.035) {
+          const sgn = orb.orbitAngularVel >= 0 ? 1 : -1;
+          orb.orbitAngularVel += sgn * 0.001;
         }
 
-        // 2. 自機の旋回運動からの運動量伝達（回すほどゴムが伸びて遠心加速！）:
-        const playerTangential = playerVx * fSpinTx + playerVy * fSpinTy;
-        if (playerTangential > 0) {
-          const transfer = playerTangential * 0.45;
-          orb.vx += fSpinTx * transfer;
-          orb.vy += fSpinTy * transfer;
-        }
+        // 最大角速度クランプ
+        const maxOmega = 0.28 * this.tuning.maxSpeedMultiplier;
+        orb.orbitAngularVel = Math.max(-maxOmega, Math.min(maxOmega, orb.orbitAngularVel));
 
-        // 3. スナップ引き戻し加速:
-        const playerRadial = playerVx * fUx + playerVy * fUy;
-        if (playerRadial < -0.30) {
-          const whip = Math.abs(playerRadial) * 0.55;
-          orb.vx += fSpinTx * whip;
-          orb.vy += fSpinTy * whip;
-        }
+        // 4. 遠心力によるゴム紐のしなやかな伸縮（のびちじみ感）
+        // 自然長 L0: 通常 68px
+        const baseL0 = (orb.tetherLength || 68) * (this.tuning.orbitRadius / 75);
+        // 角速度 omega が高いほど、遠心力で外側へ伸びる！
+        const absOmega = Math.abs(orb.orbitAngularVel);
+        const centrifugalStretch = Math.pow(absOmega / 0.14, 1.8) * 58;
+        // 自機が急激に動いた時の慣性引っ張りによる伸び
+        const pSpeed = Math.hypot(playerVx, playerVy);
+        const pullStretch = Math.min(30, pSpeed * 2.5);
+        const targetRadius = Math.max(38, Math.min(155, baseL0 + centrifugalStretch + pullStretch));
 
-        // 4. 自然な回転維持と空気抵抗:
-        const spinSpeed = Math.abs(tangentialVel);
-        if (spinSpeed < 1.0) {
-          orb.vx += fSpinTx * 0.035;
-          orb.vy += fSpinTy * 0.035;
-        }
-        orb.vx *= 0.993;
-        orb.vy *= 0.993;
+        // スプリング弾性で滑らかに目標半径へ追従
+        orb.orbitRadius += (targetRadius - orb.orbitRadius) * 0.18;
 
-        // 5. スピン状態分類:
-        const flailSpeed = Math.hypot(orb.vx, orb.vy);
-        if (flailSpeed >= 2.2) {
+        // 5. 新しい公転角度とジェミニ座標の確定
+        orb.orbitAngle += orb.orbitAngularVel;
+        const newX = playerX + Math.cos(orb.orbitAngle) * orb.orbitRadius;
+        const newY = playerY + Math.sin(orb.orbitAngle) * orb.orbitRadius;
+
+        // 速度ベクトルの計算（接線速度 + 自機移動）
+        const tangSpeed = orb.orbitAngularVel * orb.orbitRadius;
+        orb.vx = playerVx - Math.sin(orb.orbitAngle) * tangSpeed;
+        orb.vy = playerVy + Math.cos(orb.orbitAngle) * tangSpeed;
+
+        orb.x = newX;
+        orb.y = newY;
+
+        // 6. スピン状態分類
+        const flailSpeed = Math.abs(tangSpeed);
+        if (flailSpeed >= 12.0 || absOmega >= 0.13) {
           orb.spinLevel = 2;
           orb.isCharged = true;
-          orb.chargeRatio = Math.min(1.0, (flailSpeed - 2.2) / 1.2);
-        } else if (flailSpeed >= 1.25) {
+          orb.chargeRatio = Math.min(1.0, (flailSpeed - 12.0) / 10.0);
+        } else if (flailSpeed >= 6.5 || absOmega >= 0.07) {
           orb.spinLevel = 1;
           orb.isCharged = false;
           orb.chargeRatio = 0.5;
@@ -553,19 +547,6 @@ export class GeminiOrbManager {
           orb.isCharged = false;
           orb.chargeRatio = 0;
         }
-
-        // 速度制限
-        const maxSpd = (cfg.maxSpeed * 1.5) * this.tuning.maxSpeedMultiplier;
-        if (flailSpeed > maxSpd) {
-          orb.vx = (orb.vx / flailSpeed) * maxSpd;
-          orb.vy = (orb.vy / flailSpeed) * maxSpd;
-        }
-
-        orb.x += orb.vx;
-        orb.y += orb.vy;
-
-        orb.orbitAngle = Math.atan2(orb.y - playerY, orb.x - playerX);
-        orb.orbitRadius = Math.hypot(orb.x - playerX, orb.y - playerY);
 
         // 画面端反射（設定時）
         if (this.screenEdgeBounce) {

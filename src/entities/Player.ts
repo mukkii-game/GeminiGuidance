@@ -1,6 +1,12 @@
-import { PlayerState } from '../types';
+import { PlayerControlMode, PlayerState } from '../types';
+
+export const PLAYER_SPEED_PRESETS = [1.0, 2.0, 3.0, 5.0, 8.0, 10.0];
 
 export class Player {
+  public controlMode: PlayerControlMode = 'DIRECT'; // Default: DIRECT (instant mouse sync / proportional)
+  public speedMultiplier: number = 3.0;             // Default: 3.0x speed!
+  public readonly baseMaxSpeed: number = 8.4;       // 2.8 * 3.0 = 8.4 px/frame (~504 px/sec)
+
   public state: PlayerState = {
     x: 180,
     y: 440,
@@ -29,6 +35,28 @@ export class Player {
     this.state.hp = this.state.maxHp;
     this.state.invulnerableTimer = 120; // 2 seconds invulnerability on spawn
     this.state.alive = true;
+    this.state.controlMode = this.controlMode;
+    this.state.speedMultiplier = this.speedMultiplier;
+  }
+
+  public toggleControlMode(): PlayerControlMode {
+    this.controlMode = this.controlMode === 'DIRECT' ? 'LIMITED' : 'DIRECT';
+    return this.controlMode;
+  }
+
+  public setControlMode(mode: PlayerControlMode): void {
+    this.controlMode = mode;
+  }
+
+  public cycleSpeedMultiplier(): number {
+    const idx = PLAYER_SPEED_PRESETS.indexOf(this.speedMultiplier);
+    const nextIdx = (idx + 1) % PLAYER_SPEED_PRESETS.length;
+    this.speedMultiplier = PLAYER_SPEED_PRESETS[nextIdx];
+    return this.speedMultiplier;
+  }
+
+  public setSpeedMultiplier(mult: number): void {
+    this.speedMultiplier = Math.max(0.5, Math.min(20, mult));
   }
 
   public update(targetX: number, targetY: number): void {
@@ -37,22 +65,25 @@ export class Player {
     const prevX = this.state.x;
     const prevY = this.state.y;
 
-    // Movement towards input target with physical flight speed limit (prevents unnatural warping)
-    const dx = targetX - this.state.x;
-    const dy = targetY - this.state.y;
-    const dist = Math.hypot(dx, dy);
+    if (this.controlMode === 'DIRECT') {
+      // ユーザー指示: マウスの動きに比例した移動（瞬間移動・完全同期）
+      this.state.x = Math.max(16, Math.min(360 - 16, targetX));
+      this.state.y = Math.max(40, Math.min(540 - 24, targetY));
+    } else {
+      // ユーザー指示: 速度制限ありの飛行追従（速度3倍 & 調整可能）
+      const dx = targetX - this.state.x;
+      const dy = targetY - this.state.y;
+      const dist = Math.hypot(dx, dy);
 
-    // Max flight speed: 2.8 px/frame (~168 px/sec) - deliberate, tactical, analog precision
-    const maxSpeed = 2.8;
-    if (dist > 0.001) {
-      const step = Math.min(dist * 0.16, maxSpeed);
-      this.state.x += (dx / dist) * step;
-      this.state.y += (dy / dist) * step;
+      const maxSpeed = this.baseMaxSpeed * (this.speedMultiplier / 3.0);
+      if (dist > 0.001) {
+        const step = Math.min(dist * 0.40 * (this.speedMultiplier / 3.0), maxSpeed);
+        this.state.x += (dx / dist) * step;
+        this.state.y += (dy / dist) * step;
+      }
+      this.state.x = Math.max(16, Math.min(360 - 16, this.state.x));
+      this.state.y = Math.max(40, Math.min(540 - 24, this.state.y));
     }
-
-    // Keep ship strictly within canvas boundaries
-    this.state.x = Math.max(16, Math.min(360 - 16, this.state.x));
-    this.state.y = Math.max(40, Math.min(540 - 24, this.state.y));
 
     this.state.vx = this.state.x - prevX;
     this.state.vy = this.state.y - prevY;
@@ -69,6 +100,9 @@ export class Player {
     if (this.state.invulnerableTimer > 0) {
       this.state.invulnerableTimer--;
     }
+
+    this.state.controlMode = this.controlMode;
+    this.state.speedMultiplier = this.speedMultiplier;
   }
 
   public addScore(points: number): void {

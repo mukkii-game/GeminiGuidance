@@ -57,7 +57,11 @@ export interface InputState {
   tuningSpeedPressed?: boolean;
   tuningResetPressed?: boolean;
   orbCountPressed?: boolean;
+  playerControlTogglePressed?: boolean;
+  playerSpeedCyclePressed?: boolean;
 }
+
+export type PlayerControlMode = 'DIRECT' | 'LIMITED';
 
 export interface AudioSettings {
   bgm: boolean;
@@ -77,6 +81,8 @@ export interface PlayerState {
   highScore: number;
   invulnerableTimer: number;
   alive: boolean;
+  controlMode?: PlayerControlMode;
+  speedMultiplier?: number;
 }
 
 export interface GeminiDropItem {
