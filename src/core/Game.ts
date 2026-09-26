@@ -131,19 +131,26 @@ export class Game {
   public toggleOrbitWithFeedback(): boolean {
     const res = this.geminiManager.toggleOrbit(this.player.state.x, this.player.state.y);
     this.audio.playGeminiBounce();
-    if (res.isOrbit) {
+    if (res.mode === 'COMET') {
+      this.addFloatingText(
+        this.player.state.x,
+        this.player.state.y - 30,
+        '☄️モード③: ハレー彗星 (重力スイングバイ・超楕円ホーミング)',
+        '#c084fc'
+      );
+    } else if (res.mode === 'ORBIT') {
       const tier = res.tier || 'MEDIUM';
       const r = Math.round(res.radius || 90);
       let tierLabel = '';
       let tierColor = '#38bdf8';
       if (tier === 'SHORT') {
-        tierLabel = `⚡分銅【近距離バリア】(R=${r}px)`;
+        tierLabel = `⚡モード②: 伸縮分銅【近距離バリア】(R=${r}px)`;
         tierColor = '#38bdf8';
       } else if (tier === 'MEDIUM') {
-        tierLabel = `⚡分銅【中距離スイング】(R=${r}px)`;
+        tierLabel = `⚡モード②: 伸縮分銅【中距離スイング】(R=${r}px)`;
         tierColor = '#facc15';
       } else {
-        tierLabel = `⚡分銅【巨大ハンマー】(R=${r}px)`;
+        tierLabel = `⚡モード②: 伸縮分銅【巨大ハンマー】(R=${r}px)`;
         tierColor = '#ef4444';
       }
       this.addFloatingText(this.player.state.x, this.player.state.y - 30, tierLabel, tierColor);
@@ -151,7 +158,7 @@ export class Game {
       this.addFloatingText(
         this.player.state.x,
         this.player.state.y - 30,
-        '🚀攻撃①: ヨーヨー突撃 (慣性往復)',
+        '🚀モード①: ヨーヨー突き (直線突き・50%オーバーラン)',
         '#fde047'
       );
     }
@@ -189,6 +196,18 @@ export class Game {
       this.player.state.x,
       this.player.state.y - 30,
       `突き抜け勢い: ${percent}% (10m離れて自機通過+${(10 * ratio).toFixed(1)}m)`,
+      '#fde047'
+    );
+  }
+
+  public cycleMaxSpeedWithFeedback(direction: number = 1): void {
+    const val = this.geminiManager.cycleMaxSpeed(direction);
+    this.audio.playGeminiBounce();
+    const desc = val <= 0.6 ? '極重・低速' : val <= 0.8 ? '重厚・ゆったり' : val <= 1.0 ? '標準' : val <= 1.3 ? '快速' : val <= 1.6 ? '高速' : '超高速';
+    this.addFloatingText(
+      this.player.state.x,
+      this.player.state.y - 30,
+      `玉の最高速度: x${val.toFixed(1)} (${desc}) [U]`,
       '#fde047'
     );
   }
@@ -546,9 +565,7 @@ export class Game {
       this.cycleOvershootWithFeedback();
     }
     if (this.input.consumeTuningSpeed()) {
-      const val = this.geminiManager.cycleMaxSpeed();
-      this.audio.playGeminiBounce();
-      this.addFloatingText(this.player.state.x, this.player.state.y - 30, `最高速度: x${val}`, '#fde047');
+      this.cycleMaxSpeedWithFeedback();
     }
     if (this.input.consumeTuningReset()) {
       this.geminiManager.resetTuning();
@@ -1540,9 +1557,7 @@ export class Game {
       this.cycleOvershootWithFeedback();
     }
     if (this.input.consumeTuningSpeed()) {
-      const val = this.geminiManager.cycleMaxSpeed();
-      this.audio.playGeminiBounce();
-      this.addFloatingText(this.player.state.x, this.player.state.y - 30, `最高速度: x${val}`, '#fde047');
+      this.cycleMaxSpeedWithFeedback();
     }
     if (this.input.consumeTuningReset()) {
       this.geminiManager.resetTuning();
@@ -1758,9 +1773,7 @@ export class Game {
         }
         // [速度: x..[U]] (x: 187 to 244)
         if (x >= 187 && x <= 244) {
-          const val = this.geminiManager.cycleMaxSpeed();
-          this.audio.playGeminiBounce();
-          this.addFloatingText(this.player.state.x, this.player.state.y - 30, `最高速度: x${val}`, '#fde047');
+          this.cycleMaxSpeedWithFeedback();
           return true;
         }
         // [半径: ..] (x: 245 to 296)

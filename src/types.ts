@@ -118,7 +118,7 @@ export interface GeminiOrb {
   damage: number;
   trail: Array<{ x: number; y: number; alpha: number }>;
   fuseTimer: number; // sparkling burst when leveled up
-  mode: 'SLING' | 'ORBIT';
+  mode: 'SLING' | 'ORBIT' | 'COMET';
   orbitRadius: number;
   orbitAngle: number;
   orbitAngularVel: number;

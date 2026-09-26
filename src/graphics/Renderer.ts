@@ -82,7 +82,7 @@ export class ArcadeRenderer {
       dist: number;
       speed: number;
       tangentSpeed: number;
-      mode?: 'SLING' | 'ORBIT';
+      mode?: 'SLING' | 'ORBIT' | 'COMET';
       collisionMode?: GeminiCollisionMode;
       isApex?: boolean;
       orbitRadius?: number;
@@ -292,7 +292,7 @@ export class ArcadeRenderer {
   }
 
   // --- Player Ship ---
-  private renderPlayer(player: PlayerState, mode?: 'SLING' | 'ORBIT', colMode?: GeminiCollisionMode, pointerPos?: { x: number; y: number }): void {
+  private renderPlayer(player: PlayerState, mode?: 'SLING' | 'ORBIT' | 'COMET', colMode?: GeminiCollisionMode, pointerPos?: { x: number; y: number }): void {
     if (!player.alive) return;
     const ctx = this.ctx;
 
@@ -441,13 +441,11 @@ export class ArcadeRenderer {
         // --- MODE ②: のびのある細いゴム紐分銅 (Hammerfight Flail & Stretchy Rubber Cord) ---
         // ユーザー指示: 「紐付きの方はひもをもっとほそいものにして、たしょうのびちじみのもうすこしするように
         // のびのあるゴムで繋いで回している感じに」
-        const tier = orb.orbitTier || (orb.orbitRadius < 65 ? 'SHORT' : orb.orbitRadius >= 125 ? 'LONG' : 'MEDIUM');
         const isGigaSpin = orb.spinLevel === 2;
         const isHighSpin = orb.spinLevel === 1;
 
         const cordDist = Math.hypot(orb.x - playerX, orb.y - playerY) || 1;
         const baseL0 = (orb.tetherLength || orb.orbitRadius || 68);
-        const stretchPct = Math.round((cordDist / baseL0) * 100);
 
         const cordColor = isGigaSpin ? '#ff3b00' : isHighSpin ? '#fbbf24' : '#38bdf8';
         const cordGlow = isGigaSpin ? 'rgba(255, 69, 0, 0.45)' : isHighSpin ? 'rgba(251, 191, 36, 0.38)' : 'rgba(56, 189, 248, 0.32)';
@@ -527,20 +525,6 @@ export class ArcadeRenderer {
         ctx.arc(playerX, playerY, 12, 0, Math.PI * 2);
         ctx.stroke();
 
-        // 4. ゴム紐のステータスバッジ
-        const midX = (playerX + orb.x) / 2;
-        const midY = (playerY + orb.y) / 2;
-        ctx.font = '7px "DotGothic16", monospace';
-        ctx.fillStyle = cordColor;
-        ctx.textAlign = 'center';
-        if (isGigaSpin) {
-          ctx.fillText(`🔥室伏GIGAスピン!! (${Math.round(cordDist)}px / ${stretchPct}%)`, midX, midY - 6);
-        } else if (isHighSpin) {
-          ctx.fillText(`⚡室伏遠心加速 (${Math.round(cordDist)}px / ${stretchPct}%)`, midX, midY - 6);
-        } else {
-          const tierLabel = tier === 'SHORT' ? '⚡近距離ゴム' : tier === 'LONG' ? '⚡長距離ゴム' : '⚡標準ゴム紐';
-          ctx.fillText(`${tierLabel} (${Math.round(cordDist)}px / ${stretchPct}%)`, midX, midY - 6);
-        }
 
       } else {
         // --- MODE ①: ヨーヨー突き攻撃 (自由ホーミング ＆ 火の玉チャージ) ---
@@ -667,11 +651,13 @@ export class ArcadeRenderer {
         ctx.font = '7px "DotGothic16", monospace';
         ctx.fillStyle = '#ffea00';
         ctx.textAlign = 'center';
-        ctx.fillText(orb.mode === 'ORBIT' ? '🔥室伏GIGAスピン!!' : '🔥猛突撃!!', orb.x, orb.y - effectiveR - 8);
+        ctx.fillText(orb.mode === 'COMET' ? '☄️ハレー彗星!!' : orb.mode === 'ORBIT' ? '🔥室伏GIGAスピン!!' : '🔥猛突撃!!', orb.x, orb.y - effectiveR - 8);
 
       } else {
         // 通常オーラ
-        const auraColor = orb.mode === 'ORBIT'
+        const auraColor = orb.mode === 'COMET'
+          ? 'rgba(192, 132, 252, 0.40)'
+          : orb.mode === 'ORBIT'
           ? (orb.orbitTier === 'LONG' ? 'rgba(239, 68, 68, 0.40)' : orb.orbitTier === 'SHORT' ? 'rgba(56, 189, 248, 0.35)' : 'rgba(253, 224, 71, 0.35)')
           : (orb.level === 3 ? 'rgba(236, 72, 153, 0.32)' : orb.level === 2 ? 'rgba(168, 85, 247, 0.28)' : 'rgba(56, 189, 248, 0.25)');
 
@@ -1162,7 +1148,7 @@ export class ArcadeRenderer {
       dist: number;
       speed: number;
       tangentSpeed: number;
-      mode?: 'SLING' | 'ORBIT';
+      mode?: 'SLING' | 'ORBIT' | 'COMET';
       collisionMode?: GeminiCollisionMode;
       isApex?: boolean;
       orbitRadius?: number;
@@ -1238,17 +1224,18 @@ export class ArcadeRenderer {
     // Row 2 Buttons: Attack Mode (ヨーヨー / 公転) & Attribute (貫通 / 反射)
     const curMode = telemetry?.mode || 'SLING';
     const isOrbit = curMode === 'ORBIT';
+    const isComet = curMode === 'COMET';
     const btnModeX = w - 176;
     const btnModeW = 84;
-    ctx.fillStyle = isOrbit ? 'rgba(56, 189, 248, 0.45)' : 'rgba(234, 179, 8, 0.35)';
+    ctx.fillStyle = isComet ? 'rgba(192, 132, 252, 0.45)' : isOrbit ? 'rgba(56, 189, 248, 0.45)' : 'rgba(234, 179, 8, 0.35)';
     ctx.fillRect(btnModeX, 23, btnModeW, 16);
-    ctx.strokeStyle = isOrbit ? '#38bdf8' : '#fde047';
+    ctx.strokeStyle = isComet ? '#c084fc' : isOrbit ? '#38bdf8' : '#fde047';
     ctx.lineWidth = 1.2;
     ctx.strokeRect(btnModeX, 23, btnModeW, 16);
-    ctx.fillStyle = isOrbit ? '#38bdf8' : '#fde047';
+    ctx.fillStyle = isComet ? '#c084fc' : isOrbit ? '#38bdf8' : '#fde047';
     ctx.font = '8px "DotGothic16", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(isOrbit ? '⚡室伏分銅[Z]' : '🚀ヨーヨー槍[Z]', btnModeX + btnModeW / 2, 34);
+    ctx.fillText(isComet ? '☄️ハレー彗星[Z]' : isOrbit ? '⚡室伏分銅[Z]' : '🚀ヨーヨー[Z]', btnModeX + btnModeW / 2, 34);
 
     const curCol = telemetry?.collisionMode || 'PENETRATE';
     const isPen = curCol === 'PENETRATE';
@@ -1362,7 +1349,7 @@ export class ArcadeRenderer {
       dist: number;
       speed: number;
       tangentSpeed: number;
-      mode?: 'SLING' | 'ORBIT';
+      mode?: 'SLING' | 'ORBIT' | 'COMET';
       collisionMode?: GeminiCollisionMode;
       isApex?: boolean;
       orbitRadius?: number;
@@ -1481,16 +1468,18 @@ export class ArcadeRenderer {
     // Row 2: Attack Mode, Gemini Attribute, Orb Count (y: 19 to 35)
     const curMode = telemetry?.mode || 'SLING';
     const isOrbit = curMode === 'ORBIT';
+    const isComet = curMode === 'COMET';
     const btnAtkW = 112;
-    ctx.fillStyle = isOrbit ? 'rgba(56, 189, 248, 0.50)' : 'rgba(234, 179, 8, 0.45)';
+    ctx.fillStyle = isComet ? 'rgba(192, 132, 252, 0.50)' : isOrbit ? 'rgba(56, 189, 248, 0.50)' : 'rgba(234, 179, 8, 0.45)';
     ctx.fillRect(8, 19, btnAtkW, 16);
-    ctx.strokeStyle = isOrbit ? '#38bdf8' : '#fde047';
+    ctx.strokeStyle = isComet ? '#c084fc' : isOrbit ? '#38bdf8' : '#fde047';
     ctx.lineWidth = 1.5;
     ctx.strokeRect(8, 19, btnAtkW, 16);
-    ctx.fillStyle = isOrbit ? '#38bdf8' : '#fde047';
+    ctx.fillStyle = isComet ? '#c084fc' : isOrbit ? '#38bdf8' : '#fde047';
     ctx.font = '8px "DotGothic16", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(isOrbit ? '⚡攻撃②:室伏分銅[Z]' : '🚀攻撃①:ヨーヨー槍[Z]', 8 + btnAtkW / 2, 30);
+    const modeLabel = isComet ? '☄️攻撃③:ハレー彗星[Z]' : isOrbit ? '⚡攻撃②:室伏分銅[Z]' : '🚀攻撃①:ヨーヨー槍[Z]';
+    ctx.fillText(modeLabel, 8 + btnAtkW / 2, 30);
 
     const curCol = telemetry?.collisionMode || 'PENETRATE';
     const isPen = curCol === 'PENETRATE';
@@ -1632,6 +1621,9 @@ export class ArcadeRenderer {
     if (curMode === 'ORBIT') {
       ctx.fillStyle = telemetry?.spinLevel === 2 ? '#ff3b00' : telemetry?.spinLevel === 1 ? '#fde047' : '#38bdf8';
       ctx.fillText(telemetry?.spinLevel === 2 ? '🔥GIGA SPIN' : telemetry?.spinLevel === 1 ? '⚡HIGH SPIN' : 'FLAIL', 156, btmY + 15);
+    } else if (curMode === 'COMET') {
+      ctx.fillStyle = '#c084fc';
+      ctx.fillText('☄️HALLEY COMET', 156, btmY + 15);
     } else if (telemetry?.isApex) {
       ctx.fillStyle = '#fde047';
       ctx.fillText('★APEX DWELL★', 160, btmY + 15);

@@ -115,10 +115,15 @@ export class GeminiOrbManager {
     return this.tuning.apexDwellMultiplier;
   }
 
-  public cycleMaxSpeed(): number {
-    const steps = [1.0, 1.4, 2.0, 0.7];
-    const curIdx = steps.findIndex(s => Math.abs(s - this.tuning.maxSpeedMultiplier) < 0.05);
-    const nextIdx = (curIdx + 1) % steps.length;
+  public cycleMaxSpeed(direction: number = 1): number {
+    const steps = [0.6, 0.8, 1.0, 1.3, 1.6, 2.0];
+    const curIdx = steps.findIndex(s => Math.abs(s - this.tuning.maxSpeedMultiplier) < 0.06);
+    let nextIdx: number;
+    if (curIdx === -1) {
+      nextIdx = 2; // 1.0
+    } else {
+      nextIdx = (curIdx + direction + steps.length) % steps.length;
+    }
     this.tuning.maxSpeedMultiplier = steps[nextIdx];
     return this.tuning.maxSpeedMultiplier;
   }
@@ -205,71 +210,26 @@ export class GeminiOrbManager {
     return PHYSICS_PRESETS[this.currentPresetId];
   }
 
-  public toggleOrbit(playerX: number, playerY: number): { isOrbit: boolean; tier?: 'SHORT' | 'MEDIUM' | 'LONG'; radius?: number } {
-    if (this.orbs.length === 0) return { isOrbit: false };
-    const firstOrb = this.orbs[0];
-    const willOrbit = firstOrb.mode !== 'ORBIT';
-
-    let lastTier: 'SHORT' | 'MEDIUM' | 'LONG' = 'MEDIUM';
-    let lastRadius = 75;
-
-    for (let i = 0; i < this.orbs.length; i++) {
-      const orb = this.orbs[i];
-      if (willOrbit) {
-        orb.mode = 'ORBIT';
-        const dx = orb.x - playerX;
-        const dy = orb.y - playerY;
-        const dist = Math.hypot(dx, dy) || 1;
-        // Lock tether to exact distance at this moment (Hammerfight style)
-        const r = Math.max(40, Math.min(180, dist));
-        orb.tetherLength = r;
-        orb.orbitRadius = r;
-        orb.orbitAngle = Math.atan2(dy, dx);
-
-        // Initial spin kick
-        const tx = -dy / dist;
-        const ty = dx / dist;
-        orb.vx += tx * 1.2;
-        orb.vy += ty * 1.2;
-
-        // Tier classification: SHORT (< 65), MEDIUM (65 - 125), LONG (>= 125)
-        if (r < 65) {
-          orb.orbitTier = 'SHORT';
-          orb.orbitAngularVel = 0.055;
-        } else if (r < 125) {
-          orb.orbitTier = 'MEDIUM';
-          orb.orbitAngularVel = 0.038;
-        } else {
-          orb.orbitTier = 'LONG';
-          orb.orbitAngularVel = 0.025;
-        }
-        lastTier = orb.orbitTier;
-        lastRadius = Math.round(r);
-        orb.isCharged = false;
-        orb.isHoveringApex = false;
-      } else {
-        orb.mode = 'SLING';
-        orb.orbitTier = undefined;
-        orb.castTargetX = playerX;
-        orb.castTargetY = playerY;
-        // エグゼリカ式アンカー投げ: その瞬間の接線速度ベクトルを保持してすっ飛ぶ！
-        const releaseSpeed = Math.hypot(orb.vx, orb.vy);
-        if (releaseSpeed > 1.3) {
-          orb.isCharged = true;
-          orb.chargeRatio = Math.min(1.0, releaseSpeed / 3.0);
-        } else {
-          orb.isCharged = false;
-        }
-      }
-    }
-    return { isOrbit: willOrbit, tier: willOrbit ? lastTier : undefined, radius: lastRadius };
+  public toggleOrbit(playerX: number, playerY: number): { mode: 'SLING' | 'ORBIT' | 'COMET'; isOrbit: boolean; tier?: 'SHORT' | 'MEDIUM' | 'LONG'; radius?: number } {
+    if (this.orbs.length === 0) return { mode: 'SLING', isOrbit: false };
+    const curMode = this.orbs[0].mode;
+    const nextMode: 'SLING' | 'ORBIT' | 'COMET' =
+      curMode === 'SLING' ? 'ORBIT' : curMode === 'ORBIT' ? 'COMET' : 'SLING';
+    this.setMode(nextMode, playerX, playerY);
+    const first = this.orbs[0];
+    return {
+      mode: nextMode,
+      isOrbit: nextMode === 'ORBIT',
+      tier: first.orbitTier,
+      radius: Math.round(first.orbitRadius),
+    };
   }
 
-  public setMode(mode: 'SLING' | 'ORBIT', playerX: number, playerY: number): void {
+  public setMode(mode: 'SLING' | 'ORBIT' | 'COMET', playerX: number, playerY: number): void {
     for (const orb of this.orbs) {
       if (orb.mode !== mode) {
+        orb.mode = mode;
         if (mode === 'ORBIT') {
-          orb.mode = 'ORBIT';
           const dx = orb.x - playerX;
           const dy = orb.y - playerY;
           const dist = Math.hypot(dx, dy) || 1;
@@ -293,15 +253,28 @@ export class GeminiOrbManager {
           }
           orb.isCharged = false;
           orb.isHoveringApex = false;
+        } else if (mode === 'COMET') {
+          // ③ ハレー彗星スイングバイ・ホーミング初期化
+          orb.orbitTier = undefined;
+          orb.isHoveringApex = false;
+          orb.apexDwellTimer = 0;
+          const dx = orb.x - playerX;
+          const dy = orb.y - playerY;
+          const dist = Math.hypot(dx, dy) || 1;
+          // 接線方向の初速を与えて美しい楕円軌道に突入
+          const tx = -dy / dist;
+          const ty = dx / dist;
+          orb.vx = tx * 1.8;
+          orb.vy = ty * 1.8;
+          orb.isCharged = true;
+          orb.chargeRatio = 0.6;
         } else {
-          orb.mode = 'SLING';
+          // ① ヨーヨー突撃初期化
           orb.orbitTier = undefined;
           orb.strokePhase = 'INWARD';
-          orb.launchStartX = orb.x;
-          orb.launchStartY = orb.y;
           orb.castTargetX = playerX;
           orb.castTargetY = playerY;
-          orb.strokeDist = Math.max(30, Math.hypot(orb.x - playerX, orb.y - playerY));
+          orb.strokeDist = Math.max(25, Math.hypot(orb.x - playerX, orb.y - playerY));
           orb.isCharged = false;
           orb.isHoveringApex = false;
         }
@@ -323,6 +296,15 @@ export class GeminiOrbManager {
       if (orb.orbitTier === 'SHORT') tierBase = baseDamage * 0.9;
       else if (orb.orbitTier === 'LONG') tierBase = baseDamage * 2.4;
       return Math.max(1, Math.round(tierBase * multiplier));
+    } else if (orb.mode === 'COMET') {
+      // ③ Halley's Comet (速度二乗比例の重力運動エネルギー破壊)
+      const speed = Math.hypot(orb.vx, orb.vy);
+      const kineticFactor = Math.pow(speed / 1.35, 1.8);
+      let multiplier = 1.2 + kineticFactor * 1.5;
+      if (orb.isCharged) {
+        multiplier += 2.2; // 彗星光冠チャージボーナス！
+      }
+      return Math.max(1, Math.round(baseDamage * multiplier));
     } else {
       // ① Mode: Yo-yo / Spear Thrust
       if (orb.isCharged) {
@@ -367,7 +349,7 @@ export class GeminiOrbManager {
     dist: number;
     speed: number;
     tangentSpeed: number;
-    mode: 'SLING' | 'ORBIT';
+    mode: 'SLING' | 'ORBIT' | 'COMET';
     collisionMode: GeminiCollisionMode;
     isApex: boolean;
     orbitRadius: number;
@@ -487,6 +469,8 @@ export class GeminiOrbManager {
         orb.fuseTimer--;
       }
 
+      const pSpeed = Math.hypot(playerVx, playerVy);
+
       if (orb.mode === 'ORBIT') {
         // --- MODE ②: 純粋弾性テザー（ヒモ／ゴム紐）分銅物理 ---
         // 棒ではない！ジェミニは独立した慣性を持つ重り。
@@ -515,34 +499,31 @@ export class GeminiOrbManager {
           // 自機とジェミニの相対速度（離れる速度成分）
           const relVx = orb.vx - playerVx;
           const relVy = orb.vy - playerVy;
-          const radialSpeed = relVx * fUx + relVy * fUy; // 正なら離れていく（紐がさらに伸びる）
+          const radialSpeed = relVx * fUx + relVy * fUy;
 
-          // 張力（自機へ引き戻す復元力）:
-          // 伸びに比例する弾性バネ力（少し伸びるゴム紐のしなやかさ）
-          const tensionK = 0.075 * this.tuning.tensionMultiplier;
+          // 物理的張力（Euler振動・カクカクしたチャタリングを起こさない滑らかな張力定数）
+          const tensionK = 0.035 * this.tuning.tensionMultiplier;
           const tensionForce = stretch * tensionK;
 
-          // 離れる速度に対するダンピング（ゴムの内部摩擦・ディレイ感）
-          const dampForce = Math.max(0, radialSpeed) * 0.20;
+          // 連続動径ダンピング（内外の振動跳ね返りを吸収し、滑らかな円運動にする）
+          const dampForce = radialSpeed * 0.16;
 
-          // 自機へ向かう向き（-fUx, -fUy）に張力を加える
-          const totalTension = tensionForce + dampForce;
+          // 1フレームあたりの過度な急加減速をクリップして滑らかさを担保
+          const totalTension = Math.max(-0.15, Math.min(1.2, tensionForce + dampForce));
           orb.vx -= fUx * totalTension;
           orb.vy -= fUy * totalTension;
         }
-        // ※ fDist <= chainLen のときは紐がたるんでいるので、紐からの力は完全にゼロ！
-        // 自機が近づいてもジェミニの慣性運動は邪魔されない！
 
         // 2. 微小重力（自然な垂れ下がり感）
-        orb.vy += 0.015;
+        orb.vy += 0.012;
 
         // 3. 自然な空気抵抗
-        orb.vx *= 0.998;
-        orb.vy *= 0.998;
+        orb.vx *= 0.997;
+        orb.vy *= 0.997;
 
-        // 4. 最高速度クランプ（絶対速度を安全域にクランプするのみ。自機速度ベースの強制歪曲はしない）
+        // 4. 最高速度クランプ（自然な重量感・視認できる速度感: 3.2px/frame基準）
         const absSpeed = Math.hypot(orb.vx, orb.vy);
-        const maxSpd = (cfg.maxSpeed * 3.0) * this.tuning.maxSpeedMultiplier;
+        const maxSpd = (cfg.maxSpeed * 1.35) * this.tuning.maxSpeedMultiplier;
         if (absSpeed > maxSpd) {
           orb.vx = (orb.vx / absSpeed) * maxSpd;
           orb.vy = (orb.vy / absSpeed) * maxSpd;
@@ -560,11 +541,11 @@ export class GeminiOrbManager {
         const relVx = orb.vx - playerVx;
         const relVy = orb.vy - playerVy;
         const tangSpeed = Math.abs(relVx * (-fUy) + relVy * fUx);
-        if (tangSpeed >= 4.2) {
+        if (tangSpeed >= 2.8) {
           orb.spinLevel = 2;
           orb.isCharged = true;
-          orb.chargeRatio = Math.min(1.0, (tangSpeed - 4.2) / 3.0);
-        } else if (tangSpeed >= 2.0) {
+          orb.chargeRatio = Math.min(1.0, (tangSpeed - 2.8) / 1.5);
+        } else if (tangSpeed >= 1.5) {
           orb.spinLevel = 1;
           orb.isCharged = false;
           orb.chargeRatio = 0.5;
@@ -582,6 +563,88 @@ export class GeminiOrbManager {
           if (orb.y < 24) { orb.y = 24; orb.vy = Math.abs(orb.vy) * 0.85; bounced = true; }
           if (orb.y > 516) { orb.y = 516; orb.vy = -Math.abs(orb.vy) * 0.85; bounced = true; }
           if (bounced && onWallHit) onWallHit(orb.x, orb.y);
+        }
+
+      } else if (orb.mode === 'COMET') {
+        // --- MODE ③: ハレー彗星スイングバイ・ホーミング (Halley's Comet Gravitational Swing-by) ---
+        // ユーザー指示:
+        // 「本来は、自機に向かってくるホーミングなのに自機から離れて
+        //  ほーみんぐぽいしょりでやってくれない？はれーすいせいみたいな　３つめのそうさついかでいい」
+        //
+        // 【物理モデル】:
+        // 自機を太陽（引力中心）とした天体スイングバイ力学。
+        // 常に自機に向かって重力加速度（ホーミング）が働き、自機に近づく（近日点）ほど猛スピードに加速！
+        // 自機を掠めて通過する瞬間に最速（スイングバイ）となり、慣性ですっ飛んで遠く（遠日点）へ離脱！
+        // 遠くへ離れると自機の引力で滑らかに減速し、フワッと頂点で折り返して再び自機へ突進！
+        // 自機を動かすことで彗星の軌道を自在に操り、敵群を貫き通す！
+
+        orb.isHoveringApex = false;
+        orb.apexDwellTimer = 0;
+
+        const cDx = playerX - orb.x;
+        const cDy = playerY - orb.y;
+        const cDist = Math.hypot(cDx, cDy) || 1;
+        const cUx = cDx / cDist;
+        const cUy = cDy / cDist;
+
+        // 1. 重力・ホーミング加速度（万有引力 + ホーミング操舵力）
+        // 近づくほど強く加速（近日点スイングバイ）、離れても安定して引き戻す
+        const gravBase = 0.045 * this.tuning.tensionMultiplier;
+        const gravSwing = (3.6 * this.tuning.tensionMultiplier) / (cDist + 45);
+        const gravAccel = gravBase + gravSwing;
+
+        orb.vx += cUx * gravAccel;
+        orb.vy += cUy * gravAccel;
+
+        // 2. 自機の移動ベクトルによる慣性連動（プレイヤーが動くと彗星の焦点がずれて美しい放物線を描く）
+        if (pSpeed > 0.3) {
+          orb.vx += playerVx * 0.035;
+          orb.vy += playerVy * 0.035;
+        }
+
+        // 3. 宇宙空間の微小空気抵抗（軌道エネルギーの長期安定）
+        orb.vx *= 0.9985;
+        orb.vy *= 0.9985;
+
+        // 4. 最高速度クランプ（近日点でのスイングバイ最高速: 3.6px/frame基準）
+        const curSpd = Math.hypot(orb.vx, orb.vy);
+        const maxSpd = (cfg.maxSpeed * 1.5) * this.tuning.maxSpeedMultiplier;
+        if (curSpd > maxSpd) {
+          orb.vx = (orb.vx / curSpd) * maxSpd;
+          orb.vy = (orb.vy / curSpd) * maxSpd;
+        }
+
+        // 5. 位置更新
+        orb.x += orb.vx;
+        orb.y += orb.vy;
+
+        // 6. テレメトリ情報
+        orb.orbitAngle = Math.atan2(orb.y - playerY, orb.x - playerX);
+        orb.orbitRadius = cDist;
+
+        // 7. 火の玉・彗星の光冠チャージ判定（高速スイングバイ時に燃え盛る！）
+        if (curSpd > 1.8) {
+          orb.isCharged = true;
+          orb.chargeRatio = Math.min(1.0, (curSpd - 1.8) / 1.4);
+        } else {
+          orb.isCharged = false;
+          orb.chargeRatio = 0;
+        }
+
+        // 画面端反射（設定時）
+        if (this.screenEdgeBounce) {
+          let bounced = false;
+          if (orb.x < 14) { orb.x = 14; orb.vx = Math.abs(orb.vx) * 0.92; bounced = true; }
+          if (orb.x > 346) { orb.x = 346; orb.vx = -Math.abs(orb.vx) * 0.92; bounced = true; }
+          if (orb.y < 24) { orb.y = 24; orb.vy = Math.abs(orb.vy) * 0.92; bounced = true; }
+          if (orb.y > 516) { orb.y = 516; orb.vy = -Math.abs(orb.vy) * 0.92; bounced = true; }
+          if (bounced && onWallHit) onWallHit(orb.x, orb.y);
+        } else {
+          // 画面外ドラッグ
+          if (orb.x < -120) { orb.x = -120; orb.vx *= 0.5; }
+          if (orb.x > 480) { orb.x = 480; orb.vx *= 0.5; }
+          if (orb.y < -120) { orb.y = -120; orb.vy *= 0.5; }
+          if (orb.y > 640) { orb.y = 640; orb.vy *= 0.5; }
         }
 
       } else {
@@ -605,7 +668,6 @@ export class GeminiOrbManager {
 
         const playerDist = Math.hypot(orb.x - playerX, orb.y - playerY);
         const curSpd = Math.hypot(orb.vx, orb.vy);
-        const pSpeed = Math.hypot(playerVx, playerVy);
 
         // 1. フェーズ初期化
         if (!orb.strokePhase || orb.strokePhase === 'OUTWARD' || orb.strokePhase === 'RETURN') {
@@ -697,12 +759,12 @@ export class GeminiOrbManager {
           orb.isHoveringApex = false;
 
           // 基本バネ定数（微小移動では微小な力しか出ない）
-          const baseK = cfg.springK * 2.2 * this.tuning.tensionMultiplier;
+          const baseK = cfg.springK * 1.35 * this.tuning.tensionMultiplier;
 
           if (s < 0) {
             // 【アンカー手前: 接近フェーズ】
-            // 離れた距離に応じた連続的な引力（非線形補正も距離に応じて滑らかに立ち上がる）
-            const progressive = 1.0 + Math.min(2.5, Math.pow(distToAnchor / 70, 1.5) * 0.8);
+            // 離れた距離に応じた連続的な引力（自然なビルドアップ加速）
+            const progressive = 1.0 + Math.min(1.4, (distToAnchor / 75) * 0.65);
             const springForce = distToAnchor * baseK * progressive;
 
             // アンカーに向かって自然に加速 (F = m * a)
@@ -758,18 +820,18 @@ export class GeminiOrbManager {
         orb.vx *= 0.997;
         orb.vy *= 0.997;
 
-        // 最高速度クランプ
+        // 最高速度クランプ（自然な重量感・制御しやすい速度: 3.2px/frame基準）
         const updatedSpeed = Math.hypot(orb.vx, orb.vy);
-        const maxSpd = (cfg.maxSpeed * 2.8 + (orb.level - 1) * 0.6) * this.tuning.maxSpeedMultiplier;
+        const maxSpd = (cfg.maxSpeed * 1.35 + (orb.level - 1) * 0.35) * this.tuning.maxSpeedMultiplier;
         if (updatedSpeed > maxSpd) {
           orb.vx = (orb.vx / updatedSpeed) * maxSpd;
           orb.vy = (orb.vy / updatedSpeed) * maxSpd;
         }
 
         // 火の玉チャージ判定（十分に離れて猛スピードで突進している時のみ点火）
-        if (playerDist > 65 && updatedSpeed > 1.8) {
+        if (playerDist > 55 && updatedSpeed > 1.6) {
           orb.isCharged = true;
-          orb.chargeRatio = Math.min(1.0, (playerDist - 50) / 80);
+          orb.chargeRatio = Math.min(1.0, (playerDist - 45) / 75);
         } else {
           orb.isCharged = false;
           orb.chargeRatio = 0;
