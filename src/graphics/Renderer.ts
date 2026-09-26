@@ -675,7 +675,7 @@ export class ArcadeRenderer {
           ? (orb.orbitTier === 'LONG' ? 'rgba(239, 68, 68, 0.40)' : orb.orbitTier === 'SHORT' ? 'rgba(56, 189, 248, 0.35)' : 'rgba(253, 224, 71, 0.35)')
           : (orb.level === 3 ? 'rgba(236, 72, 153, 0.32)' : orb.level === 2 ? 'rgba(168, 85, 247, 0.28)' : 'rgba(56, 189, 248, 0.25)');
 
-        const strokeColor = orb.isHoveringApex ? '#fde047' : orb.level === 3 ? '#f472b6' : orb.level === 2 ? '#c084fc' : '#38bdf8';
+        const strokeColor = orb.level === 3 ? '#f472b6' : orb.level === 2 ? '#c084fc' : '#38bdf8';
 
         ctx.fillStyle = auraColor;
         ctx.beginPath();
@@ -714,7 +714,7 @@ export class ArcadeRenderer {
       if (sprite) {
         ctx.save();
         ctx.translate(orb.x, orb.y);
-        const scale = isCharged ? 1.35 : isFast ? 1.25 : orb.isHoveringApex ? 1.15 : 1.0;
+        const scale = isCharged ? 1.35 : isFast ? 1.25 : 1.0;
         ctx.scale(scale, scale);
         ctx.drawImage(sprite, -sprite.width / 2, -sprite.height / 2);
         ctx.restore();
@@ -803,30 +803,57 @@ export class ArcadeRenderer {
         ctx.restore();
       }
 
-      // In TEST_STAGE: show clear collision property badges & HP gauges!
-      if (e.pattern === 'DUMMY') {
+      // HP表示（耐久値が2以上の敵、またはDUMMY敵）
+      if (e.maxHp > 1) {
         ctx.save();
-        ctx.font = '8px "DotGothic16", monospace';
-        ctx.textAlign = 'center';
-        const isPen = e.collisionType === 'PENETRATE';
-        const massStr = (e.mass || 2) >= 100 ? '重壁' : (e.mass || 2) >= 3 ? '中' : '軽';
-        const label = isPen ? `【貫通】HP:${Math.max(0, e.hp)}` : `【反射:${massStr}】HP:${Math.max(0, e.hp)}`;
-        ctx.fillStyle = isPen ? '#22c55e' : '#f97316';
-        ctx.fillText(label, e.x, e.y - e.height / 2 - 8);
+        if (e.pattern === 'DUMMY' && e.maxHp > 10) {
+          // 大型ダミー（HP 35や500など）はバー表示
+          ctx.font = '8px "DotGothic16", monospace';
+          ctx.textAlign = 'center';
+          const isPen = e.collisionType === 'PENETRATE';
+          const massStr = (e.mass || 2) >= 100 ? '重壁' : (e.mass || 2) >= 3 ? '中' : '軽';
+          const label = isPen ? `【貫通】HP:${Math.max(0, e.hp)}` : `【反射:${massStr}】HP:${Math.max(0, e.hp)}`;
+          ctx.fillStyle = isPen ? '#22c55e' : '#f97316';
+          ctx.fillText(label, e.x, e.y - e.height / 2 - 8);
 
-        // Dummy HP Bar (Width: 44, Height: 4)
-        const barW = 44;
-        const barH = 4;
-        const barX = e.x - barW / 2;
-        const barY = e.y - e.height / 2 - 6;
-        ctx.fillStyle = 'rgba(0,0,0,0.75)';
-        ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
-        const ratio = Math.max(0, Math.min(1, e.hp / (e.maxHp || 500)));
-        ctx.fillStyle = isPen ? '#22c55e' : '#f97316';
-        ctx.fillRect(barX, barY, barW * ratio, barH);
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 0.8;
-        ctx.strokeRect(barX - 1, barY - 1, barW + 2, barH + 2);
+          const barW = 44;
+          const barH = 4;
+          const barX = e.x - barW / 2;
+          const barY = e.y - e.height / 2 - 6;
+          ctx.fillStyle = 'rgba(0,0,0,0.75)';
+          ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
+          const ratio = Math.max(0, Math.min(1, e.hp / (e.maxHp || 500)));
+          ctx.fillStyle = isPen ? '#22c55e' : '#f97316';
+          ctx.fillRect(barX, barY, barW * ratio, barH);
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 0.8;
+          ctx.strokeRect(barX - 1, barY - 1, barW + 2, barH + 2);
+        } else {
+          // ザコ手応えチェック用: 2撃死・3撃死・4撃死のピップ表示（Hit Pip Markers）
+          const pipCount = e.maxHp;
+          const pipW = 8;
+          const pipH = 4;
+          const pipGap = 3;
+          const totalW = pipCount * pipW + (pipCount - 1) * pipGap;
+          const startX = e.x - totalW / 2;
+          const startY = e.y - e.height / 2 - 8;
+
+          for (let p = 0; p < pipCount; p++) {
+            const px = startX + p * (pipW + pipGap);
+            const isFilled = p < e.hp;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(px - 1, startY - 1, pipW + 2, pipH + 2);
+
+            ctx.fillStyle = isFilled
+              ? (pipCount === 2 ? '#38bdf8' : '#fbbf24')
+              : 'rgba(239, 68, 68, 0.4)';
+            ctx.fillRect(px, startY, pipW, pipH);
+
+            ctx.strokeStyle = isFilled ? '#ffffff' : 'rgba(255, 255, 255, 0.2)';
+            ctx.lineWidth = 0.6;
+            ctx.strokeRect(px - 1, startY - 1, pipW + 2, pipH + 2);
+          }
+        }
         ctx.restore();
       }
     }

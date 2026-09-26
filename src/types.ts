@@ -128,7 +128,7 @@ export interface GeminiOrb {
   isCharged?: boolean;
   chargeRatio?: number;
   orbitTier?: 'SHORT' | 'MEDIUM' | 'LONG';
-  strokePhase?: 'OUTWARD' | 'APEX' | 'RETURN';
+  strokePhase?: 'INWARD' | 'OVERSHOOT' | 'APEX' | 'REST' | 'OUTWARD' | 'RETURN';
   castTargetX?: number;
   castTargetY?: number;
   returnGoalX?: number;
@@ -136,6 +136,12 @@ export interface GeminiOrb {
   tetherLength?: number;
   strokeElapsed?: number;
   spinLevel?: number; // 0 = idle, 1 = active spin, 2 = MUROFUSHI GIGA SPIN
+  launchStartX?: number;
+  launchStartY?: number;
+  strokeDirX?: number;
+  strokeDirY?: number;
+  strokeDist?: number;
+  peakSpeed?: number;
 }
 
 export type EnemyType = 

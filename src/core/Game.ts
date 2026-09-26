@@ -931,7 +931,7 @@ export class Game {
               } else if (orb.isHoveringApex) {
                 this.addFloatingText(e.x, e.y - 14, `★APEX SHRED!! -${effectiveDmg}`, '#fde047');
               } else {
-                this.addFloatingText(e.x, e.y - 14, `貫通HIT! -${effectiveDmg}`, '#38bdf8');
+                this.addFloatingText(e.x, e.y - 14, `貫通HIT! -${effectiveDmg} (残HP:${e.hp})`, '#38bdf8');
               }
             }
           }
@@ -1393,16 +1393,17 @@ export class Game {
       case 'SWARM_PENETRATE': {
         const types: EnemyType[] = ['DEEPSEEK_FLASH', 'MISTRAL_FLAME', 'CLAUDE_HAIKU', 'GPT6_LUNA'];
         for (let r = 0; r < 4; r++) {
+          const rowHp = r === 0 ? 1 : r === 1 ? 2 : 3; // 前列1撃死 / 中列2撃死 / 後列3撃死
           for (let c = 0; c < 4; c++) {
             const ex = 55 + c * 70;
             const ey = 115 + r * 44;
             const type = types[(r + c) % types.length];
-            const e = this.enemyManager.spawn(type, ex, ey, 'DUMMY', undefined, 1);
+            const e = this.enemyManager.spawn(type, ex, ey, 'DUMMY', undefined, rowHp);
             e.collisionType = 'PENETRATE';
             e.mass = 1.0;
           }
         }
-        this.addFloatingText(w / 2, 140, '敵設定: ② 貫通一発死ザコ群 (一網打尽)', '#22c55e');
+        this.addFloatingText(w / 2, 140, '敵設定: ② 混成ザコ群 (前列1撃/中列2撃/後列3撃)', '#22c55e');
         break;
       }
 

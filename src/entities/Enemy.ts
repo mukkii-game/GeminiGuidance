@@ -112,11 +112,12 @@ export class EnemyManager {
     this.invaderTotal = cols * rows;
 
     for (let r = 0; r < rows; r++) {
-      const type: EnemyType = r === 0 ? 'QWEN_CUBE' : 'MISTRAL_FLAME';
+      const type: EnemyType = r === 0 ? 'QWEN_CUBE' : r === 1 ? 'KIMI_MOON' : 'MISTRAL_FLAME';
+      const rowHp = r === 0 ? 3 : r === 1 ? 2 : 1; // 上段3撃死 / 中段2撃死 / 前段1撃死
       for (let c = 0; c < cols; c++) {
         const x = startX + c * stepX;
         const y = startY + r * stepY;
-        this.spawn(type, x, y, 'INVADER', 'invaders_wave', r === 0 ? 2 : 1);
+        this.spawn(type, x, y, 'INVADER', 'invaders_wave', rowHp);
       }
     }
   }
