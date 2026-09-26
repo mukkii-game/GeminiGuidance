@@ -472,13 +472,22 @@ export class ArcadeRenderer {
           ctx.stroke();
         }
 
-        // 3. のびのある細いゴム紐（Thin Stretchy Elastic Cord）
+        // 3. のびのある細いゴム紐（たるんでいる時は下にしなやかに垂れ下がる）
+        const isSlack = cordDist < baseL0;
+        const sag = isSlack ? Math.min(22, (baseL0 - cordDist) * 0.5) : 0;
+        const ctrlX = (playerX + orb.x) / 2;
+        const ctrlY = (playerY + orb.y) / 2 + sag;
+
         // 外側のやわらかなグロー
         ctx.strokeStyle = cordGlow;
         ctx.lineWidth = 3.6;
         ctx.beginPath();
         ctx.moveTo(playerX, playerY);
-        ctx.lineTo(orb.x, orb.y);
+        if (sag > 1) {
+          ctx.quadraticCurveTo(ctrlX, ctrlY, orb.x, orb.y);
+        } else {
+          ctx.lineTo(orb.x, orb.y);
+        }
         ctx.stroke();
 
         // 細いゴム本体（線幅 1.4px）
@@ -486,7 +495,11 @@ export class ArcadeRenderer {
         ctx.lineWidth = 1.4;
         ctx.beginPath();
         ctx.moveTo(playerX, playerY);
-        ctx.lineTo(orb.x, orb.y);
+        if (sag > 1) {
+          ctx.quadraticCurveTo(ctrlX, ctrlY, orb.x, orb.y);
+        } else {
+          ctx.lineTo(orb.x, orb.y);
+        }
         ctx.stroke();
 
         // 芯の白ハイライト（線幅 0.7px）
@@ -494,7 +507,11 @@ export class ArcadeRenderer {
         ctx.lineWidth = 0.7;
         ctx.beginPath();
         ctx.moveTo(playerX, playerY);
-        ctx.lineTo(orb.x, orb.y);
+        if (sag > 1) {
+          ctx.quadraticCurveTo(ctrlX, ctrlY, orb.x, orb.y);
+        } else {
+          ctx.lineTo(orb.x, orb.y);
+        }
         ctx.stroke();
 
         // 自機側の結び目リング
