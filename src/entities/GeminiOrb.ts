@@ -469,76 +469,97 @@ export class GeminiOrbManager {
       }
 
       if (orb.mode === 'ORBIT') {
-        // --- MODE ②: エグゼリカ式アンカー回転 ＆ のびのある細いゴム紐分銅 ---
-        // 参照: http://crueltear.web.fc2.com/anchor.html 『トリガーハート エグゼリカ』アンカーシュート基礎
-        // 「アンカーに対して90度の角度でレバー入れるほうが、強い回転加速度を得られる」
-        // 「敵が反時計回りに回りだすので、それに合わせて常に敵より90度先をいく感じで変えていきます。そうすると、ぐるんぐるんです。」
-        // 「敵と反対方向にレバー入れると、引き寄せられてくっついちゃうだけで回転してくれません」
+        // --- MODE ②: 鎖鎌式フリーボディチェーン物理 ---
+        // 硬い棒ではない！ジェミニは自由に飛ぶ重り。
+        // 鎖の長さを超えて離れた時だけ、張力がかかって引き戻される。
+        // 鎖がたるんでいる時（距離 < 鎖の長さ）は一切力がかからない。
         orb.isHoveringApex = false;
         orb.apexDwellTimer = 0;
 
-        // 1. 極座標系の角度と単位ベクトル
-        const curAngle = orb.orbitAngle;
-        const cosA = Math.cos(curAngle);
-        const sinA = Math.sin(curAngle);
+        // 現在の相対位置
+        const fDx = orb.x - playerX;
+        const fDy = orb.y - playerY;
+        const fDist = Math.hypot(fDx, fDy) || 1;
+        const fUx = fDx / fDist; // 自機→ジェミニの単位ベクトル
+        const fUy = fDy / fDist;
 
-        // 反時計回りの接線単位ベクトル (90度 Tangent)
-        const tanX = -sinA;
-        const tanY = cosA;
+        // 鎖の最大長（テザー長）
+        const chainLen = (orb.tetherLength || 75) * (this.tuning.orbitRadius / 75);
 
-        // 2. 自機の移動によるトルク入力 (エグゼリカ90度入力則)
-        // 自機の移動ベクトルを接線方向（90度）へ射影
-        const playerTangential = playerVx * tanX + playerVy * tanY;
-        const torqueK = 0.0072 * this.tuning.tensionMultiplier;
-        orb.orbitAngularVel += playerTangential * torqueK;
+        // 1. 鎖の張力: 距離 > 鎖の長さ の時だけ張力発生（鎖がピンと張った！）
+        if (fDist > chainLen) {
+          const overstretch = fDist - chainLen;
+          // 張力: 伸びすぎた分に比例 + 離れる速度を殺す減衰
+          const relVx = orb.vx - playerVx;
+          const relVy = orb.vy - playerVy;
+          const radialVel = relVx * fUx + relVy * fUy; // 離れる速度（正=離れていく）
 
-        // 3. 慣性保存（フライホイール効果）と空気抵抗
-        orb.orbitAngularVel *= 0.993;
+          // バネ張力（鎖がしなやかに引っ張る）
+          const tensionK = 0.12 * this.tuning.tensionMultiplier;
+          const tension = overstretch * tensionK;
 
-        // 微小回転の自然維持（停止せずゆっくり公転）
-        if (Math.abs(orb.orbitAngularVel) < 0.035) {
-          const sgn = orb.orbitAngularVel >= 0 ? 1 : -1;
-          orb.orbitAngularVel += sgn * 0.001;
+          // 離れる方向の速度を減衰（鎖がピンと張って止まる感覚）
+          const radialDamp = Math.max(0, radialVel) * 0.35;
+
+          orb.vx -= fUx * (tension + radialDamp);
+          orb.vy -= fUy * (tension + radialDamp);
+
+          // ハードリミット: 鎖の1.5倍以上には絶対に離れない
+          const hardLimit = chainLen * 1.5;
+          if (fDist > hardLimit) {
+            orb.x = playerX + fUx * hardLimit;
+            orb.y = playerY + fUy * hardLimit;
+            // 離れる方向の速度成分だけ消す（接線方向は保持！鎖鎌の回転を殺さない）
+            if (radialVel > 0) {
+              orb.vx -= radialVel * fUx;
+              orb.vy -= radialVel * fUy;
+            }
+          }
+        }
+        // ※鎖がたるんでいる時（fDist <= chainLen）は何もしない！自由に飛ぶ！
+
+        // 2. 自機の移動による間接的な運動量伝達
+        // 鎖が張っている時のみ、自機の動きが接線方向トルクとして伝わる
+        if (fDist > chainLen * 0.7) {
+          const fTx = -fUy; // 接線単位ベクトル
+          const fTy = fUx;
+          const playerTangential = playerVx * fTx + playerVy * fTy;
+          // 接線方向の運動量を伝達（エグゼリカ90度入力則）
+          const transfer = playerTangential * 0.38 * this.tuning.tensionMultiplier;
+          orb.vx += fTx * transfer;
+          orb.vy += fTy * transfer;
+
+          // スナップ引き戻し（自機がジェミニから離れる方向に急に動いた時→鞭打ち加速）
+          const playerRadial = playerVx * fUx + playerVy * fUy;
+          if (playerRadial < -0.5) {
+            const whip = Math.abs(playerRadial) * 0.4;
+            orb.vx += fTx * whip * (playerTangential >= 0 ? 1 : -1);
+            orb.vy += fTy * whip * (playerTangential >= 0 ? 1 : -1);
+          }
         }
 
-        // 最大角速度クランプ
-        const maxOmega = 0.28 * this.tuning.maxSpeedMultiplier;
-        orb.orbitAngularVel = Math.max(-maxOmega, Math.min(maxOmega, orb.orbitAngularVel));
+        // 3. 重力（わずかな下向きの力で自然な垂れ下がり感）
+        orb.vy += 0.012;
 
-        // 4. 遠心力によるゴム紐のしなやかな伸縮（のびちじみ感）
-        // 自然長 L0: 通常 68px
-        const baseL0 = (orb.tetherLength || 68) * (this.tuning.orbitRadius / 75);
-        // 角速度 omega が高いほど、遠心力で外側へ伸びる！
-        const absOmega = Math.abs(orb.orbitAngularVel);
-        const centrifugalStretch = Math.pow(absOmega / 0.14, 1.8) * 58;
-        // 自機が急激に動いた時の慣性引っ張りによる伸び
-        const pSpeed = Math.hypot(playerVx, playerVy);
-        const pullStretch = Math.min(30, pSpeed * 2.5);
-        const targetRadius = Math.max(38, Math.min(155, baseL0 + centrifugalStretch + pullStretch));
+        // 4. 空気抵抗（鎖鎌らしい慣性感を残しつつ、いつかは減速）
+        orb.vx *= 0.997;
+        orb.vy *= 0.997;
 
-        // スプリング弾性で滑らかに目標半径へ追従
-        orb.orbitRadius += (targetRadius - orb.orbitRadius) * 0.18;
+        // 5. 位置更新
+        orb.x += orb.vx;
+        orb.y += orb.vy;
 
-        // 5. 新しい公転角度とジェミニ座標の確定
-        orb.orbitAngle += orb.orbitAngularVel;
-        const newX = playerX + Math.cos(orb.orbitAngle) * orb.orbitRadius;
-        const newY = playerY + Math.sin(orb.orbitAngle) * orb.orbitRadius;
+        // 6. テレメトリ用に極座標情報を更新
+        orb.orbitAngle = Math.atan2(orb.y - playerY, orb.x - playerX);
+        orb.orbitRadius = fDist;
 
-        // 速度ベクトルの計算（接線速度 + 自機移動）
-        const tangSpeed = orb.orbitAngularVel * orb.orbitRadius;
-        orb.vx = playerVx - Math.sin(orb.orbitAngle) * tangSpeed;
-        orb.vy = playerVy + Math.cos(orb.orbitAngle) * tangSpeed;
-
-        orb.x = newX;
-        orb.y = newY;
-
-        // 6. スピン状態分類
-        const flailSpeed = Math.abs(tangSpeed);
-        if (flailSpeed >= 12.0 || absOmega >= 0.13) {
+        // 7. スピン状態分類
+        const flailSpeed = Math.hypot(orb.vx - playerVx, orb.vy - playerVy);
+        if (flailSpeed >= 4.5) {
           orb.spinLevel = 2;
           orb.isCharged = true;
-          orb.chargeRatio = Math.min(1.0, (flailSpeed - 12.0) / 10.0);
-        } else if (flailSpeed >= 6.5 || absOmega >= 0.07) {
+          orb.chargeRatio = Math.min(1.0, (flailSpeed - 4.5) / 3.0);
+        } else if (flailSpeed >= 2.2) {
           orb.spinLevel = 1;
           orb.isCharged = false;
           orb.chargeRatio = 0.5;
@@ -548,13 +569,21 @@ export class GeminiOrbManager {
           orb.chargeRatio = 0;
         }
 
+        // 速度制限
+        const maxSpd = (cfg.maxSpeed * 2.5) * this.tuning.maxSpeedMultiplier;
+        if (flailSpeed > maxSpd) {
+          const scale = maxSpd / flailSpeed;
+          orb.vx = playerVx + (orb.vx - playerVx) * scale;
+          orb.vy = playerVy + (orb.vy - playerVy) * scale;
+        }
+
         // 画面端反射（設定時）
         if (this.screenEdgeBounce) {
           let bounced = false;
-          if (orb.x < 14) { orb.x = 14; orb.vx = Math.abs(orb.vx) * 0.95; bounced = true; }
-          if (orb.x > 346) { orb.x = 346; orb.vx = -Math.abs(orb.vx) * 0.95; bounced = true; }
-          if (orb.y < 24) { orb.y = 24; orb.vy = Math.abs(orb.vy) * 0.95; bounced = true; }
-          if (orb.y > 516) { orb.y = 516; orb.vy = -Math.abs(orb.vy) * 0.95; bounced = true; }
+          if (orb.x < 14) { orb.x = 14; orb.vx = Math.abs(orb.vx) * 0.85; bounced = true; }
+          if (orb.x > 346) { orb.x = 346; orb.vx = -Math.abs(orb.vx) * 0.85; bounced = true; }
+          if (orb.y < 24) { orb.y = 24; orb.vy = Math.abs(orb.vy) * 0.85; bounced = true; }
+          if (orb.y > 516) { orb.y = 516; orb.vy = -Math.abs(orb.vy) * 0.85; bounced = true; }
           if (bounced && onWallHit) onWallHit(orb.x, orb.y);
         }
 
@@ -575,11 +604,12 @@ export class GeminiOrbManager {
         const uy = dy / dist;
 
         // 1. バネ・引力によるプレイヤー方向への加速度:
-        // 10m離れた位置から自機へ向かって加速し、自機通過時に最高速に達する
-        const stretch = dist;
-        const springForce = (stretch * cfg.springK * 2.8) * this.tuning.tensionMultiplier;
-        const nonlinearForce = (stretch > 60 ? Math.pow((stretch - 60) / 90, 2) * 0.045 : 0) * this.tuning.tensionMultiplier;
-        const totalPull = Math.min(0.38, springForce + nonlinearForce);
+        // 振り子の原理: F = -k * x （フックの法則）
+        // 10m離れたところから来たら、自機を通過して反対側10mまで行く！
+        // エネルギー保存: 減衰がなければ振幅は保存される
+        const springForce = dist * cfg.springK * this.tuning.tensionMultiplier;
+        // 非線形力は廃止 — 遠距離ほど急激に引き戻す力は振り子に反する
+        const totalPull = Math.min(0.55, springForce);
 
         // プレイヤーへ向けて加速（既存の慣性ベクトルを保ちつつ、滑らかに軌道を曲げるホーミング）
         orb.vx += ux * totalPull;
@@ -588,19 +618,19 @@ export class GeminiOrbManager {
         // 2. 自機の移動によるポンピング・共鳴（プレイヤーが自機を振ったときの勢い伝達）:
         const pSpeed = Math.hypot(playerVx, playerVy);
         if (pSpeed > 0.45 && dist < 55) {
-          // 自機が勢いよく動いてジェミニが近くを通過する瞬間、ブランコを漕ぐように運動量を上乗せ！
           orb.vx += playerVx * 0.28;
           orb.vy += playerVy * 0.28;
         }
 
-        // 3. 自然な空気抵抗（減衰）:
-        // 振り子のように何度も自機を行き来しながら、プレイヤーが静止していれば徐々に減衰
-        orb.vx *= cfg.damping;
-        orb.vy *= cfg.damping;
+        // 3. 空気抵抗（極めて小さい減衰）:
+        // 振り子のエネルギー保存を尊重！ 0.9995^60 ≈ 0.97 → 1秒で3%しか減衰しない
+        // プレイヤーが静止していれば10往復くらいかけてゆっくり収束する
+        orb.vx *= 0.9995;
+        orb.vy *= 0.9995;
 
-        // 4. 最高速度クランプ:
+        // 4. 最高速度クランプ（大幅引き上げ — 振り子の自機通過時最高速を妨げない）:
         const curSpeed = Math.hypot(orb.vx, orb.vy);
-        const maxSpd = (cfg.maxSpeed + (orb.level - 1) * 0.4) * this.tuning.maxSpeedMultiplier;
+        const maxSpd = (cfg.maxSpeed * 2.5 + (orb.level - 1) * 0.6) * this.tuning.maxSpeedMultiplier;
         if (curSpeed > maxSpd) {
           orb.vx = (orb.vx / curSpeed) * maxSpd;
           orb.vy = (orb.vy / curSpeed) * maxSpd;
