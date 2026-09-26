@@ -240,6 +240,8 @@ export class GeminiOrbManager {
       } else {
         orb.mode = 'SLING';
         orb.orbitTier = undefined;
+        orb.castTargetX = playerX;
+        orb.castTargetY = playerY;
         // エグゼリカ式アンカー投げ: その瞬間の接線速度ベクトルを保持してすっ飛ぶ！
         const releaseSpeed = Math.hypot(orb.vx, orb.vy);
         if (releaseSpeed > 1.3) {
@@ -287,6 +289,8 @@ export class GeminiOrbManager {
           orb.strokePhase = 'RETURN';
           orb.returnGoalX = playerX;
           orb.returnGoalY = playerY;
+          orb.castTargetX = playerX;
+          orb.castTargetY = playerY;
           orb.isCharged = false;
         }
       }
@@ -597,29 +601,55 @@ export class GeminiOrbManager {
         //  ひもでひっぱられているわけではない体なので、そのままゴールを目指すよね これが基本
         //  ただ、ホーミング感を出すために、多少プレイヤーの動きに合わせて補正してもいい」
 
-        const dx = playerX - orb.x;
-        const dy = playerY - orb.y;
+        // 仮想アンカー（振り子の中心・支点）:
+        // 自機が急激に動いても、支点は慣性を持ってなめらかに追従する。
+        // これにより、自機がジェミニを迎えに行っても、通過中心が瞬間ワープせず、
+        // ジェミニは元のゴール（反対側10m先）まで綺麗に突き抜ける！
+        if (orb.castTargetX === undefined || orb.castTargetY === undefined) {
+          orb.castTargetX = playerX;
+          orb.castTargetY = playerY;
+        }
+        // 支点の自機への追従（毎フレーム緩やかに追従し、アナログなホーミング感を生む）
+        const anchorFollowRate = 0.08 * this.tuning.tensionMultiplier;
+        orb.castTargetX += (playerX - orb.castTargetX) * anchorFollowRate;
+        orb.castTargetY += (playerY - orb.castTargetY) * anchorFollowRate;
+
+        // 引力計算は仮想アンカー（支点）を基準にする
+        const dx = orb.castTargetX - orb.x;
+        const dy = orb.castTargetY - orb.y;
         const dist = Math.hypot(dx, dy) || 1;
-        const ux = dx / dist; // 自機へ向かう単位ベクトル
+        const ux = dx / dist; // 支点へ向かう単位ベクトル
         const uy = dy / dist;
 
-        // 1. バネ・引力によるプレイヤー方向への加速度:
+        // 1. バネ・引力による支点方向への加速度:
         // 振り子の原理: F = -k * x （フックの法則）
-        // 10m離れたところから来たら、自機を通過して反対側10mまで行く！
+        // 10m離れたところから来たら、支点を通過して反対側10mまで行く！
         // エネルギー保存: 減衰がなければ振幅は保存される
         const springForce = dist * cfg.springK * this.tuning.tensionMultiplier;
-        // 非線形力は廃止 — 遠距離ほど急激に引き戻す力は振り子に反する
         const totalPull = Math.min(0.55, springForce);
 
-        // プレイヤーへ向けて加速（既存の慣性ベクトルを保ちつつ、滑らかに軌道を曲げるホーミング）
+        // 支点へ向けて加速（既存の慣性ベクトルを保ちつつ、滑らかに軌道を曲げるホーミング）
         orb.vx += ux * totalPull;
         orb.vy += uy * totalPull;
 
         // 2. 自機の移動によるポンピング・共鳴（プレイヤーが自機を振ったときの勢い伝達）:
+        // 【重要バグ修正】: 自機をジェミニに向かって動かした時（対向衝突）にジェミニの速度を引いてブレーキをかけては絶対にダメ！
+        // 自機の移動ベクトルがジェミニの進行方向と同じ向き（追撃・引っ張り）の時のみ運動量を上乗せする。
         const pSpeed = Math.hypot(playerVx, playerVy);
-        if (pSpeed > 0.45 && dist < 55) {
-          orb.vx += playerVx * 0.28;
-          orb.vy += playerVy * 0.28;
+        const curSpeed = Math.hypot(orb.vx, orb.vy);
+        const playerDist = Math.hypot(playerX - orb.x, playerY - orb.y);
+        if (pSpeed > 0.45 && curSpeed > 0.1 && playerDist < 70) {
+          const gDirX = orb.vx / curSpeed;
+          const gDirY = orb.vy / curSpeed;
+          // 自機の移動をジェミニの進行方向に射影
+          const forwardP = playerVx * gDirX + playerVy * gDirY;
+          if (forwardP > 0) {
+            // 同方向（追撃）のときのみ運動量を上乗せ（最高2.0までクランプ）
+            const boost = Math.min(2.0, forwardP * 0.28);
+            orb.vx += gDirX * boost;
+            orb.vy += gDirY * boost;
+          }
+          // ※ forwardP <= 0 （自機がジェミニを迎えに行く）ときは何もしない！ジェミニの慣性速度は絶対に奪わない！
         }
 
         // 3. 空気抵抗（極めて小さい減衰）:
@@ -629,16 +659,16 @@ export class GeminiOrbManager {
         orb.vy *= 0.9995;
 
         // 4. 最高速度クランプ（大幅引き上げ — 振り子の自機通過時最高速を妨げない）:
-        const curSpeed = Math.hypot(orb.vx, orb.vy);
+        const updatedSpeed = Math.hypot(orb.vx, orb.vy);
         const maxSpd = (cfg.maxSpeed * 2.5 + (orb.level - 1) * 0.6) * this.tuning.maxSpeedMultiplier;
-        if (curSpeed > maxSpd) {
-          orb.vx = (orb.vx / curSpeed) * maxSpd;
-          orb.vy = (orb.vy / curSpeed) * maxSpd;
+        if (updatedSpeed > maxSpd) {
+          orb.vx = (orb.vx / updatedSpeed) * maxSpd;
+          orb.vy = (orb.vy / updatedSpeed) * maxSpd;
         }
 
         // 5. 頂点（折り返し地点・Apex）検出:
-        // 自機から離れた場所（dist > 50）で速度が落ちた瞬間を頂点と判定
-        if (dist > 50 && curSpeed < (cfg.apexThreshold * 1.4)) {
+        // 自機から離れた場所（playerDist > 50）で速度が落ちた瞬間を頂点と判定
+        if (playerDist > 50 && updatedSpeed < (cfg.apexThreshold * 1.4)) {
           orb.isHoveringApex = true;
           orb.apexDwellTimer++;
         } else {
@@ -647,9 +677,9 @@ export class GeminiOrbManager {
         }
 
         // 6. 火の玉チャージ判定（自機から離れて勢いよく突進している時）:
-        if (dist > 55 && curSpeed > 1.1) {
+        if (playerDist > 55 && updatedSpeed > 1.1) {
           orb.isCharged = true;
-          orb.chargeRatio = Math.min(1.0, (dist - 40) / 80);
+          orb.chargeRatio = Math.min(1.0, (playerDist - 40) / 80);
         } else {
           orb.isCharged = false;
           orb.chargeRatio = 0;
