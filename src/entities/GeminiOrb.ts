@@ -587,38 +587,59 @@ export class GeminiOrbManager {
         const cUx = cDx / cDist;
         const cUy = cDy / cDist;
 
-        // 1. 重力・ホーミング加速度（万有引力 + ホーミング操舵力）
-        // 近づくほど強く加速（近日点スイングバイ）、離れても安定して引き戻す
-        const gravBase = 0.045 * this.tuning.tensionMultiplier;
-        const gravSwing = (3.6 * this.tuning.tensionMultiplier) / (cDist + 45);
+        // 1. 角度的ホーミング旋回（Proportional Navigation Steering）
+        // ユーザー指示: 「ハレー彗星もうちょっとホーミング力強くして 自機に近づきやすい、角度的に」
+        // 速度ベクトルの向きを自機方向へ強力に旋回操舵。
+        // これにより横方向の惰性で大回りすることなく、鋭く自機に向かって突進・回頭する！
+        let curSpd = Math.hypot(orb.vx, orb.vy);
+        if (curSpd > 0.05) {
+          const curAngle = Math.atan2(orb.vy, orb.vx);
+          const targetAngle = Math.atan2(cDy, cDx);
+          let angleDiff = targetAngle - curAngle;
+          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+
+          // 旋回角速度: 距離が離れているときは確実に自機を捉え、通過時もキュッと鋭くUターン
+          const turnRate = (0.08 + 0.04 * Math.min(1.0, cDist / 120)) * this.tuning.tensionMultiplier;
+          const turnStep = Math.sign(angleDiff) * Math.min(Math.abs(angleDiff), turnRate);
+          const steeredAngle = curAngle + turnStep;
+
+          orb.vx = Math.cos(steeredAngle) * curSpd;
+          orb.vy = Math.sin(steeredAngle) * curSpd;
+        }
+
+        // 2. 重力・ホーミング加速度（万有引力 + ホーミング突進力）
+        // 引力加速度を底上げし、遠くでも自機へ力強く引き戻し、至近距離（近日点）でスイングバイ加速
+        const gravBase = 0.075 * this.tuning.tensionMultiplier;
+        const gravSwing = (5.2 * this.tuning.tensionMultiplier) / (cDist + 35);
         const gravAccel = gravBase + gravSwing;
 
         orb.vx += cUx * gravAccel;
         orb.vy += cUy * gravAccel;
 
-        // 2. 自機の移動ベクトルによる慣性連動（プレイヤーが動くと彗星の焦点がずれて美しい放物線を描く）
+        // 3. 自機の移動ベクトルによる慣性連動（プレイヤーが動くと彗星の焦点がずれて美しい放物線を描く）
         if (pSpeed > 0.3) {
-          orb.vx += playerVx * 0.035;
-          orb.vy += playerVy * 0.035;
+          orb.vx += playerVx * 0.045;
+          orb.vy += playerVy * 0.045;
         }
 
-        // 3. 宇宙空間の微小空気抵抗（軌道エネルギーの長期安定）
-        orb.vx *= 0.9985;
-        orb.vy *= 0.9985;
+        // 4. 宇宙空間の微小空気抵抗（軌道エネルギーの長期安定）
+        orb.vx *= 0.9982;
+        orb.vy *= 0.9982;
 
-        // 4. 最高速度クランプ（近日点でのスイングバイ最高速: 3.6px/frame基準）
-        const curSpd = Math.hypot(orb.vx, orb.vy);
+        // 5. 最高速度クランプ（近日点でのスイングバイ最高速: 3.6px/frame基準）
+        curSpd = Math.hypot(orb.vx, orb.vy);
         const maxSpd = (cfg.maxSpeed * 1.5) * this.tuning.maxSpeedMultiplier;
         if (curSpd > maxSpd) {
           orb.vx = (orb.vx / curSpd) * maxSpd;
           orb.vy = (orb.vy / curSpd) * maxSpd;
         }
 
-        // 5. 位置更新
+        // 6. 位置更新
         orb.x += orb.vx;
         orb.y += orb.vy;
 
-        // 6. テレメトリ情報
+        // 7. テレメトリ情報
         orb.orbitAngle = Math.atan2(orb.y - playerY, orb.x - playerX);
         orb.orbitRadius = cDist;
 
