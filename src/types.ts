@@ -18,7 +18,14 @@ export interface PhysicsPresetConfig {
 
 export type GeminiCollisionMode = 'PENETRATE' | 'REFLECT';
 
-export type TestEnemySetup = 'NONE' | 'SWARM_PENETRATE' | 'BOSS_PENETRATE' | 'MIDBOSS_REFLECT';
+export type TestEnemySetup = 
+  | 'NONE'
+  | 'SWARM_PENETRATE'
+  | 'SHIELD_SNIPER'
+  | 'BARRAGE_RUSH'
+  | 'WAVE_TACKLE'
+  | 'ORBIT_CORE'
+  | 'BOSS_PENETRATE';
 
 export interface PhysicsTuningState {
   tensionMultiplier: number;   // 0.5 (弱), 1.0 (標準), 1.8 (強), 3.0 (猛烈)
@@ -147,7 +154,12 @@ export type MovementPattern =
   | 'INVADER'
   | 'UFO_FLYBY'
   | 'TACKLE_DASH'
-  | 'DUMMY';
+  | 'DUMMY'
+  | 'BARRAGE_DRIFT'
+  | 'SNIPER_HOVER'
+  | 'SHIELD_FORWARD'
+  | 'RUSH_DIVE'
+  | 'ORBIT_BIT';
 
 export interface EnemyEntity {
   id: string;
@@ -172,6 +184,10 @@ export interface EnemyEntity {
   mass?: number; // 1 = light (full bounce), 3 = medium (half bounce), 999 = heavy/immovable (zero enemy knockback)
   knockbackVx?: number;
   knockbackVy?: number;
+  orbitCenterX?: number;
+  orbitCenterY?: number;
+  targetX?: number;
+  targetY?: number;
 }
 
 export type GroundType = 

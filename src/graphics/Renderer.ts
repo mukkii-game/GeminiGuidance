@@ -1370,12 +1370,15 @@ export class ArcadeRenderer {
       ctx.fillText(`[${t.num}]${t.label}`, tabX + tabW / 2, tabY + 10);
     }
 
-    // Row 4: 4 Enemy Setup Switcher (y: 53 to 69)
+    // Row 4: 7 Enemy Scenario Switcher (y: 53 to 69)
     const enemyTabs: Array<{ id: TestEnemySetup; label: string; x: number; w: number; color: string }> = [
-      { id: 'NONE', label: '①敵なし', x: 8, w: 78, color: '#38bdf8' },
-      { id: 'SWARM_PENETRATE', label: '②貫通ザコ群', x: 90, w: 84, color: '#22c55e' },
-      { id: 'BOSS_PENETRATE', label: '③貫通大ボス', x: 178, w: 84, color: '#22c55e' },
-      { id: 'MIDBOSS_REFLECT', label: '④反射中ボス', x: 266, w: 86, color: '#f97316' },
+      { id: 'NONE', label: '①空', x: 5, w: 32, color: '#94a3b8' },
+      { id: 'SWARM_PENETRATE', label: '②ザコ群', x: 40, w: 46, color: '#22c55e' },
+      { id: 'SHIELD_SNIPER', label: '③盾+狙撃', x: 89, w: 52, color: '#fde047' },
+      { id: 'BARRAGE_RUSH', label: '④弾幕+突進', x: 144, w: 58, color: '#38bdf8' },
+      { id: 'WAVE_TACKLE', label: '⑤5連特攻', x: 205, w: 48, color: '#f97316' },
+      { id: 'ORBIT_CORE', label: '⑥回転要塞', x: 256, w: 48, color: '#ec4899' },
+      { id: 'BOSS_PENETRATE', label: '⑦大ボス', x: 307, w: 48, color: '#ef4444' },
     ];
     for (const et of enemyTabs) {
       const isAct = testEnemySetup === et.id;

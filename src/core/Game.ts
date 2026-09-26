@@ -1304,6 +1304,72 @@ export class Game {
         break;
       }
 
+      case 'SHIELD_SNIPER': {
+        // Front-line reflective shields (mass 999) + Rear Snipers
+        const s1 = this.enemyManager.spawn('CLAUDE_OPUS', w * 0.30, 140, 'SHIELD_FORWARD', undefined, 14);
+        s1.collisionType = 'REFLECT';
+        s1.mass = 999;
+        const s2 = this.enemyManager.spawn('CLAUDE_OPUS', w * 0.70, 140, 'SHIELD_FORWARD', undefined, 14);
+        s2.collisionType = 'REFLECT';
+        s2.mass = 999;
+
+        const sn1 = this.enemyManager.spawn('CURSOR_PROBE', w * 0.28, 52, 'SNIPER_HOVER', undefined, 4);
+        sn1.collisionType = 'PENETRATE';
+        sn1.shootCooldown = 50;
+        const sn2 = this.enemyManager.spawn('DEEPSEEK_FLASH', w * 0.72, 52, 'SNIPER_HOVER', undefined, 4);
+        sn2.collisionType = 'PENETRATE';
+        sn2.shootCooldown = 110;
+
+        this.addFloatingText(w / 2, 140, '敵設定: ③ 盾+狙撃 (遠距離分銅で盾を迂回横殴り！)', '#fde047');
+        break;
+      }
+
+      case 'BARRAGE_RUSH': {
+        // Central barrage sprinkler + 2 flank rushers
+        const sp = this.enemyManager.spawn('MISTRAL_FLAME', w / 2, 100, 'BARRAGE_DRIFT', undefined, 10);
+        sp.collisionType = 'PENETRATE';
+        sp.shootCooldown = 30;
+
+        const r1 = this.enemyManager.spawn('COPILOT_GLIDER', 60, -20, 'RUSH_DIVE', undefined, 3);
+        r1.collisionType = 'PENETRATE';
+        const r2 = this.enemyManager.spawn('COPILOT_GLIDER', w - 60, -20, 'RUSH_DIVE', undefined, 3);
+        r2.collisionType = 'PENETRATE';
+
+        this.addFloatingText(w / 2, 140, '敵設定: ④ 弾幕+突進 (短距離バリアで弾消し＆火の玉迎撃！)', '#38bdf8');
+        break;
+      }
+
+      case 'WAVE_TACKLE': {
+        // 5-wave rhythmic dive bombers
+        for (let i = 0; i < 5; i++) {
+          const rx = 50 + i * 65;
+          const ry = -20 - i * 60;
+          const r = this.enemyManager.spawn('SPACEX_ROCKET', rx, ry, 'RUSH_DIVE', undefined, 4);
+          r.collisionType = 'PENETRATE';
+          r.mass = 1.5;
+        }
+        this.addFloatingText(w / 2, 140, '敵設定: ⑤ 5連特攻 (火の玉チャージ突きで連続迎撃！)', '#f97316');
+        break;
+      }
+
+      case 'ORBIT_CORE': {
+        // Central core + 4 orbiting shield satellites
+        const core = this.enemyManager.spawn('GPT6_TERRA', w / 2, 135, 'DUMMY', undefined, 35);
+        core.collisionType = 'PENETRATE';
+        core.mass = 4.0;
+
+        for (let i = 0; i < 4; i++) {
+          const bit = this.enemyManager.spawn('CURSOR_PROBE', w / 2, 135, 'ORBIT_BIT', undefined, 3);
+          bit.collisionType = 'REFLECT';
+          bit.mass = 2.0;
+          bit.angle = (i * Math.PI) / 2;
+          bit.orbitCenterX = w / 2;
+          bit.orbitCenterY = 135;
+        }
+        this.addFloatingText(w / 2, 140, '敵設定: ⑥ 回転要塞 (公転逆スピンでビット粉砕＆コア貫通！)', '#ec4899');
+        break;
+      }
+
       case 'BOSS_PENETRATE': {
         this.bossManager.spawn('STAGE2_GROK_CURSOR', w);
         if (this.bossManager.currentBoss) {
@@ -1312,19 +1378,7 @@ export class Game {
           this.bossManager.currentBoss.maxHp = 100000;
         }
         this.testBossCollisionMode = 'PENETRATE';
-        this.addFloatingText(w / 2, 140, '敵設定: ③ 貫通大ボス (滞空多段削り実験)', '#22c55e');
-        break;
-      }
-
-      case 'MIDBOSS_REFLECT': {
-        const mb1 = this.enemyManager.spawn('CLAUDE_OPUS', w * 0.33, 150, 'DUMMY', undefined, 5000);
-        mb1.collisionType = 'REFLECT';
-        mb1.mass = 4.0;
-        const mb2 = this.enemyManager.spawn('SPACEX_ROCKET', w * 0.67, 150, 'DUMMY', undefined, 5000);
-        mb2.collisionType = 'REFLECT';
-        mb2.mass = 5.0;
-        this.testBossCollisionMode = 'REFLECT';
-        this.addFloatingText(w / 2, 140, '敵設定: ④ 固く反作用のある中ボス (弾性衝突)', '#f97316');
+        this.addFloatingText(w / 2, 140, '敵設定: ⑦ 貫通大ボス (滞空多段削り実験)', '#22c55e');
         break;
       }
     }
@@ -1350,7 +1404,7 @@ export class Game {
       );
     }
     if (this.input.consumeEnemySetupCycle()) {
-      const setups: TestEnemySetup[] = ['NONE', 'SWARM_PENETRATE', 'BOSS_PENETRATE', 'MIDBOSS_REFLECT'];
+      const setups: TestEnemySetup[] = ['NONE', 'SWARM_PENETRATE', 'SHIELD_SNIPER', 'BARRAGE_RUSH', 'WAVE_TACKLE', 'ORBIT_CORE', 'BOSS_PENETRATE'];
       const curIdx = setups.indexOf(this.testEnemySetup);
       const next = setups[(curIdx + 1) % setups.length];
       this.applyTestEnemySetup(next);
@@ -1399,29 +1453,14 @@ export class Game {
       }
     );
 
-    // Auto-respawn for SWARM_PENETRATE
-    if (this.testEnemySetup === 'SWARM_PENETRATE') {
-      const activeEnemies = this.enemyManager.enemies.filter(e => e.pattern === 'DUMMY');
-      if (activeEnemies.length <= 2) {
+    // Auto-respawn for all active test scenarios when cleared
+    if (this.testEnemySetup !== 'NONE' && this.testEnemySetup !== 'BOSS_PENETRATE') {
+      const remainingEnemies = this.enemyManager.enemies;
+      if (remainingEnemies.length === 0) {
         this.testSwarmRespawnCooldown++;
-        if (this.testSwarmRespawnCooldown > 35) {
+        if (this.testSwarmRespawnCooldown > 50) {
           this.testSwarmRespawnCooldown = 0;
-          this.applyTestEnemySetup('SWARM_PENETRATE');
-        }
-      }
-    }
-
-    // Auto-respawn for MIDBOSS_REFLECT
-    if (this.testEnemySetup === 'MIDBOSS_REFLECT') {
-      for (let i = this.testDummyRespawnQueue.length - 1; i >= 0; i--) {
-        const item = this.testDummyRespawnQueue[i];
-        item.timer--;
-        if (item.timer <= 0) {
-          const spawned = this.enemyManager.spawn(item.type, item.x, item.y, item.pattern, undefined, 5000);
-          spawned.collisionType = item.collisionType;
-          spawned.mass = item.mass;
-          this.addExplosion(item.x, item.y, 18, false);
-          this.testDummyRespawnQueue.splice(i, 1);
+          this.applyTestEnemySetup(this.testEnemySetup);
         }
       }
     }
@@ -1432,7 +1471,7 @@ export class Game {
       this.canvas.height,
       this.player.state.x,
       this.player.state.y,
-      () => {}
+      (bx, by, bvx, bvy) => this.spawnBullet(bx, by, bvx, bvy)
     );
 
     // Update Boss (if active in BOSS_PENETRATE)
@@ -1551,31 +1590,23 @@ export class Game {
         }
       }
 
-      // 5. Row 4: 4 Enemy Setups (y: 53 to 70)
+      // 5. Row 4: 7 Enemy Scenario Setups (y: 53 to 70)
       if (y >= 53 && y <= 70) {
-        // [① 敵なし] (x: 6 to 88)
-        if (x >= 6 && x <= 88) {
-          this.applyTestEnemySetup('NONE');
-          this.audio.playGeminiBounce();
-          return true;
-        }
-        // [② 貫通ザコ群] (x: 89 to 176)
-        if (x >= 89 && x <= 176) {
-          this.applyTestEnemySetup('SWARM_PENETRATE');
-          this.audio.playGeminiBounce();
-          return true;
-        }
-        // [③ 貫通大ボス] (x: 177 to 264)
-        if (x >= 177 && x <= 264) {
-          this.applyTestEnemySetup('BOSS_PENETRATE');
-          this.audio.playGeminiBounce();
-          return true;
-        }
-        // [④ 反射中ボス] (x: 265 to 354)
-        if (x >= 265 && x <= 354) {
-          this.applyTestEnemySetup('MIDBOSS_REFLECT');
-          this.audio.playGeminiBounce();
-          return true;
+        const enemyTabs: Array<{ id: TestEnemySetup; x: number; w: number }> = [
+          { id: 'NONE', x: 5, w: 32 },
+          { id: 'SWARM_PENETRATE', x: 40, w: 46 },
+          { id: 'SHIELD_SNIPER', x: 89, w: 52 },
+          { id: 'BARRAGE_RUSH', x: 144, w: 58 },
+          { id: 'WAVE_TACKLE', x: 205, w: 48 },
+          { id: 'ORBIT_CORE', x: 256, w: 48 },
+          { id: 'BOSS_PENETRATE', x: 307, w: 48 },
+        ];
+        for (const tab of enemyTabs) {
+          if (x >= tab.x && x <= tab.x + tab.w) {
+            this.applyTestEnemySetup(tab.id);
+            this.audio.playGeminiBounce();
+            return true;
+          }
         }
       }
 

@@ -85,6 +85,10 @@ export class EnemyManager {
       mass,
       knockbackVx: 0,
       knockbackVy: 0,
+      orbitCenterX: x,
+      orbitCenterY: y,
+      targetX: x,
+      targetY: y,
     };
 
     this.enemies.push(enemy);
@@ -199,17 +203,43 @@ export class EnemyManager {
         }
       }
 
-      // Very rare, deliberate bullet firing from heavy non-invader units
-      const canShoot = e.type === 'GPT6_SOL' || e.type === 'GPT6_TERRA' || e.type === 'CLAUDE_OPUS' || e.type === 'GROK_RAIDER';
-      if (canShoot && onSpawnBullet) {
-        e.shootCooldown--;
-        if (e.shootCooldown <= 0 && e.y > 60 && e.y < canvasHeight - 160) {
-          e.shootCooldown = 400 + Math.floor(Math.random() * 240);
-          const bdx = playerX - e.x;
-          const bdy = playerY - e.y;
-          const bdist = Math.hypot(bdx, bdy) || 1;
-          const bspeed = 0.35;
-          onSpawnBullet(e.x, e.y, (bdx / bdist) * bspeed, (bdy / bdist) * bspeed);
+      // Specialized bullet firing
+      if (onSpawnBullet) {
+        if (e.pattern === 'BARRAGE_DRIFT') {
+          e.shootCooldown--;
+          if (e.shootCooldown <= 0 && e.y > 40 && e.y < canvasHeight - 120) {
+            e.shootCooldown = 150 + Math.floor(Math.random() * 50);
+            const baseAngle = Math.atan2(playerY - e.y, playerX - e.x);
+            // 3-way fan spread
+            for (const offset of [-0.35, 0, 0.35]) {
+              const ang = baseAngle + offset;
+              const spd = 0.36;
+              onSpawnBullet(e.x, e.y + 12, Math.cos(ang) * spd, Math.sin(ang) * spd);
+            }
+          }
+        } else if (e.pattern === 'SNIPER_HOVER') {
+          e.shootCooldown--;
+          if (e.shootCooldown <= 0 && e.y > 30) {
+            e.shootCooldown = 140 + Math.floor(Math.random() * 60);
+            const bdx = playerX - e.x;
+            const bdy = playerY - e.y;
+            const bdist = Math.hypot(bdx, bdy) || 1;
+            const spd = 0.52; // sniper aimed shot
+            onSpawnBullet(e.x, e.y + 16, (bdx / bdist) * spd, (bdy / bdist) * spd);
+          }
+        } else {
+          const canShoot = e.type === 'GPT6_SOL' || e.type === 'GPT6_TERRA' || e.type === 'CLAUDE_OPUS' || e.type === 'GROK_RAIDER';
+          if (canShoot) {
+            e.shootCooldown--;
+            if (e.shootCooldown <= 0 && e.y > 60 && e.y < canvasHeight - 160) {
+              e.shootCooldown = 400 + Math.floor(Math.random() * 240);
+              const bdx = playerX - e.x;
+              const bdy = playerY - e.y;
+              const bdist = Math.hypot(bdx, bdy) || 1;
+              const bspeed = 0.35;
+              onSpawnBullet(e.x, e.y, (bdx / bdist) * bspeed, (bdy / bdist) * bspeed);
+            }
+          }
         }
       }
 
@@ -309,6 +339,85 @@ export class EnemyManager {
 
       case 'TACKLE_DASH': {
         // Linear high-speed body tackle
+        break;
+      }
+
+      case 'BARRAGE_DRIFT': {
+        // Enters to targetY (default ~100) and hovers with sinusoidal drift
+        const targetY = e.targetY ?? 100;
+        if (e.y < targetY) {
+          e.vy = 0.35;
+          e.vx = 0;
+        } else {
+          e.vy = Math.sin(t * 0.04) * 0.12;
+          e.vx = Math.sin(t * 0.025) * 0.38;
+        }
+        break;
+      }
+
+      case 'SNIPER_HOVER': {
+        // Stays high at y ~ 52, slides horizontally
+        const targetY = e.targetY ?? 52;
+        if (e.y < targetY) {
+          e.vy = 0.28;
+          e.vx = 0;
+        } else {
+          e.vy = 0;
+          e.vx = Math.sin(t * 0.03) * 0.45;
+        }
+        break;
+      }
+
+      case 'SHIELD_FORWARD': {
+        // Heavy advancing bulwark
+        const targetY = e.targetY ?? 150;
+        if (e.y < targetY) {
+          e.vy = 0.22;
+        } else {
+          e.vy = Math.sin(t * 0.03) * 0.08;
+        }
+        e.vx = Math.sin(t * 0.02) * 0.18;
+        break;
+      }
+
+      case 'RUSH_DIVE': {
+        // Phase 1 (t < 40): Hover at spawn, lock onto player vector
+        // Phase 2 (t >= 40): Accelerate in straight line towards target
+        if (t < 40) {
+          e.vx = 0;
+          e.vy = 0.08;
+          e.targetX = playerX;
+          e.targetY = _playerY;
+        } else if (t === 40) {
+          const dx = (e.targetX ?? playerX) - e.x;
+          const dy = (e.targetY ?? _playerY) - e.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          const rushSpeed = 1.15;
+          e.vx = (dx / dist) * rushSpeed;
+          e.vy = (dy / dist) * rushSpeed;
+        }
+        // If dives offscreen, loops back from top
+        if (e.y > 540 + 40) {
+          e.y = -30;
+          e.x = Math.random() * (canvasWidth - 80) + 40;
+          e.age = 0;
+          e.vx = 0;
+          e.vy = 0;
+        }
+        break;
+      }
+
+      case 'ORBIT_BIT': {
+        // Orbits around (orbitCenterX, orbitCenterY) with radius 48px
+        const cx = e.orbitCenterX ?? (canvasWidth / 2);
+        const cy = e.orbitCenterY ?? 130;
+        const ang = (e.angle || 0) + 0.035;
+        e.angle = ang;
+        const r = 48;
+        e.x = cx + Math.cos(ang) * r;
+        e.y = cy + Math.sin(ang) * r;
+        e.vx = 0;
+        e.vy = 0;
         break;
       }
 
