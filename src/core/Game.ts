@@ -524,6 +524,18 @@ export class Game {
     // Keyboard support
     this.input.updateKeyboardMovement();
 
+    // Touch leash clamp: keeps target within 85px of ship so direction reversals are instantaneous
+    if (this.input.state.isTouch) {
+      const maxLeash = 85;
+      const ldx = this.input.state.x - this.player.state.x;
+      const ldy = this.input.state.y - this.player.state.y;
+      const ldist = Math.hypot(ldx, ldy);
+      if (ldist > maxLeash) {
+        this.input.state.x = this.player.state.x + (ldx / ldist) * maxLeash;
+        this.input.state.y = this.player.state.y + (ldy / ldist) * maxLeash;
+      }
+    }
+
     // Player Update
     this.player.update(this.input.state.x, this.input.state.y);
 
@@ -781,8 +793,12 @@ export class Game {
           }
 
           // Determine reflection vs penetration:
+          // In ORBIT mode: NEVER penetrates enemies (always reflects/rebounds upon hitting enemies)!
+          // In SLING mode: penetrates if collisionMode is PENETRATE (or enemy is PENETRATE)!
           let isReflect = false;
-          if (this.geminiManager.collisionMode === 'REFLECT') {
+          if (orb.mode === 'ORBIT') {
+            isReflect = true;
+          } else if (this.geminiManager.collisionMode === 'REFLECT') {
             isReflect = true;
           } else if (this.geminiManager.collisionMode === 'PENETRATE') {
             isReflect = false;
@@ -823,7 +839,9 @@ export class Game {
               this.audio.playGeminiBounce();
               this.addExplosion(e.x, e.y, orb.isCharged ? 20 : 14, false);
               this.player.addScore(50 * effectiveDmg);
-              if (orb.isCharged) {
+              if (orb.mode === 'ORBIT') {
+                this.addFloatingText(e.x, e.y - 14, `🛡️公転弾き! -${effectiveDmg}`, '#38bdf8');
+              } else if (orb.isCharged) {
                 this.addFloatingText(e.x, e.y - 14, `🔥大突撃BOUNCE! -${effectiveDmg}`, '#ff3b00');
               } else {
                 this.addFloatingText(e.x, e.y - 14, `BOUNCE! -${effectiveDmg}`, '#f97316');
@@ -911,9 +929,9 @@ export class Game {
           const bossHitRadius = Math.max(b.width, b.height) * 0.48 + orbRadius;
 
           if (bdist < bossHitRadius) {
-            const isBossReflect = (this.state === 'TEST_STAGE')
+            const isBossReflect = (orb.mode === 'ORBIT') || ((this.state === 'TEST_STAGE')
               ? (this.testBossCollisionMode === 'REFLECT' || this.geminiManager.collisionMode === 'REFLECT')
-              : (this.geminiManager.collisionMode === 'REFLECT');
+              : (this.geminiManager.collisionMode === 'REFLECT'));
 
             const res = this.bossManager.hit(effectiveDmg, orb.x, orb.y);
             if (res.bossHit) {
@@ -923,7 +941,11 @@ export class Game {
               if (isBossReflect) {
                 this.audio.playGeminiBounce();
                 this.addExplosion(orb.x, orb.y, 22, false);
-                this.addFloatingText(orb.x, orb.y - 16, `BOUNCE! -${effectiveDmg}`, '#f97316');
+                if (orb.mode === 'ORBIT') {
+                  this.addFloatingText(orb.x, orb.y - 16, `🛡️公転弾き! -${effectiveDmg}`, '#38bdf8');
+                } else {
+                  this.addFloatingText(orb.x, orb.y - 16, `BOUNCE! -${effectiveDmg}`, '#f97316');
+                }
 
                 // Elastic reflection off boss body in SLING mode!
                 if (orb.mode === 'SLING') {
@@ -1387,6 +1409,19 @@ export class Game {
   private updateTestStage(dtFactor: number = 1.0): void {
     this.terrain.update(dtFactor);
     this.input.updateKeyboardMovement();
+
+    // Touch leash clamp
+    if (this.input.state.isTouch) {
+      const maxLeash = 85;
+      const ldx = this.input.state.x - this.player.state.x;
+      const ldy = this.input.state.y - this.player.state.y;
+      const ldist = Math.hypot(ldx, ldy);
+      if (ldist > maxLeash) {
+        this.input.state.x = this.player.state.x + (ldx / ldist) * maxLeash;
+        this.input.state.y = this.player.state.y + (ldy / ldist) * maxLeash;
+      }
+    }
+
     this.player.update(this.input.state.x, this.input.state.y);
 
     // Continuous full repair in test stage

@@ -34,13 +34,25 @@ export class Player {
   public update(targetX: number, targetY: number): void {
     if (!this.state.alive) return;
 
-    // Smooth movement towards input target
     const prevX = this.state.x;
     const prevY = this.state.y;
 
-    const lerpFactor = 0.24;
-    this.state.x += (targetX - this.state.x) * lerpFactor;
-    this.state.y += (targetY - this.state.y) * lerpFactor;
+    // Movement towards input target with physical flight speed limit (prevents unnatural warping)
+    const dx = targetX - this.state.x;
+    const dy = targetY - this.state.y;
+    const dist = Math.hypot(dx, dy);
+
+    // Max flight speed: 5.6 px/frame (~336 px/sec) - agile, arcade-responsive, but strictly physical
+    const maxSpeed = 5.6;
+    if (dist > 0.001) {
+      const step = Math.min(dist * 0.22, maxSpeed);
+      this.state.x += (dx / dist) * step;
+      this.state.y += (dy / dist) * step;
+    }
+
+    // Keep ship strictly within canvas boundaries
+    this.state.x = Math.max(16, Math.min(360 - 16, this.state.x));
+    this.state.y = Math.max(40, Math.min(540 - 24, this.state.y));
 
     this.state.vx = this.state.x - prevX;
     this.state.vy = this.state.y - prevY;

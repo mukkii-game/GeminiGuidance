@@ -137,7 +137,7 @@ export class ArcadeRenderer {
 
     // 8. Draw Player Ship
     if (state === 'PLAYING' || state === 'STAGE_CLEAR' || state === 'TEST_STAGE') {
-      this.renderPlayer(player, telemetry?.mode, telemetry?.collisionMode);
+      this.renderPlayer(player, telemetry?.mode, telemetry?.collisionMode, pointerPos);
     }
 
     // 9. Draw Explosions & Particle Effects
@@ -292,9 +292,40 @@ export class ArcadeRenderer {
   }
 
   // --- Player Ship ---
-  private renderPlayer(player: PlayerState, mode?: 'SLING' | 'ORBIT', colMode?: GeminiCollisionMode): void {
+  private renderPlayer(player: PlayerState, mode?: 'SLING' | 'ORBIT', colMode?: GeminiCollisionMode, pointerPos?: { x: number; y: number }): void {
     if (!player.alive) return;
     const ctx = this.ctx;
+
+    // Flight Waypoint Target Marker (When player is flying towards mouse/touch waypoint)
+    if (pointerPos) {
+      const pdist = Math.hypot(pointerPos.x - player.x, pointerPos.y - player.y);
+      if (pdist > 16) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.40)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 3]);
+        ctx.beginPath();
+        ctx.moveTo(player.x, player.y);
+        ctx.lineTo(pointerPos.x, pointerPos.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Small target reticle
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(pointerPos.x, pointerPos.y, 5, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(pointerPos.x - 7, pointerPos.y); ctx.lineTo(pointerPos.x - 2, pointerPos.y);
+        ctx.moveTo(pointerPos.x + 2, pointerPos.y); ctx.lineTo(pointerPos.x + 7, pointerPos.y);
+        ctx.moveTo(pointerPos.x, pointerPos.y - 7); ctx.lineTo(pointerPos.x, pointerPos.y - 2);
+        ctx.moveTo(pointerPos.x, pointerPos.y + 2); ctx.lineTo(pointerPos.x, pointerPos.y + 7);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
 
     // Invulnerability Shield Barrier & Visual Feedback
     const isInvulnerable = player.invulnerableTimer > 0;
@@ -380,9 +411,14 @@ export class ArcadeRenderer {
       ctx.save();
       ctx.font = '7px "DotGothic16", monospace';
       ctx.textAlign = 'center';
-      ctx.fillStyle = mode === 'ORBIT' ? '#38bdf8' : '#fde047';
-      const colLabel = colMode === 'REFLECT' ? '[反射]' : '[貫通]';
-      ctx.fillText(`${mode === 'ORBIT' ? '⚡旋回' : '🚀ヨーヨー'}${colLabel}`, player.x, player.y - 18);
+      if (mode === 'ORBIT') {
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillText('⚡分銅[反射/弾消し]', player.x, player.y - 18);
+      } else {
+        ctx.fillStyle = '#fde047';
+        const colLabel = colMode === 'REFLECT' ? '[反射]' : '[貫通]';
+        ctx.fillText(`🚀ヨーヨー${colLabel}`, player.x, player.y - 18);
+      }
       ctx.restore();
     }
   }
