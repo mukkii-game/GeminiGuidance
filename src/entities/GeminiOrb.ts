@@ -610,166 +610,153 @@ export class GeminiOrbManager {
         // 1. フェーズ初期化
         if (!orb.strokePhase || orb.strokePhase === 'OUTWARD' || orb.strokePhase === 'RETURN') {
           orb.strokePhase = 'INWARD';
-          orb.launchStartX = orb.x;
-          orb.launchStartY = orb.y;
           orb.castTargetX = playerX;
           orb.castTargetY = playerY;
-          orb.strokeDist = Math.max(40, playerDist);
+          orb.strokeDist = playerDist;
           orb.apexDwellTimer = 0;
           orb.isHoveringApex = false;
         }
 
-        // 基準ストローク距離 D0 と 目標オーバーシュート距離（50% = +5m）
-        const D0 = Math.max(35, orb.strokeDist || playerDist);
-        const targetOvershoot = D0 * (this.tuning.overshootRatio || 0.5);
+        // 基準ストローク距離 D0
+        const D0 = Math.max(10, orb.strokeDist ?? playerDist);
+        const ratio = Math.max(0.25, this.tuning.overshootRatio || 0.5);
+
+        // アンカー（通過目標点）
+        const anchorX = orb.castTargetX ?? playerX;
+        const anchorY = orb.castTargetY ?? playerY;
+
+        // アンカーへの変位ベクトル
+        const dx = anchorX - orb.x;
+        const dy = anchorY - orb.y;
+        const distToAnchor = Math.hypot(dx, dy) || 1;
+        const ux = dx / distToAnchor;
+        const uy = dy / distToAnchor;
+
+        // ストローク進行方向ベクトル
+        if (orb.strokeDirX === undefined || orb.strokeDirY === undefined) {
+          orb.strokeDirX = ux;
+          orb.strokeDirY = uy;
+        }
+        const sDirX = orb.strokeDirX;
+        const sDirY = orb.strokeDirY;
+
+        // アンカーを基準とした進行方向の変位 s
+        // （s < 0: アンカー手前で接近中、s >= 0: アンカー通過後でオーバーラン中）
+        const s = (orb.x - anchorX) * sDirX + (orb.y - anchorY) * sDirY;
+        const forwardV = orb.vx * sDirX + orb.vy * sDirY;
 
         if (orb.strokePhase === 'APEX') {
           // --- APEX滞空フェーズ ---
-          // フワッとした最上部滞空（急反転・角度急変を排除し、放物線の頂点のように滑らかに静止）
+          // 放物線の頂点のようにフワッと微小な慣性で漂う
           orb.isHoveringApex = true;
           orb.vx *= 0.88;
           orb.vy *= 0.88;
           orb.apexDwellTimer = (orb.apexDwellTimer || 0) - 1;
 
           if (orb.apexDwellTimer <= 0) {
-            // 滞空完了: 次のストローク開始！
-            // 最新の自機位置を通過目標にセットし、INWARDフェーズへ
-            orb.strokePhase = 'INWARD';
+            // 滞空完了: 次のストロークを現在の自機位置に向けて開始
             orb.isHoveringApex = false;
-            orb.launchStartX = orb.x;
-            orb.launchStartY = orb.y;
             orb.castTargetX = playerX;
             orb.castTargetY = playerY;
-            orb.strokeDist = Math.max(30, playerDist);
+            orb.strokeDist = playerDist;
 
-            const dx = playerX - orb.x;
-            const dy = playerY - orb.y;
-            const d = Math.hypot(dx, dy) || 1;
-            orb.strokeDirX = dx / d;
-            orb.strokeDirY = dy / d;
+            if (playerDist < 18 && pSpeed < 0.2) {
+              orb.strokePhase = 'REST';
+            } else {
+              orb.strokePhase = 'INWARD';
+              const ndx = playerX - orb.x;
+              const ndy = playerY - orb.y;
+              const nd = Math.hypot(ndx, ndy) || 1;
+              orb.strokeDirX = ndx / nd;
+              orb.strokeDirY = ndy / nd;
+            }
           }
 
         } else if (orb.strokePhase === 'REST') {
           // --- REST静止フェーズ ---
-          // 自機近くで落ち着いた状態。無理な公転をせず、自機の周りで静止。
+          // 自機近くで落ち着いた状態。無理な公転をせず、自然にバネ減衰。
           orb.isHoveringApex = false;
-          orb.vx *= 0.90;
-          orb.vy *= 0.90;
+          orb.vx *= 0.92;
+          orb.vy *= 0.92;
 
-          // プレイヤーが一気に距離を取ったら（引っ張ったら）、強力発進！
-          if (playerDist > 35 || pSpeed > 0.45) {
+          // 自機から距離が離れたら（引っ張られたら）、自然に新ストロークへ
+          if (playerDist > 25 || pSpeed > 0.4) {
             orb.strokePhase = 'INWARD';
-            orb.launchStartX = orb.x;
-            orb.launchStartY = orb.y;
             orb.castTargetX = playerX;
             orb.castTargetY = playerY;
-            orb.strokeDist = Math.max(35, playerDist);
-            const dx = playerX - orb.x;
-            const dy = playerY - orb.y;
-            const d = Math.hypot(dx, dy) || 1;
-            orb.strokeDirX = dx / d;
-            orb.strokeDirY = dy / d;
-          }
-
-        } else if (orb.strokePhase === 'OVERSHOOT') {
-          // --- OVERSHOOT突き抜けフェーズ ---
-          // 自機通過後、さらに +50%（5m）慣性で突き抜ける！
-          // 紐はたるんでいるため、自機が動いたり交差しても減衰・停止は起きない！
-          orb.isHoveringApex = false;
-
-          const anchorX = orb.castTargetX ?? playerX;
-          const anchorY = orb.castTargetY ?? playerY;
-          const dirX = orb.strokeDirX ?? (curSpd > 0.01 ? orb.vx / curSpd : 0);
-          const dirY = orb.strokeDirY ?? (curSpd > 0.01 ? orb.vy / curSpd : -1);
-
-          // 通過点からの進行方向の距離 s
-          const s = (orb.x - anchorX) * dirX + (orb.y - anchorY) * dirY;
-
-          // 進行方向の前進速度
-          const forwardV = orb.vx * dirX + orb.vy * dirY;
-
-          // 目標オーバーシュート距離 targetOvershoot に向けて滑らかにブレーキ減速
-          const peakV = Math.max(2.0, orb.peakSpeed || curSpd);
-          const brakeAccel = (peakV * peakV) / (2 * Math.max(20, targetOvershoot));
-          orb.vx -= dirX * brakeAccel * 0.92;
-          orb.vy -= dirY * brakeAccel * 0.92;
-
-          // 直線整流（横方向のブレを減衰）
-          const perpVx = orb.vx - forwardV * dirX;
-          const perpVy = orb.vy - forwardV * dirY;
-          orb.vx = forwardV * dirX + perpVx * 0.85;
-          orb.vy = forwardV * dirY + perpVy * 0.85;
-
-          // 自機が元の距離 D0 以上改めて離れた場合のみ、紐がピンと張って引力がかかる
-          if (playerDist > D0 * 1.15) {
-            const tautF = Math.min(0.8, (playerDist - D0) * 0.02 * this.tuning.tensionMultiplier);
-            orb.vx += ((playerX - orb.x) / playerDist) * tautF;
-            orb.vy += ((playerY - orb.y) / playerDist) * tautF;
-          }
-
-          // 頂点到達判定（50%オーバーシュート地点に達したか、前進速度がゼロになった時）
-          if (s >= targetOvershoot || forwardV <= 0.20) {
-            orb.strokePhase = 'APEX';
-            orb.apexDwellTimer = Math.round(9 * this.tuning.apexDwellMultiplier);
-            orb.isHoveringApex = true;
+            orb.strokeDist = playerDist;
+            const ndx = playerX - orb.x;
+            const ndy = playerY - orb.y;
+            const nd = Math.hypot(ndx, ndy) || 1;
+            orb.strokeDirX = ndx / nd;
+            orb.strokeDirY = ndy / nd;
           }
 
         } else {
-          // --- INWARD接近フェーズ ---
-          // 離れた距離 D0 に応じた強烈なパチンコ初期加速！
+          // --- 純粋物理バネ力学 (Hooke's Law + 非対称バネ) ---
           orb.isHoveringApex = false;
 
-          const anchorX = orb.castTargetX ?? playerX;
-          const anchorY = orb.castTargetY ?? playerY;
-          const dx = anchorX - orb.x;
-          const dy = anchorY - orb.y;
-          const distToAnchor = Math.hypot(dx, dy) || 1;
-          const dirX = dx / distToAnchor;
-          const dirY = dy / distToAnchor;
-          orb.strokeDirX = dirX;
-          orb.strokeDirY = dirY;
+          // 基本バネ定数（微小移動では微小な力しか出ない）
+          const baseK = cfg.springK * 2.2 * this.tuning.tensionMultiplier;
 
-          // 距離に応じた推進力
-          const linearF = distToAnchor * cfg.springK * this.tuning.tensionMultiplier * 1.35;
-          const slingshotBonus = D0 > 45 ? Math.pow((D0 - 45) / 55, 1.6) * 0.055 * this.tuning.tensionMultiplier : 0;
-          const accel = Math.min(1.5, linearF + slingshotBonus);
+          if (s < 0) {
+            // 【アンカー手前: 接近フェーズ】
+            // 離れた距離に応じた連続的な引力（非線形補正も距離に応じて滑らかに立ち上がる）
+            const progressive = 1.0 + Math.min(2.5, Math.pow(distToAnchor / 70, 1.5) * 0.8);
+            const springForce = distToAnchor * baseK * progressive;
 
-          orb.vx += dirX * accel;
-          orb.vy += dirY * accel;
+            // アンカーに向かって自然に加速 (F = m * a)
+            orb.vx += ux * springForce;
+            orb.vy += uy * springForce;
 
-          // 直線整流
+            // アンカーを通過した瞬間、OVERSHOOTへ
+            if (s >= -2.0 || distToAnchor <= 8) {
+              orb.strokePhase = 'OVERSHOOT';
+            }
+
+          } else {
+            // 【アンカー通過後: 50%オーバーシュート・ブレーキフェーズ】
+            // 物理的な非対称バネ: k_out = k_in / (ratio^2)
+            // これにより、自然な調和振動子のまま 50% の距離で前進速度がゼロになる！
+            const kOut = baseK / (ratio * ratio);
+            const brakeForce = s * kOut;
+
+            // アンカー方向（手前）へ引っ張る復元力
+            orb.vx -= sDirX * brakeForce;
+            orb.vy -= sDirY * brakeForce;
+
+            // 頂点到達判定（前進速度がゼロ以下になった、またはオーバーシュート目標到達）
+            const maxOvershootDist = D0 * ratio;
+            if (forwardV <= 0.10 || s >= maxOvershootDist) {
+              orb.strokePhase = 'APEX';
+              orb.apexDwellTimer = Math.round(7 * this.tuning.apexDwellMultiplier);
+              orb.isHoveringApex = true;
+            }
+          }
+
+          // 紐のたるみ物理（Slack Rope）:
+          // 自機が元の距離 D0 以上に改めて離れた場合のみ、紐が張って自機への引力が加算
+          if (playerDist > D0 * 1.25) {
+            const tautF = (playerDist - D0) * baseK * 0.5;
+            const tdx = (playerX - orb.x) / playerDist;
+            const tdy = (playerY - orb.y) / playerDist;
+            orb.vx += tdx * tautF;
+            orb.vy += tdy * tautF;
+          }
+
+          // 直線整流: 横方向のブレ（公転成分）を滑らかに減衰し、綺麗な直線往復にする
           if (curSpd > 0.15) {
-            const alongV = orb.vx * dirX + orb.vy * dirY;
-            const perpVx = orb.vx - alongV * dirX;
-            const perpVy = orb.vy - alongV * dirY;
-            orb.vx = alongV * dirX + perpVx * 0.88;
-            orb.vy = alongV * dirY + perpVy * 0.88;
-          }
-
-          // 自機が同方向に引いた時の共鳴ポンピング加速
-          if (pSpeed > 0.4 && curSpd > 0.1) {
-            const forwardP = playerVx * dirX + playerVy * dirY;
-            if (forwardP > 0) {
-              const boost = Math.min(2.0, forwardP * 0.25);
-              orb.vx += dirX * boost;
-              orb.vy += dirY * boost;
-            }
-          }
-
-          // 通過点到達判定（アンカーを通過したか、12px以内に接近した時）
-          const forwardAlongDir = (orb.x - anchorX) * dirX + (orb.y - anchorY) * dirY;
-          if (forwardAlongDir >= -2.0 || distToAnchor <= 12) {
-            orb.strokePhase = 'OVERSHOOT';
-            orb.peakSpeed = Math.hypot(orb.vx, orb.vy);
-
-            // 自機が静止していて距離がごく小さい場合は自然にRESTへ移行
-            if (D0 < 22 && pSpeed < 0.2) {
-              orb.strokePhase = 'REST';
-              orb.vx *= 0.3;
-              orb.vy *= 0.3;
-            }
+            const alongV = orb.vx * sDirX + orb.vy * sDirY;
+            const perpVx = orb.vx - alongV * sDirX;
+            const perpVy = orb.vy - alongV * sDirY;
+            orb.vx = alongV * sDirX + perpVx * 0.88;
+            orb.vy = alongV * sDirY + perpVy * 0.88;
           }
         }
+
+        // 自然な空気抵抗
+        orb.vx *= 0.997;
+        orb.vy *= 0.997;
 
         // 最高速度クランプ
         const updatedSpeed = Math.hypot(orb.vx, orb.vy);
@@ -779,10 +766,10 @@ export class GeminiOrbManager {
           orb.vy = (orb.vy / updatedSpeed) * maxSpd;
         }
 
-        // 火の玉チャージ判定
-        if (playerDist > 55 && updatedSpeed > 1.2) {
+        // 火の玉チャージ判定（十分に離れて猛スピードで突進している時のみ点火）
+        if (playerDist > 65 && updatedSpeed > 1.8) {
           orb.isCharged = true;
-          orb.chargeRatio = Math.min(1.0, (playerDist - 40) / 80);
+          orb.chargeRatio = Math.min(1.0, (playerDist - 50) / 80);
         } else {
           orb.isCharged = false;
           orb.chargeRatio = 0;
