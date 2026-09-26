@@ -580,81 +580,117 @@ export class GeminiOrbManager {
         }
 
       } else {
-        // --- MODE ①: 振り子・バネ・ヨーヨー物理 (直線突き刺し＆滑らかな放物線滞空) ---
-        // 仮想アンカー（振り子の中心・支点）:
-        if (orb.castTargetX === undefined || orb.castTargetY === undefined) {
+        // --- MODE ①: ヨーヨー突き攻撃 (紐のたるみ物理 ＆ 慣性突き抜け保証) ---
+        // ユーザー指示:
+        // 「ヨーヨーなので、たとえば１０ｍのきょりで、さあいくぞとジェミニが進むと、
+        //  今の自機の位置より少しオーバーランする、これはできている。
+        //  ただ自機がヨーヨーと交差するようにしても、リアルタイムのヨーヨーの位置を見てそこに向かうベクトルを入れて減衰し、
+        //  動かなかったときに比べて距離が短くなる。
+        //  でも、ヨーヨーだと、ひもがゆるんでいるから、元の距離と同じかそれ以上の距離が改めて離れない限り、
+        //  自機の移動による減衰は起きないよね」
+        //
+        // 【物理モデル】:
+        // 1. 外側で「さあ行くぞ」と突進を開始した瞬間に、その時の自機位置・距離 D0（10m）と、
+        //    自機通過後+5mの「目標到達地点（空間固定ゴール）」を確定。
+        // 2. 突進中〜自機通過〜目標到達点までの間、紐はずっとたるんでいる（Slack状態）！
+        //    自機が交差しようが横に動こうが、自機のリアルタイム位置による引力ブレーキは一切かからない！
+        //    動かなかった時と全く同じ勢いで突き抜ける！
+        // 3. 自機から「元の距離 D0 以上」離れるか、目標到達点に達した瞬間に初めて紐がピンと張り、
+        //    そこで自然に減速して次のストロークへ折り返す！
+
+        const playerDist = Math.hypot(orb.x - playerX, orb.y - playerY);
+        const curSpd = Math.hypot(orb.vx, orb.vy);
+
+        // ストローク発進・折り返し判定
+        const isTurnaround = curSpd < (cfg.apexThreshold * 1.5) && playerDist > 30;
+
+        if (isTurnaround || !orb.castTargetX || !orb.returnGoalX) {
+          // 「さあ行くぞ」のストローク初期化！
+          const originDist = Math.max(40, playerDist);
+          orb.tetherLength = originDist; // 元の距離 D0（例: 140px = 10m）
+          const overshootRatio = this.tuning.overshootRatio || 0.5; // 突き抜け率（初期値50%=5m）
+          const overshootDist = originDist * overshootRatio;
+
+          // 発進時の自機方向への単位ベクトル
+          const pDirX = (playerX - orb.x) / originDist;
+          const pDirY = (playerY - orb.y) / originDist;
+
+          // 通過基準点（発進時の自機位置）
           orb.castTargetX = playerX;
           orb.castTargetY = playerY;
-        }
-        // 支点の自機への追従（毎フレーム緩やかに追従し、アナログなホーミング感を生む）
-        const anchorFollowRate = 0.08 * this.tuning.tensionMultiplier;
-        orb.castTargetX += (playerX - orb.castTargetX) * anchorFollowRate;
-        orb.castTargetY += (playerY - orb.castTargetY) * anchorFollowRate;
-
-        // 引力計算は仮想アンカー（支点）を基準にする
-        const dx = orb.castTargetX - orb.x;
-        const dy = orb.castTargetY - orb.y;
-        const dist = Math.hypot(dx, dy) || 1;
-        const ux = dx / dist; // 支点へ向かう単位ベクトル
-        const uy = dy / dist;
-
-        // 1. 【要望② ほっておいたら無理に回転を入れず直線往復に整流】:
-        // 速度ベクトルを動径方向（自機に向かう/離れる直線方向）と接線方向（周りを回る横成分）に分解し、
-        // 横成分を急速に減衰させて、勝手に周りを回る現象を完全に解消！
-        const radialVel = orb.vx * ux + orb.vy * uy;
-        const tangVx = orb.vx - radialVel * ux;
-        const tangVy = orb.vy - radialVel * uy;
-        // 横滑り速度を強力に減衰（0.85）して一直線ヨーヨーにする
-        orb.vx = radialVel * ux + tangVx * 0.85;
-        orb.vy = radialVel * uy + tangVy * 0.85;
-
-        // 2. 引力計算（接近フェーズ vs 離脱・突き抜けフェーズ）:
-        const isApproaching = radialVel >= -0.05;
-
-        // 基本バネ力
-        const linearForce = dist * cfg.springK * this.tuning.tensionMultiplier;
-        // 一気に距離を取った時の強力な引き絞り加速（パチンコ・スリングショット効果）
-        const slingshotBonus = dist > 50 ? Math.pow((dist - 50) / 70, 1.7) * 0.038 * this.tuning.tensionMultiplier : 0;
-        let pullMagnitude = linearForce + slingshotBonus;
-
-        // 離脱中（自機・仮想支点を通過した区間）は、overshootRatio（初期値0.5=50%）に合わせた復元力でブレーキ！
-        if (!isApproaching) {
-          const ratio = Math.max(0.2, this.tuning.overshootRatio || 0.5);
-          const brakeMultiplier = 1.0 / (ratio * ratio);
-          pullMagnitude *= brakeMultiplier;
-        }
-
-        let totalPull = Math.min(1.2, pullMagnitude);
-
-        // 3. 【要望① 最上部（Apex）のフワッとした滞空感（静止ではなく滑らかな放物線）】:
-        // 急停止ドラッグではなく、頂点付近での引力立ち上がりをなだらかにしてフワッと漂わせる
-        const curSpd = Math.hypot(orb.vx, orb.vy);
-        const isNearApex = dist > 40 && curSpd < (cfg.apexThreshold * 1.8);
-        if (isNearApex) {
-          orb.isHoveringApex = true;
-          orb.apexDwellTimer++;
-        } else if (curSpd > cfg.apexThreshold * 2.2 || dist < 35) {
+          // 目標突き抜け点（自機を挟んで反対側へ +5m 突き抜けた地点）
+          orb.returnGoalX = playerX + pDirX * overshootDist;
+          orb.returnGoalY = playerY + pDirY * overshootDist;
           orb.isHoveringApex = false;
           orb.apexDwellTimer = 0;
         }
 
-        // 滞空中のフワッとした放物線タメ効果（静止させずに引力をソフトに立ち上げる）
-        const maxDwellFrames = Math.round(22 * this.tuning.apexDwellMultiplier);
-        if (orb.isHoveringApex && orb.apexDwellTimer < maxDwellFrames) {
-          // 時間経過とともにゼロから滑らかに引力が立ち上がる（二次曲線イージング）
-          const t = orb.apexDwellTimer / maxDwellFrames;
-          const softEase = Math.pow(t, 2.0); // 0からゆっくり立ち上がる
-          totalPull *= (0.08 + 0.92 * softEase);
-          // ※ 急激な速度ゼロ殺しは廃止！速度は慣性のまま滑らかに折り返す
+        // 通過点（発進時の自機位置）へのベクトル
+        const passDx = (orb.castTargetX || playerX) - orb.x;
+        const passDy = (orb.castTargetY || playerY) - orb.y;
+        const distToPass = Math.hypot(passDx, passDy) || 1;
+        const passUx = passDx / distToPass;
+        const passUy = passDy / distToPass;
+
+        // 通過点を通過したか？（進行方向と通過点ベクトルの内積が負 = 自機通過後）
+        const dotPass = orb.vx * passUx + orb.vy * passUy;
+        const passedCenter = dotPass < 0 && distToPass > 12;
+
+        // 1. 引力計算（紐がたるんでいる間の慣性推進 vs ゴール到達・紐張り時のブレーキ）
+        let pullAx = 0;
+        let pullAy = 0;
+
+        const D0 = orb.tetherLength || 100;
+        // 自機から「元の距離と同じかそれ以上」離れた場合のみ紐が張る
+        const isTautByPlayer = playerDist > D0 * 1.05;
+
+        if (!passedCenter) {
+          // 【通過前: 加速フェーズ】
+          // 通過点に向かって、距離に応じた力強いパチンコ加速！
+          const linearF = distToPass * cfg.springK * this.tuning.tensionMultiplier;
+          const slingshotF = distToPass > 50 ? Math.pow((distToPass - 50) / 70, 1.7) * 0.04 * this.tuning.tensionMultiplier : 0;
+          const pullF = Math.min(1.2, linearF + slingshotF);
+          pullAx = passUx * pullF;
+          pullAy = passUy * pullF;
+        } else {
+          // 【通過後: 突き抜けオーバーランフェーズ】
+          // 紐はたるんでいる！自機の動きによる減衰は起きない！
+          // 通過点から離れるほど復元力（ブレーキ）が滑らかにかかり、目標地点（+5m）で止まる
+          const ratio = Math.max(0.2, this.tuning.overshootRatio || 0.5);
+          const brakeK = (cfg.springK * this.tuning.tensionMultiplier) / (ratio * ratio);
+          const brakeF = Math.min(1.4, distToPass * brakeK);
+          pullAx = passUx * brakeF; // 通過点へ引き戻す（進行方向逆向き）
+          pullAy = passUy * brakeF;
         }
 
-        // 支点へ向けて加速
-        orb.vx += ux * totalPull;
-        orb.vy += uy * totalPull;
+        // 自機が極端に離れた場合（「元の距離と同じかそれ以上の距離が改めて離れた時」）のみ紐が張る
+        if (isTautByPlayer) {
+          const tautDx = playerX - orb.x;
+          const tautDy = playerY - orb.y;
+          const tautDist = Math.hypot(tautDx, tautDy) || 1;
+          const tautF = Math.min(0.8, (playerDist - D0) * 0.018 * this.tuning.tensionMultiplier);
+          pullAx += (tautDx / tautDist) * tautF;
+          pullAy += (tautDy / tautDist) * tautF;
+        }
+
+        // 2. 加速度の適用
+        orb.vx += pullAx;
+        orb.vy += pullAy;
+
+        // 3. 直線ヨーヨー整流（横滑り・公転成分の減衰）:
+        if (curSpd > 0.15) {
+          const targetDirX = passedCenter ? -passUx : passUx;
+          const targetDirY = passedCenter ? -passUy : passUy;
+          const alongV = orb.vx * targetDirX + orb.vy * targetDirY;
+          const perpVx = orb.vx - alongV * targetDirX;
+          const perpVy = orb.vy - alongV * targetDirY;
+          // 横方向のブレを減衰してまっすぐ突き抜ける
+          orb.vx = alongV * targetDirX + perpVx * 0.88;
+          orb.vy = alongV * targetDirY + perpVy * 0.88;
+        }
 
         // 4. 自機の移動によるポンピング・共鳴:
         const pSpeed = Math.hypot(playerVx, playerVy);
-        const playerDist = Math.hypot(playerX - orb.x, playerY - orb.y);
         if (pSpeed > 0.45 && curSpd > 0.1 && playerDist < 70) {
           const gDirX = orb.vx / curSpd;
           const gDirY = orb.vy / curSpd;
@@ -667,7 +703,7 @@ export class GeminiOrbManager {
         }
 
         // 5. 空気抵抗（プレイヤーが静止しているときは自然にバネ減衰して中央で静止）:
-        const restingDamping = pSpeed < 0.2 && dist < 45 ? 0.985 : 0.9995;
+        const restingDamping = pSpeed < 0.2 && playerDist < 45 ? 0.985 : 0.9995;
         orb.vx *= restingDamping;
         orb.vy *= restingDamping;
 

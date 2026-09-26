@@ -863,12 +863,8 @@ export class Game {
           }
 
           // Determine reflection vs penetration:
-          // In ORBIT mode: NEVER penetrates enemies (always reflects/rebounds upon hitting enemies)!
-          // In SLING mode: penetrates if collisionMode is PENETRATE (or enemy is PENETRATE)!
           let isReflect = false;
-          if (orb.mode === 'ORBIT') {
-            isReflect = true;
-          } else if (this.geminiManager.collisionMode === 'REFLECT') {
+          if (this.geminiManager.collisionMode === 'REFLECT') {
             isReflect = true;
           } else if (this.geminiManager.collisionMode === 'PENETRATE') {
             isReflect = false;
@@ -1006,9 +1002,9 @@ export class Game {
           const bossHitRadius = Math.max(b.width, b.height) * 0.48 + orbRadius;
 
           if (bdist < bossHitRadius) {
-            const isBossReflect = (orb.mode === 'ORBIT') || ((this.state === 'TEST_STAGE')
+            const isBossReflect = (this.state === 'TEST_STAGE')
               ? (this.testBossCollisionMode === 'REFLECT' || this.geminiManager.collisionMode === 'REFLECT')
-              : (this.geminiManager.collisionMode === 'REFLECT'));
+              : (this.geminiManager.collisionMode === 'REFLECT');
 
             const res = this.bossManager.hit(effectiveDmg, orb.x, orb.y);
             if (res.bossHit) {

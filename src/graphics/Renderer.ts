@@ -433,7 +433,7 @@ export class ArcadeRenderer {
       const isCharged = !!orb.isCharged;
       const effectiveR = orb.mode === 'ORBIT'
         ? (orb.orbitTier === 'SHORT' ? orb.radius * 0.75 : orb.orbitTier === 'LONG' ? orb.radius * 1.65 : orb.radius)
-        : (isCharged ? orb.radius * 1.4 : orb.isHoveringApex ? orb.radius * 1.25 : orb.radius);
+        : (isCharged ? orb.radius * 1.4 : orb.radius);
 
       // 0. Energy Tether (Mode ② 光のロープ vs Mode ① 自由ホーミング)
       ctx.save();
@@ -557,7 +557,7 @@ export class ArcadeRenderer {
       // =========================================================================
       ctx.save();
       const headingAngle = Math.atan2(orb.vy, orb.vx);
-      const isMoving = speed > 0.25;
+      const isMoving = speed > 0.55; // 低速・頂点付近での急激な角度反転を防ぐ
 
       if (orb.mode !== 'ORBIT' && isMoving) {
         // --- MODE ① 人魂（ひとだま）＆ 進行方向ビジュアル ---
@@ -688,16 +688,7 @@ export class ArcadeRenderer {
         ctx.arc(orb.x, orb.y, effectiveR + 2, 0, Math.PI * 2);
         ctx.stroke();
 
-        if (orb.isHoveringApex) {
-          ctx.strokeStyle = '#fde047';
-          ctx.lineWidth = 2.0;
-          ctx.beginPath();
-          ctx.moveTo(orb.x - effectiveR - 6, orb.y);
-          ctx.lineTo(orb.x + effectiveR + 6, orb.y);
-          ctx.moveTo(orb.x, orb.y - effectiveR - 6);
-          ctx.lineTo(orb.x, orb.y + effectiveR + 6);
-          ctx.stroke();
-        } else if (orb.mode === 'ORBIT' && orb.spinLevel === 1) {
+        if (orb.mode === 'ORBIT' && orb.spinLevel === 1) {
           ctx.font = '7px "DotGothic16", monospace';
           ctx.fillStyle = '#38bdf8';
           ctx.textAlign = 'center';
