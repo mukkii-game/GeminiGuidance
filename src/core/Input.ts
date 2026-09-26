@@ -9,6 +9,8 @@ export class InputManager {
     isPointerDown: false,
     crtTogglePressed: false,
     audioTogglePressed: false,
+    bgmTogglePressed: false,
+    seTogglePressed: false,
   };
 
   private canvas: HTMLCanvasElement;
@@ -113,6 +115,12 @@ export class InputManager {
       if (e.code === 'KeyM') {
         this.state.audioTogglePressed = true;
       }
+      if (e.code === 'KeyB') {
+        this.state.bgmTogglePressed = true;
+      }
+      if (e.code === 'KeyN' || e.code === 'KeyV') {
+        this.state.seTogglePressed = true;
+      }
       if (e.code === 'KeyT') {
         this.state.testStageTogglePressed = true;
       }
@@ -134,7 +142,7 @@ export class InputManager {
       if (e.code === 'KeyX') {
         this.state.collisionTogglePressed = true;
       }
-      if (e.code === 'KeyW' || e.code === 'KeyB') {
+      if (e.code === 'KeyQ' || e.code === 'KeyG') {
         this.state.wallTogglePressed = true;
       }
       if (e.code === 'KeyE') {
@@ -205,6 +213,18 @@ export class InputManager {
   public consumeAudioToggle(): boolean {
     const val = !!this.state.audioTogglePressed;
     this.state.audioTogglePressed = false;
+    return val;
+  }
+
+  public consumeBgmToggle(): boolean {
+    const val = !!this.state.bgmTogglePressed;
+    this.state.bgmTogglePressed = false;
+    return val;
+  }
+
+  public consumeSeToggle(): boolean {
+    const val = !!this.state.seTogglePressed;
+    this.state.seTogglePressed = false;
     return val;
   }
 

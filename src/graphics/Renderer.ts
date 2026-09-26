@@ -16,6 +16,7 @@ import {
   GeminiCollisionMode,
   TestEnemySetup,
   PhysicsTuningState,
+  AudioSettings,
 } from '../types';
 import { SpriteSheet } from './Sprites';
 import { TerrainEngine } from './Terrain';
@@ -93,7 +94,8 @@ export class ArcadeRenderer {
     testBossDamage: number = 0,
     testEnemySetup: TestEnemySetup = 'SWARM_PENETRATE',
     testBossCollisionMode: 'PENETRATE' | 'REFLECT' = 'PENETRATE',
-    pointerPos?: { x: number; y: number }
+    pointerPos?: { x: number; y: number },
+    audioSettings?: AudioSettings
   ): void {
     const ctx = this.ctx;
 
@@ -160,13 +162,13 @@ export class ArcadeRenderer {
 
     // 13. Arcade HUD
     if (state === 'TEST_STAGE') {
-      this.renderTestStageHUD(player, geminiOrbs, boss, presetConfig, telemetry, testBossDamage, testEnemySetup, testBossCollisionMode);
+      this.renderTestStageHUD(player, geminiOrbs, boss, presetConfig, telemetry, testBossDamage, testEnemySetup, testBossCollisionMode, audioSettings);
     } else {
-      this.renderHUD(player, stage, geminiOrbs, boss, presetConfig, telemetry);
+      this.renderHUD(player, stage, geminiOrbs, boss, presetConfig, telemetry, audioSettings);
     }
 
     // 14. State Overlays (Title, Stage Clear, Game Over, Game Clear)
-    this.renderStateOverlays(state, stage, stageTick, player.score, pointerPos);
+    this.renderStateOverlays(state, stage, stageTick, player.score, pointerPos, audioSettings);
 
     ctx.restore();
   }
@@ -928,27 +930,54 @@ export class ArcadeRenderer {
       isApex?: boolean;
       orbitRadius?: number;
       effectiveDamage?: number;
-    }
+    },
+    audioSettings?: AudioSettings
   ): void {
     const ctx = this.ctx;
     const w = this.canvas.width;
 
-    ctx.font = '9px "Press Start 2P", monospace';
+    ctx.font = '8px "Press Start 2P", monospace';
     ctx.textAlign = 'left';
 
     // Top Header: 1UP Score & HIGH Score
     ctx.fillStyle = '#ef4444';
-    ctx.fillText('1UP', 14, 16);
+    ctx.fillText('1UP', 8, 15);
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(player.score.toString().padStart(6, '0'), 46, 16);
+    ctx.fillText(player.score.toString().padStart(6, '0'), 36, 15);
 
     ctx.fillStyle = '#ef4444';
-    ctx.fillText('HI', 114, 16);
+    ctx.fillText('HI', 84, 15);
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(player.highScore.toString().padStart(6, '0'), 136, 16);
+    ctx.fillText(player.highScore.toString().padStart(6, '0'), 102, 15);
+
+    // Audio Buttons (BGM & SE)
+    const isBgmOn = audioSettings?.bgm !== false;
+    const isSeOn = audioSettings?.se !== false;
+
+    // BGM Button (x: 148 to 184)
+    ctx.fillStyle = isBgmOn ? 'rgba(56, 189, 248, 0.30)' : 'rgba(239, 68, 68, 0.25)';
+    ctx.fillRect(148, 4, 36, 15);
+    ctx.strokeStyle = isBgmOn ? '#38bdf8' : '#ef4444';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(148, 4, 36, 15);
+    ctx.fillStyle = isBgmOn ? '#38bdf8' : '#f87171';
+    ctx.font = '7px "DotGothic16", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(isBgmOn ? '🎵ON' : '🎵OFF', 166, 14);
+
+    // SE Button (x: 186 to 222)
+    ctx.fillStyle = isSeOn ? 'rgba(253, 224, 71, 0.30)' : 'rgba(239, 68, 68, 0.25)';
+    ctx.fillRect(186, 4, 36, 15);
+    ctx.strokeStyle = isSeOn ? '#fde047' : '#ef4444';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(186, 4, 36, 15);
+    ctx.fillStyle = isSeOn ? '#fde047' : '#f87171';
+    ctx.font = '7px "DotGothic16", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(isSeOn ? '🔊ON' : '🔊OFF', 204, 14);
 
     // Row 1 Buttons: Preset & LAB
-    const btnTestX = w - 46;
+    const btnTestX = w - 44;
     ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
     ctx.fillRect(btnTestX, 4, 40, 15);
     ctx.strokeStyle = '#38bdf8';
@@ -1101,7 +1130,8 @@ export class ArcadeRenderer {
     },
     testBossDamage: number = 0,
     testEnemySetup: TestEnemySetup = 'SWARM_PENETRATE',
-    testBossCollisionMode: 'PENETRATE' | 'REFLECT' = 'PENETRATE'
+    testBossCollisionMode: 'PENETRATE' | 'REFLECT' = 'PENETRATE',
+    audioSettings?: AudioSettings
   ): void {
     const ctx = this.ctx;
     const w = this.canvas.width;
@@ -1134,46 +1164,72 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1.5;
     ctx.strokeRect(0, 0, w, 89);
 
-    // Row 1: Title, Shield, Wall Bounce Toggle, Lv, Return (y: 2 to 18)
+    // Row 1: Title, Shield, Wall Bounce Toggle, Lv, BGM, SE, Return (y: 2 to 18)
     ctx.font = '8px "Press Start 2P", monospace';
     ctx.fillStyle = '#38bdf8';
     ctx.textAlign = 'left';
-    ctx.fillText('⚡LAB', 8, 14);
+    ctx.fillText('⚡LAB', 4, 14);
 
     ctx.fillStyle = player.hp > 30 ? '#22c55e' : '#ef4444';
     ctx.font = '7px "Press Start 2P", monospace';
-    ctx.fillText(`SHLD:${player.hp}%`, 48, 14);
+    ctx.fillText(`SHLD:${player.hp}%`, 38, 14);
 
-    // [壁: 反射ON] / [画面端: 通過]
+    // [壁: 反射ON] / [画面端: 通過] (x: 88 to 174, w: 86)
     const isWallBounce = !!telemetry?.screenEdgeBounce;
     ctx.fillStyle = isWallBounce ? 'rgba(56, 189, 248, 0.45)' : 'rgba(30, 41, 59, 0.85)';
-    ctx.fillRect(98, 2, 112, 15);
+    ctx.fillRect(88, 2, 86, 15);
     ctx.strokeStyle = isWallBounce ? '#38bdf8' : '#64748b';
     ctx.lineWidth = isWallBounce ? 1.5 : 1;
-    ctx.strokeRect(98, 2, 112, 15);
+    ctx.strokeRect(88, 2, 86, 15);
     ctx.fillStyle = isWallBounce ? '#38bdf8' : '#94a3b8';
     ctx.font = '7px "DotGothic16", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(isWallBounce ? '🧱壁:反射ON[W]' : '🚪画面端:通過[W]', 98 + 56, 13);
+    ctx.fillText(isWallBounce ? '🧱壁:反射[Q]' : '🚪端:通過[Q]', 88 + 43, 13);
 
+    // Lv Button (x: 176 to 222, w: 46)
     const lv = geminiOrbs[0]?.level || 1;
     ctx.fillStyle = 'rgba(236, 72, 153, 0.25)';
-    ctx.fillRect(216, 2, 62, 15);
+    ctx.fillRect(176, 2, 46, 15);
     ctx.strokeStyle = '#ec4899';
     ctx.lineWidth = 1;
-    ctx.strokeRect(216, 2, 62, 15);
+    ctx.strokeRect(176, 2, 46, 15);
     ctx.fillStyle = '#ec4899';
     ctx.font = '6px "Press Start 2P", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(`Lv.${lv}[L]`, 247, 12);
+    ctx.fillText(`Lv.${lv}[L]`, 176 + 23, 12);
 
+    // BGM Button (x: 224 to 264, w: 40)
+    const isBgmOn = audioSettings?.bgm !== false;
+    ctx.fillStyle = isBgmOn ? 'rgba(56, 189, 248, 0.30)' : 'rgba(239, 68, 68, 0.25)';
+    ctx.fillRect(224, 2, 40, 15);
+    ctx.strokeStyle = isBgmOn ? '#38bdf8' : '#ef4444';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(224, 2, 40, 15);
+    ctx.fillStyle = isBgmOn ? '#38bdf8' : '#f87171';
+    ctx.font = '7px "DotGothic16", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(isBgmOn ? '🎵ON[B]' : '🎵OFF[B]', 224 + 20, 13);
+
+    // SE Button (x: 266 to 306, w: 40)
+    const isSeOn = audioSettings?.se !== false;
+    ctx.fillStyle = isSeOn ? 'rgba(253, 224, 71, 0.30)' : 'rgba(239, 68, 68, 0.25)';
+    ctx.fillRect(266, 2, 40, 15);
+    ctx.strokeStyle = isSeOn ? '#fde047' : '#ef4444';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(266, 2, 40, 15);
+    ctx.fillStyle = isSeOn ? '#fde047' : '#f87171';
+    ctx.font = '7px "DotGothic16", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(isSeOn ? '🔊ON[N]' : '🔊OFF[N]', 266 + 20, 13);
+
+    // Exit Button (x: 308 to 356, w: 48)
     ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
-    ctx.fillRect(282, 2, 70, 15);
+    ctx.fillRect(308, 2, 48, 15);
     ctx.strokeStyle = '#ef4444';
     ctx.lineWidth = 1;
-    ctx.strokeRect(282, 2, 70, 15);
+    ctx.strokeRect(308, 2, 48, 15);
     ctx.fillStyle = '#f87171';
-    ctx.fillText('✕戻る(T)', 317, 12);
+    ctx.fillText('✕戻る(T)', 308 + 24, 12);
 
     // Row 2: Attack Mode, Gemini Attribute, Orb Count (y: 19 to 35)
     const curMode = telemetry?.mode || 'SLING';
@@ -1340,7 +1396,8 @@ export class ArcadeRenderer {
     stage: number,
     stageTick: number,
     score: number,
-    pointerPos?: { x: number; y: number }
+    pointerPos?: { x: number; y: number },
+    audioSettings?: AudioSettings
   ): void {
     const ctx = this.ctx;
     const w = this.canvas.width;
@@ -1493,29 +1550,59 @@ export class ArcadeRenderer {
       ctx.strokeStyle = '#1e293b';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(20, 394);
-      ctx.lineTo(w - 20, 394);
+      ctx.moveTo(20, 392);
+      ctx.lineTo(w - 20, 392);
       ctx.stroke();
+
+      // Audio Toggles on Title Screen (y: 396 to 416)
+      const isBgmOn = audioSettings?.bgm !== false;
+      const isSeOn = audioSettings?.se !== false;
+
+      // BGM Button (x: 24 to 172, y: 396 to 416)
+      ctx.fillStyle = isBgmOn ? 'rgba(56, 189, 248, 0.35)' : 'rgba(239, 68, 68, 0.25)';
+      ctx.fillRect(24, 396, 148, 20);
+      ctx.strokeStyle = isBgmOn ? '#38bdf8' : '#ef4444';
+      ctx.lineWidth = 1.2;
+      ctx.strokeRect(24, 396, 148, 20);
+      ctx.fillStyle = isBgmOn ? '#38bdf8' : '#f87171';
+      ctx.font = '8px "DotGothic16", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(isBgmOn ? '🎵 BGM: ON [Bキー]' : '🎵 BGM: OFF [Bキー]', 98, 410);
+
+      // SE Button (x: 188 to 336, y: 396 to 416)
+      ctx.fillStyle = isSeOn ? 'rgba(253, 224, 71, 0.35)' : 'rgba(239, 68, 68, 0.25)';
+      ctx.fillRect(188, 396, 148, 20);
+      ctx.strokeStyle = isSeOn ? '#fde047' : '#ef4444';
+      ctx.lineWidth = 1.2;
+      ctx.strokeRect(188, 396, 148, 20);
+      ctx.fillStyle = isSeOn ? '#fde047' : '#f87171';
+      ctx.font = '8px "DotGothic16", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(isSeOn ? '🔊 効果音: ON [Nキー]' : '🔊 効果音: OFF [Nキー]', 262, 410);
+
+      // Master Mute text
+      ctx.font = '7px "DotGothic16", monospace';
+      ctx.fillStyle = '#64748b';
+      ctx.fillText('[Mキー] サウンド全消音 / 全解除', w / 2, 426);
 
       // 7. Asset Attribution
       ctx.font = '8px "DotGothic16", monospace';
       ctx.fillStyle = '#67e8f9';
-      ctx.fillText('【 音源・素材クレジット 】', w / 2, 408);
+      ctx.fillText('【 音源・素材クレジット 】', w / 2, 440);
       ctx.fillStyle = '#94a3b8';
-      ctx.fillText('■ BGM: 魔王魂 (maou.audio) | 効果音: 効果音ラボ', w / 2, 422);
-      ctx.fillText('■ メインロゴ: NANO BANANA | 敵勢力: GenAI Official Logos', w / 2, 436);
+      ctx.fillText('■ BGM: 魔王魂 (maou.audio) | 効果音: 効果音ラボ', w / 2, 452);
       ctx.fillStyle = '#64748b';
-      ctx.fillText('※本作は非営利的パロディ作品であり各社商標は各権利者に帰属します', w / 2, 452);
+      ctx.fillText('※本作は非営利的パロディ作品であり各社商標は各権利者に帰属します', w / 2, 466);
 
       // Controls guide
       ctx.fillStyle = '#94a3b8';
-      ctx.fillText('📱 1本指ドラッグで移動・誘導スイング', w / 2, 474);
-      ctx.fillText('💻 PC: マウスまたはWASD / 矢印キー移動', w / 2, 490);
+      ctx.fillText('📱 1本指ドラッグで移動・誘導スイング', w / 2, 484);
+      ctx.fillText('💻 PC: マウスまたはWASD / 矢印キー移動', w / 2, 498);
 
       // Copyright
       ctx.font = '8px "Press Start 2P", monospace';
       ctx.fillStyle = '#ef4444';
-      ctx.fillText('(C) 2026 MUKKII ARCADE SYSTEM', w / 2, 520);
+      ctx.fillText('(C) 2026 MUKKII ARCADE SYSTEM', w / 2, 522);
 
     } else if (state === 'STAGE_CLEAR') {
       ctx.font = '14px "Press Start 2P", monospace';

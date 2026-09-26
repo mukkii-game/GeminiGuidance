@@ -35,6 +35,8 @@ export interface InputState {
   isPointerDown?: boolean;
   crtTogglePressed?: boolean;
   audioTogglePressed?: boolean;
+  bgmTogglePressed?: boolean;
+  seTogglePressed?: boolean;
   presetSelectPressed?: PhysicsPresetId;
   testStageTogglePressed?: boolean;
   levelUpPressed?: boolean;
@@ -48,6 +50,11 @@ export interface InputState {
   tuningSpeedPressed?: boolean;
   tuningResetPressed?: boolean;
   orbCountPressed?: boolean;
+}
+
+export interface AudioSettings {
+  bgm: boolean;
+  se: boolean;
 }
 
 export interface PlayerState {

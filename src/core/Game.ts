@@ -99,15 +99,84 @@ export class Game {
     this.setupAudioAndCrtControls();
   }
 
+  public toggleBgm(): boolean {
+    this.audio.resume();
+    const on = this.audio.toggleBgm();
+    this.updateAudioButtonsUi();
+    this.addFloatingText(this.player.state.x, this.player.state.y - 30, on ? '🎵 BGM: ON' : '🎵 BGM: OFF', on ? '#38bdf8' : '#ef4444');
+    return on;
+  }
+
+  public toggleSe(): boolean {
+    this.audio.resume();
+    const on = this.audio.toggleSe();
+    this.updateAudioButtonsUi();
+    this.addFloatingText(this.player.state.x, this.player.state.y - 30, on ? '🔊 効果音: ON' : '🔊 効果音: OFF', on ? '#fde047' : '#ef4444');
+    return on;
+  }
+
+  public toggleAllAudio(): boolean {
+    this.audio.resume();
+    const on = this.audio.toggle();
+    this.updateAudioButtonsUi();
+    this.addFloatingText(
+      this.player.state.x,
+      this.player.state.y - 30,
+      on ? '🔊 サウンド全解除 (ON)' : '🔇 サウンド全消音 (OFF)',
+      on ? '#22c55e' : '#ef4444'
+    );
+    return on;
+  }
+
+  private updateAudioButtonsUi(): void {
+    const btnBgm = document.getElementById('btn-bgm');
+    const btnSe = document.getElementById('btn-se');
+    const btnAll = document.getElementById('btn-all-audio') || document.getElementById('btn-audio');
+
+    const bgmOn = this.audio.isBgmEnabled();
+    const seOn = this.audio.isSeEnabled();
+
+    if (btnBgm) {
+      btnBgm.textContent = bgmOn ? '🎵 BGM: ON' : '🎵 BGM: OFF';
+      btnBgm.style.borderColor = bgmOn ? '#38bdf8' : '#ef4444';
+      btnBgm.style.color = bgmOn ? '#9cb3cc' : '#ef4444';
+    }
+    if (btnSe) {
+      btnSe.textContent = seOn ? '🔊 SE: ON' : '🔊 SE: OFF';
+      btnSe.style.borderColor = seOn ? '#fde047' : '#ef4444';
+      btnSe.style.color = seOn ? '#9cb3cc' : '#ef4444';
+    }
+    if (btnAll) {
+      const anyOn = bgmOn || seOn;
+      btnAll.textContent = anyOn ? '🔇 全消音' : '🔈 全解除';
+      btnAll.style.borderColor = anyOn ? '#2b4058' : '#22c55e';
+      btnAll.style.color = anyOn ? '#9cb3cc' : '#22c55e';
+    }
+  }
+
   private setupAudioAndCrtControls(): void {
-    const btnAudio = document.getElementById('btn-audio');
-    if (btnAudio) {
-      btnAudio.addEventListener('click', () => {
-        this.audio.resume();
-        const enabled = this.audio.toggle();
-        btnAudio.textContent = enabled ? 'BGM/SE: ON' : 'BGM/SE: OFF';
+    const btnBgm = document.getElementById('btn-bgm');
+    if (btnBgm) {
+      btnBgm.addEventListener('click', () => {
+        this.toggleBgm();
       });
     }
+
+    const btnSe = document.getElementById('btn-se');
+    if (btnSe) {
+      btnSe.addEventListener('click', () => {
+        this.toggleSe();
+      });
+    }
+
+    const btnAll = document.getElementById('btn-all-audio') || document.getElementById('btn-audio');
+    if (btnAll) {
+      btnAll.addEventListener('click', () => {
+        this.toggleAllAudio();
+      });
+    }
+
+    this.updateAudioButtonsUi();
   }
 
   public start(): void {
@@ -273,8 +342,24 @@ export class Game {
         }
       }
 
-      // If clicked anywhere else on title screen (e.g. prompt area)
-      if (y >= 90) {
+      // 3. Audio Toggles on Title Screen (y: 394 to 420)
+      if (y >= 394 && y <= 420) {
+        if (x >= 24 && x <= 172) {
+          this.toggleBgm();
+          return;
+        }
+        if (x >= 188 && x <= 336) {
+          this.toggleSe();
+          return;
+        }
+      }
+      if (y > 420 && y <= 436) {
+        this.toggleAllAudio();
+        return;
+      }
+
+      // If clicked in start prompt area (y: 288 to 310)
+      if (y >= 288 && y <= 310) {
         this.startNewGame(1);
         return;
       }
@@ -294,11 +379,14 @@ export class Game {
         btnCrt.textContent = isOff ? 'CRT: OFF' : 'CRT: ON';
       }
     }
+    if (this.input.consumeBgmToggle()) {
+      this.toggleBgm();
+    }
+    if (this.input.consumeSeToggle()) {
+      this.toggleSe();
+    }
     if (this.input.consumeAudioToggle()) {
-      const btnAudio = document.getElementById('btn-audio');
-      this.audio.resume();
-      const enabled = this.audio.toggle();
-      if (btnAudio) btnAudio.textContent = enabled ? 'SND: ON' : 'SND: OFF';
+      this.toggleAllAudio();
     }
 
     // Handle Title Screen
@@ -1064,7 +1152,8 @@ export class Game {
       this.testBossTotalDamage,
       this.testEnemySetup,
       this.testBossCollisionMode,
-      { x: this.input.state.x, y: this.input.state.y }
+      { x: this.input.state.x, y: this.input.state.y },
+      { bgm: this.audio.isBgmEnabled(), se: this.audio.isSeEnabled() }
     );
   }
 
@@ -1333,8 +1422,8 @@ export class Game {
     const w = this.canvas.width;
 
     if (this.state === 'TEST_STAGE') {
-      // 0. Row 1: [壁: 反射 / 通過] button (x: 96 to 212, y: 2 to 18)
-      if (x >= 96 && x <= 212 && y >= 2 && y <= 18) {
+      // 0. Row 1: [壁: 反射 / 通過] button (x: 88 to 174, y: 2 to 18)
+      if (x >= 88 && x <= 174 && y >= 2 && y <= 18) {
         const bounce = this.geminiManager.toggleScreenEdgeBounce();
         this.audio.playGeminiBounce();
         this.addFloatingText(
@@ -1346,8 +1435,8 @@ export class Game {
         return true;
       }
 
-      // 1. Row 1: [Lv.UP(L)] button (x: 214 to 280, y: 2 to 18)
-      if (x >= 214 && x <= 280 && y >= 2 && y <= 18) {
+      // 1. Row 1: [Lv.UP(L)] button (x: 176 to 222, y: 2 to 18)
+      if (x >= 176 && x <= 222 && y >= 2 && y <= 18) {
         for (const orb of this.geminiManager.orbs) {
           this.geminiManager.levelUpOrb(orb);
         }
@@ -1356,8 +1445,20 @@ export class Game {
         return true;
       }
 
-      // 2. Row 1: [✕戻る(T)] button (x: 282 to 356, y: 2 to 18)
-      if (x >= 282 && x <= 356 && y >= 2 && y <= 18) {
+      // 2. Row 1: [🎵BGM] button (x: 224 to 264, y: 2 to 18)
+      if (x >= 224 && x <= 264 && y >= 2 && y <= 18) {
+        this.toggleBgm();
+        return true;
+      }
+
+      // 3. Row 1: [🔊SE] button (x: 266 to 306, y: 2 to 18)
+      if (x >= 266 && x <= 306 && y >= 2 && y <= 18) {
+        this.toggleSe();
+        return true;
+      }
+
+      // 4. Row 1: [✕戻る(T)] button (x: 308 to 356, y: 2 to 18)
+      if (x >= 308 && x <= 356 && y >= 2 && y <= 18) {
         this.exitTestStage();
         return true;
       }
@@ -1483,14 +1584,26 @@ export class Game {
       return false;
     } else {
       // Normal HUD buttons
-      // Row 1: [LAB(T)] button (x: w - 46 to w - 6, y: 3 to 20)
-      if (x >= w - 48 && x <= w - 4 && y >= 3 && y <= 20) {
+      // Row 1: [🎵BGM] button (x: 148 to 184, y: 3 to 20)
+      if (x >= 148 && x <= 184 && y >= 3 && y <= 20) {
+        this.toggleBgm();
+        return true;
+      }
+
+      // Row 1: [🔊SE] button (x: 186 to 222, y: 3 to 20)
+      if (x >= 186 && x <= 222 && y >= 3 && y <= 20) {
+        this.toggleSe();
+        return true;
+      }
+
+      // Row 1: [LAB(T)] button (x: w - 46 to w - 4, y: 3 to 20)
+      if (x >= w - 46 && x <= w - 4 && y >= 3 && y <= 20) {
         this.enterTestStage();
         return true;
       }
 
-      // Row 1: [1-5: PRESET] button (x: w - 134 to w - 50, y: 3 to 20)
-      if (x >= w - 136 && x <= w - 48 && y >= 3 && y <= 20) {
+      // Row 1: [1-5: PRESET] button (x: w - 134 to w - 48, y: 3 to 20)
+      if (x >= w - 134 && x <= w - 48 && y >= 3 && y <= 20) {
         const p = this.geminiManager.cyclePreset();
         this.addFloatingText(this.player.state.x, this.player.state.y - 30, `MODE: ${p.nameJa}`, '#fde047');
         this.audio.playGeminiBounce();

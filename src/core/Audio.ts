@@ -15,7 +15,8 @@ export class SoundEngine {
   private sfxGain: GainNode | null = null;
   private buffers: Map<string, AudioBuffer> = new Map();
   private loaded: boolean = false;
-  private enabled: boolean = true;
+  private bgmEnabled: boolean = true;
+  private seEnabled: boolean = true;
 
   // Debounce tracking to prevent volume stacking
   private lastPlayedTime: Map<string, number> = new Map();
@@ -23,9 +24,24 @@ export class SoundEngine {
   // Background Music tracks (魔王魂)
   private currentBgmAudio: HTMLAudioElement | null = null;
   private currentBgmType: 'STAGE_A' | 'STAGE_B' | 'BOSS' | null = null;
+  private currentBgmUrl: string | null = null;
+  private currentBgmVolume: number = 0.16;
 
   constructor() {
-    // Lazy AudioContext initialization on first user interaction
+    try {
+      const savedBgm = localStorage.getItem('gemini_bgm_enabled');
+      if (savedBgm !== null) this.bgmEnabled = savedBgm === 'true';
+      const savedSe = localStorage.getItem('gemini_se_enabled');
+      if (savedSe !== null) this.seEnabled = savedSe === 'true';
+    } catch (_) {}
+  }
+
+  public isBgmEnabled(): boolean {
+    return this.bgmEnabled;
+  }
+
+  public isSeEnabled(): boolean {
+    return this.seEnabled;
   }
 
   public init(): void {
@@ -48,7 +64,7 @@ export class SoundEngine {
       this.masterGain.connect(this.compressor);
 
       this.sfxGain = this.ctx.createGain();
-      this.sfxGain.gain.setValueAtTime(0.35, this.ctx.currentTime);
+      this.sfxGain.gain.setValueAtTime(this.seEnabled ? 0.35 : 0.0, this.ctx.currentTime);
       this.sfxGain.connect(this.masterGain);
 
       this.loadSoundAssets();
@@ -66,19 +82,74 @@ export class SoundEngine {
     }
   }
 
+  /** Toggle BGM independently */
+  public toggleBgm(): boolean {
+    this.resume();
+    this.bgmEnabled = !this.bgmEnabled;
+    try {
+      localStorage.setItem('gemini_bgm_enabled', String(this.bgmEnabled));
+    } catch (_) {}
+
+    if (this.bgmEnabled) {
+      if (this.currentBgmAudio) {
+        this.currentBgmAudio.play().catch(() => {});
+      } else if (this.currentBgmUrl) {
+        this.switchBgm(this.currentBgmType || 'STAGE_A', this.currentBgmUrl, this.currentBgmVolume);
+      } else {
+        this.startBgm();
+      }
+    } else {
+      if (this.currentBgmAudio) {
+        this.currentBgmAudio.pause();
+      }
+    }
+    return this.bgmEnabled;
+  }
+
+  /** Toggle SE independently */
+  public toggleSe(): boolean {
+    this.resume();
+    this.seEnabled = !this.seEnabled;
+    try {
+      localStorage.setItem('gemini_se_enabled', String(this.seEnabled));
+    } catch (_) {}
+
+    if (this.sfxGain && this.ctx) {
+      this.sfxGain.gain.setValueAtTime(this.seEnabled ? 0.35 : 0.0, this.ctx.currentTime);
+    }
+    if (this.seEnabled) {
+      this.playBuffer('cursor', 0.8, 1.4, 0);
+    }
+    return this.seEnabled;
+  }
+
+  /** Toggle Master Mute (both BGM and SE) */
   public toggle(): boolean {
-    this.enabled = !this.enabled;
-    if (this.masterGain && this.ctx) {
-      this.masterGain.gain.setValueAtTime(this.enabled ? 0.35 : 0.0, this.ctx.currentTime);
+    this.resume();
+    const turningOn = !(this.bgmEnabled || this.seEnabled);
+    this.bgmEnabled = turningOn;
+    this.seEnabled = turningOn;
+    try {
+      localStorage.setItem('gemini_bgm_enabled', String(this.bgmEnabled));
+      localStorage.setItem('gemini_se_enabled', String(this.seEnabled));
+    } catch (_) {}
+
+    if (this.sfxGain && this.ctx) {
+      this.sfxGain.gain.setValueAtTime(this.seEnabled ? 0.35 : 0.0, this.ctx.currentTime);
     }
     if (this.currentBgmAudio) {
-      if (this.enabled) {
+      if (this.bgmEnabled) {
         this.currentBgmAudio.play().catch(() => {});
       } else {
         this.currentBgmAudio.pause();
       }
+    } else if (this.bgmEnabled && this.currentBgmUrl) {
+      this.switchBgm(this.currentBgmType || 'STAGE_A', this.currentBgmUrl, this.currentBgmVolume);
     }
-    return this.enabled;
+    if (this.seEnabled) {
+      this.playBuffer('cursor', 0.8, 1.4, 0);
+    }
+    return turningOn;
   }
 
   public startBgm(): void {
@@ -108,6 +179,10 @@ export class SoundEngine {
   }
 
   private switchBgm(type: 'STAGE_A' | 'STAGE_B' | 'BOSS', url: string, volume: number): void {
+    this.currentBgmType = type;
+    this.currentBgmUrl = url;
+    this.currentBgmVolume = volume;
+
     if (this.currentBgmType === type && this.currentBgmAudio && !this.currentBgmAudio.paused) {
       return;
     }
@@ -117,12 +192,11 @@ export class SoundEngine {
       this.currentBgmAudio.currentTime = 0;
     }
 
-    this.currentBgmType = type;
     try {
       this.currentBgmAudio = new Audio(url);
       this.currentBgmAudio.loop = true;
       this.currentBgmAudio.volume = volume;
-      if (this.enabled) {
+      if (this.bgmEnabled) {
         this.currentBgmAudio.play().catch(() => {});
       }
     } catch (err) {
@@ -173,7 +247,7 @@ export class SoundEngine {
   }
 
   private playBuffer(name: string, volume: number = 1.0, rate: number = 1.0, debounceMs: number = 40): boolean {
-    if (!this.enabled || !this.ctx || !this.sfxGain) return false;
+    if (!this.seEnabled || !this.ctx || !this.sfxGain) return false;
     const now = performance.now();
     const last = this.lastPlayedTime.get(name) || 0;
     if (now - last < debounceMs) {
