@@ -69,8 +69,8 @@ export class EnemyManager {
       formationId,
       x,
       y,
-      vx: pattern === 'UFO_FLYBY' ? 0.70 : 0,
-      vy: pattern === 'ROCKET_ASCENT' ? -0.42 : pattern === 'INVADER' || pattern === 'UFO_FLYBY' ? 0 : 0.32,
+      vx: pattern === 'UFO_FLYBY' ? 0.35 : 0,
+      vy: pattern === 'ROCKET_ASCENT' ? -0.21 : pattern === 'INVADER' || pattern === 'UFO_FLYBY' ? 0 : 0.16,
       width,
       height,
       hp,
@@ -127,7 +127,7 @@ export class EnemyManager {
   public spawnDeepSeekUfo(canvasWidth: number, fromLeft: boolean = true): EnemyEntity {
     const startX = fromLeft ? -35 : canvasWidth + 35;
     const ufo = this.spawn('DEEPSEEK_FLASH', startX, 44, 'UFO_FLYBY', 'ufo_wave', 1);
-    ufo.vx = fromLeft ? 1.35 : -1.35;
+    ufo.vx = fromLeft ? 0.65 : -0.65;
     ufo.vy = 0;
     return ufo;
   }
@@ -213,7 +213,7 @@ export class EnemyManager {
             // 3-way fan spread
             for (const offset of [-0.35, 0, 0.35]) {
               const ang = baseAngle + offset;
-              const spd = 0.36;
+              const spd = 0.18;
               onSpawnBullet(e.x, e.y + 12, Math.cos(ang) * spd, Math.sin(ang) * spd);
             }
           }
@@ -224,7 +224,7 @@ export class EnemyManager {
             const bdx = playerX - e.x;
             const bdy = playerY - e.y;
             const bdist = Math.hypot(bdx, bdy) || 1;
-            const spd = 0.52; // sniper aimed shot
+            const spd = 0.26; // sniper aimed shot
             onSpawnBullet(e.x, e.y + 16, (bdx / bdist) * spd, (bdy / bdist) * spd);
           }
         } else {
@@ -236,7 +236,7 @@ export class EnemyManager {
               const bdx = playerX - e.x;
               const bdy = playerY - e.y;
               const bdist = Math.hypot(bdx, bdy) || 1;
-              const bspeed = 0.35;
+              const bspeed = 0.18;
               onSpawnBullet(e.x, e.y, (bdx / bdist) * bspeed, (bdy / bdist) * bspeed);
             }
           }
@@ -271,7 +271,7 @@ export class EnemyManager {
     if (invaders.length === 0) return;
 
     // Classic Invaders acceleration: fewer enemies -> faster tempo!
-    const stepInterval = Math.max(8, Math.floor((invaders.length / this.invaderTotal) * 36));
+    const stepInterval = Math.max(16, Math.floor((invaders.length / this.invaderTotal) * 60));
     this.invaderStepTimer++;
 
     if (this.invaderStepTimer >= stepInterval) {
@@ -297,12 +297,12 @@ export class EnemyManager {
       if (shouldDrop) {
         // Drop down a row!
         for (const inv of invaders) {
-          inv.y += 12;
+          inv.y += 10;
         }
       } else {
         // Step horizontally!
         for (const inv of invaders) {
-          inv.x += this.invaderMarchDir * 4;
+          inv.x += this.invaderMarchDir * 2;
         }
       }
     }
@@ -313,7 +313,7 @@ export class EnemyManager {
       this.invaderShootCooldown = 110 + Math.floor(Math.random() * 80);
       const randomInv = invaders[Math.floor(Math.random() * invaders.length)];
       if (randomInv) {
-        onSpawnBullet(randomInv.x, randomInv.y + 16, 0, 0.95); // straight down white bullet
+        onSpawnBullet(randomInv.x, randomInv.y + 16, 0, 0.45); // straight down white bullet
       }
     }
   }
@@ -346,11 +346,11 @@ export class EnemyManager {
         // Enters to targetY (default ~100) and hovers with sinusoidal drift
         const targetY = e.targetY ?? 100;
         if (e.y < targetY) {
-          e.vy = 0.35;
+          e.vy = 0.18;
           e.vx = 0;
         } else {
-          e.vy = Math.sin(t * 0.04) * 0.12;
-          e.vx = Math.sin(t * 0.025) * 0.38;
+          e.vy = Math.sin(t * 0.04) * 0.06;
+          e.vx = Math.sin(t * 0.025) * 0.19;
         }
         break;
       }
@@ -359,11 +359,11 @@ export class EnemyManager {
         // Stays high at y ~ 52, slides horizontally
         const targetY = e.targetY ?? 52;
         if (e.y < targetY) {
-          e.vy = 0.28;
+          e.vy = 0.14;
           e.vx = 0;
         } else {
           e.vy = 0;
-          e.vx = Math.sin(t * 0.03) * 0.45;
+          e.vx = Math.sin(t * 0.03) * 0.22;
         }
         break;
       }
@@ -372,11 +372,11 @@ export class EnemyManager {
         // Heavy advancing bulwark
         const targetY = e.targetY ?? 150;
         if (e.y < targetY) {
-          e.vy = 0.22;
+          e.vy = 0.11;
         } else {
-          e.vy = Math.sin(t * 0.03) * 0.08;
+          e.vy = Math.sin(t * 0.03) * 0.04;
         }
-        e.vx = Math.sin(t * 0.02) * 0.18;
+        e.vx = Math.sin(t * 0.02) * 0.09;
         break;
       }
 
@@ -385,14 +385,14 @@ export class EnemyManager {
         // Phase 2 (t >= 40): Accelerate in straight line towards target
         if (t < 40) {
           e.vx = 0;
-          e.vy = 0.08;
+          e.vy = 0.04;
           e.targetX = playerX;
           e.targetY = _playerY;
         } else if (t === 40) {
           const dx = (e.targetX ?? playerX) - e.x;
           const dy = (e.targetY ?? _playerY) - e.y;
           const dist = Math.hypot(dx, dy) || 1;
-          const rushSpeed = 1.15;
+          const rushSpeed = 0.58;
           e.vx = (dx / dist) * rushSpeed;
           e.vy = (dy / dist) * rushSpeed;
         }
@@ -411,7 +411,7 @@ export class EnemyManager {
         // Orbits around (orbitCenterX, orbitCenterY) with radius 48px
         const cx = e.orbitCenterX ?? (canvasWidth / 2);
         const cy = e.orbitCenterY ?? 130;
-        const ang = (e.angle || 0) + 0.035;
+        const ang = (e.angle || 0) + 0.018;
         e.angle = ang;
         const r = 48;
         e.x = cx + Math.cos(ang) * r;
@@ -423,30 +423,30 @@ export class EnemyManager {
 
       case 'TOROID_SWOOP': {
         if (t < 70) {
-          e.vy = 0.38;
+          e.vy = 0.19;
           e.vx = 0;
         } else if (t < 130) {
           const progress = (t - 70) / 60;
           const angle = progress * Math.PI;
           const dir = e.x < canvasWidth / 2 ? -1 : 1;
-          e.vx = Math.sin(angle) * dir * 0.65;
-          e.vy = Math.cos(angle) * 0.38;
+          e.vx = Math.sin(angle) * dir * 0.32;
+          e.vy = Math.cos(angle) * 0.19;
         } else {
-          e.vy = -0.45;
-          e.vx = e.x < canvasWidth / 2 ? -0.22 : 0.22;
+          e.vy = -0.22;
+          e.vx = e.x < canvasWidth / 2 ? -0.11 : 0.11;
         }
         break;
       }
 
       case 'TORKAN_TRACK_DASH': {
         if (t < 65) {
-          e.vy = 0.25;
-          e.vx = (playerX - e.x) * 0.012;
+          e.vy = 0.12;
+          e.vx = (playerX - e.x) * 0.006;
         } else if (t < 120) {
-          e.vy = 0.70;
+          e.vy = 0.35;
           e.vx = 0;
         } else {
-          e.vy = 0.45;
+          e.vy = 0.22;
         }
         break;
       }
@@ -454,44 +454,44 @@ export class EnemyManager {
       case 'ZOSHI_REACTIVE_SWOOP': {
         if (t < 50) {
           const dir = e.x < canvasWidth / 2 ? 1 : -1;
-          e.vx = dir * 0.70;
-          e.vy = 0.30;
+          e.vx = dir * 0.35;
+          e.vy = 0.15;
         } else {
           e.vx *= 0.98;
-          e.vy = 0.42;
+          e.vy = 0.21;
         }
         break;
       }
 
       case 'GALAGA_LOOP': {
         if (t < 50) {
-          e.vy = 0.35;
-          e.vx = (canvasWidth / 2 - e.x) * 0.008;
+          e.vy = 0.18;
+          e.vx = (canvasWidth / 2 - e.x) * 0.004;
         } else if (t < 140) {
-          const loopAngle = (t - 50) * 0.045;
-          e.vx = Math.cos(loopAngle) * 0.65;
-          e.vy = Math.sin(loopAngle) * 0.42 + 0.18;
+          const loopAngle = (t - 50) * 0.025;
+          e.vx = Math.cos(loopAngle) * 0.32;
+          e.vy = Math.sin(loopAngle) * 0.21 + 0.09;
         } else {
           e.vx = 0;
-          e.vy = 0.35;
+          e.vy = 0.18;
         }
         break;
       }
 
       case 'SPAROID_CRUISE': {
-        e.vy = 0.55;
-        e.vx = Math.sin(t * 0.03) * 0.6;
+        e.vy = 0.28;
+        e.vx = Math.sin(t * 0.03) * 0.30;
         break;
       }
 
       case 'ROCKET_ASCENT': {
-        e.vy = -0.75;
+        e.vy = -0.38;
         e.vx = 0;
         break;
       }
 
       default: {
-        e.vy = 0.60;
+        e.vy = 0.30;
         break;
       }
     }

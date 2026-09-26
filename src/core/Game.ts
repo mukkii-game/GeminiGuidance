@@ -137,13 +137,13 @@ export class Game {
       let tierLabel = '';
       let tierColor = '#38bdf8';
       if (tier === 'SHORT') {
-        tierLabel = `⚡公転【短距離バリア】(R=${r}px)`;
+        tierLabel = `⚡分銅【近距離バリア】(R=${r}px)`;
         tierColor = '#38bdf8';
       } else if (tier === 'MEDIUM') {
-        tierLabel = `⚡公転【中距離スイング】(R=${r}px)`;
+        tierLabel = `⚡分銅【中距離スイング】(R=${r}px)`;
         tierColor = '#facc15';
       } else {
-        tierLabel = `⚡公転【巨大分銅ハンマー】(R=${r}px)`;
+        tierLabel = `⚡分銅【巨大ハンマー】(R=${r}px)`;
         tierColor = '#ef4444';
       }
       this.addFloatingText(this.player.state.x, this.player.state.y - 30, tierLabel, tierColor);
@@ -151,7 +151,7 @@ export class Game {
       this.addFloatingText(
         this.player.state.x,
         this.player.state.y - 30,
-        '🚀攻撃①: ヨーヨー突撃 (スリング解除)',
+        '🚀攻撃①: ヨーヨー突撃 (慣性往復)',
         '#fde047'
       );
     }
@@ -814,16 +814,15 @@ export class Game {
             const nx = (orb.x - e.x) / (dist || 1);
             const ny = (orb.y - e.y) / (dist || 1);
 
-            // Reflect Gemini in SLING mode
-            if (orb.mode === 'SLING') {
-              const dot = orb.vx * nx + orb.vy * ny;
-              if (dot < 0) {
-                orb.vx -= 1.90 * dot * nx;
-                orb.vy -= 1.90 * dot * ny;
-                orb.x = e.x + nx * (orbRadius + e.width * 0.46);
-                orb.y = e.y + ny * (orbRadius + e.width * 0.46);
-              }
-            } else {
+            // Elastic reflection for both SLING and ORBIT (Hammerfight)
+            const dot = orb.vx * nx + orb.vy * ny;
+            if (dot < 0) {
+              orb.vx -= 1.85 * dot * nx;
+              orb.vy -= 1.85 * dot * ny;
+              orb.x = e.x + nx * (orbRadius + e.width * 0.46);
+              orb.y = e.y + ny * (orbRadius + e.width * 0.46);
+            }
+            if (orb.mode === 'ORBIT') {
               orb.orbitAngularVel = -orb.orbitAngularVel * 0.85;
             }
 
@@ -831,8 +830,8 @@ export class Game {
             if ((e.mass || 2) < 100) {
               const kFactor = Math.min(1.4, 1.4 / (e.mass || 2));
               const speed = Math.hypot(orb.vx, orb.vy);
-              e.knockbackVx = -nx * (Math.max(2.5, speed * 0.75) * kFactor);
-              e.knockbackVy = -ny * (Math.max(2.5, speed * 0.75) * kFactor);
+              e.knockbackVx = -nx * (Math.max(1.4, speed * 0.65) * kFactor);
+              e.knockbackVy = -ny * (Math.max(1.4, speed * 0.65) * kFactor);
             }
 
             if (e.hp > 0) {
@@ -947,18 +946,17 @@ export class Game {
                   this.addFloatingText(orb.x, orb.y - 16, `BOUNCE! -${effectiveDmg}`, '#f97316');
                 }
 
-                // Elastic reflection off boss body in SLING mode!
-                if (orb.mode === 'SLING') {
-                  const bnx = bdx / bdist;
-                  const bny = bdy / bdist;
-                  const dot = orb.vx * bnx + orb.vy * bny;
-                  if (dot < 0) {
-                    orb.vx -= 1.95 * dot * bnx;
-                    orb.vy -= 1.95 * dot * bny;
-                    orb.x = b.x + bnx * (b.width * 0.45 + orbRadius + 2);
-                    orb.y = b.y + bny * (b.height * 0.45 + orbRadius + 2);
-                  }
-                } else {
+                // Elastic reflection off boss body for both SLING and ORBIT (Hammerfight)
+                const bnx = bdx / bdist;
+                const bny = bdy / bdist;
+                const dot = orb.vx * bnx + orb.vy * bny;
+                if (dot < 0) {
+                  orb.vx -= 1.85 * dot * bnx;
+                  orb.vy -= 1.85 * dot * bny;
+                  orb.x = b.x + bnx * (b.width * 0.45 + orbRadius + 2);
+                  orb.y = b.y + bny * (b.height * 0.45 + orbRadius + 2);
+                }
+                if (orb.mode === 'ORBIT') {
                   orb.orbitAngularVel = -orb.orbitAngularVel * 0.85;
                 }
               } else {

@@ -11,7 +11,7 @@ export class TerrainEngine {
   private width: number;
   private height: number;
   private scrollY: number = 0;
-  private scrollSpeed: number = 0.50;
+  private scrollSpeed: number = 0.25;
   private patternCanvas: HTMLCanvasElement;
   private patternCtx: CanvasRenderingContext2D;
 

@@ -126,13 +126,13 @@ export class BossManager {
 
     // Entrance flight
     if (b.y < b.targetY) {
-      b.y += 0.65;
+      b.y += 0.32;
       return;
     }
 
     // --- 1. デカくてゆっくりうごく (Huge, majestic, slow sway at top) ---
-    b.x = canvasWidth / 2 + Math.sin(b.timer * 0.012) * 65;
-    b.y = b.targetY + Math.cos(b.timer * 0.016) * 10;
+    b.x = canvasWidth / 2 + Math.sin(b.timer * 0.008) * 65;
+    b.y = b.targetY + Math.cos(b.timer * 0.010) * 10;
 
     // --- 2. ザコが体当たりしてくる (Minion Targeted Body Slam) ---
     // Every 140 ticks (~2.3s), boss launches a tackle minion aimed directly at Solvalou!
@@ -159,7 +159,7 @@ export class BossManager {
       const dx = playerX - launchX;
       const dy = playerY - launchY;
       const dist = Math.hypot(dx, dy) || 1;
-      const tackleSpeed = 2.45; // Readable, dodgeable high-speed tackle!
+      const tackleSpeed = 1.20; // Readable, dodgeable high-speed tackle!
 
       onSpawnTackleMinion(
         minionType,
@@ -181,7 +181,7 @@ export class BossManager {
       const bdx = playerX - b.x;
       const bdy = playerY - b.y;
       const dist = Math.hypot(bdx, bdy) || 1;
-      onSpawnBullet(b.x, b.y + 25, (bdx / dist) * 0.60, (bdy / dist) * 0.60);
+      onSpawnBullet(b.x, b.y + 25, (bdx / dist) * 0.30, (bdy / dist) * 0.30);
     }
   }
 

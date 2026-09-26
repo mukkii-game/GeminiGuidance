@@ -413,7 +413,7 @@ export class ArcadeRenderer {
       ctx.textAlign = 'center';
       if (mode === 'ORBIT') {
         ctx.fillStyle = '#38bdf8';
-        ctx.fillText('⚡分銅[反射/弾消し]', player.x, player.y - 18);
+        ctx.fillText('⚡分銅[Hammerfight/弾消し]', player.x, player.y - 18);
       } else {
         ctx.fillStyle = '#fde047';
         const colLabel = colMode === 'REFLECT' ? '[反射]' : '[貫通]';
@@ -430,7 +430,7 @@ export class ArcadeRenderer {
     for (const orb of orbs) {
       const dist = Math.hypot(orb.x - playerX, orb.y - playerY);
       const speed = Math.hypot(orb.vx, orb.vy);
-      const isFast = speed > 2.5;
+      const isFast = speed > 1.25;
       const isCharged = !!orb.isCharged;
       const effectiveR = orb.mode === 'ORBIT'
         ? (orb.orbitTier === 'SHORT' ? orb.radius * 0.75 : orb.orbitTier === 'LONG' ? orb.radius * 1.65 : orb.radius)
@@ -1121,7 +1121,7 @@ export class ArcadeRenderer {
     ctx.fillStyle = isOrbit ? '#38bdf8' : '#fde047';
     ctx.font = '8px "DotGothic16", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(isOrbit ? '⚡光ロープ分銅' : '🚀ヨーヨー突撃', btnModeX + btnModeW / 2, 34);
+    ctx.fillText(isOrbit ? '⚡分銅ハンマー' : '🚀ヨーヨー突撃', btnModeX + btnModeW / 2, 34);
 
     const curCol = telemetry?.collisionMode || 'PENETRATE';
     const isPen = curCol === 'PENETRATE';
@@ -1353,7 +1353,7 @@ export class ArcadeRenderer {
     ctx.fillStyle = isOrbit ? '#38bdf8' : '#fde047';
     ctx.font = '8px "DotGothic16", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(isOrbit ? '⚡攻撃②:光ロープ分銅' : '🚀攻撃①:ヨーヨー突撃', 8 + btnAtkW / 2, 30);
+    ctx.fillText(isOrbit ? '⚡攻撃②:分銅ハンマー' : '🚀攻撃①:ヨーヨー突撃', 8 + btnAtkW / 2, 30);
 
     const curCol = telemetry?.collisionMode || 'PENETRATE';
     const isPen = curCol === 'PENETRATE';

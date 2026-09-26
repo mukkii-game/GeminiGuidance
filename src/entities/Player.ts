@@ -42,10 +42,10 @@ export class Player {
     const dy = targetY - this.state.y;
     const dist = Math.hypot(dx, dy);
 
-    // Max flight speed: 5.6 px/frame (~336 px/sec) - agile, arcade-responsive, but strictly physical
-    const maxSpeed = 5.6;
+    // Max flight speed: 2.8 px/frame (~168 px/sec) - deliberate, tactical, analog precision
+    const maxSpeed = 2.8;
     if (dist > 0.001) {
-      const step = Math.min(dist * 0.22, maxSpeed);
+      const step = Math.min(dist * 0.16, maxSpeed);
       this.state.x += (dx / dist) * step;
       this.state.y += (dy / dist) * step;
     }
@@ -58,9 +58,9 @@ export class Player {
     this.state.vy = this.state.y - prevY;
 
     // Calculate bank tilt
-    if (this.state.vx < -0.8) {
+    if (this.state.vx < -0.4) {
       this.state.tilt = -1;
-    } else if (this.state.vx > 0.8) {
+    } else if (this.state.vx > 0.4) {
       this.state.tilt = 1;
     } else {
       this.state.tilt = 0;

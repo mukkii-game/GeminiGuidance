@@ -6,12 +6,12 @@ export const PHYSICS_PRESETS: Record<PhysicsPresetId, PhysicsPresetConfig> = {
     name: 'SNAP SLING',
     nameJa: '標準突き (ヨーヨー)',
     descJa: '前後に小気味よく突き刺すホーミング＆火の玉チャージ',
-    springK: 0.0016,
-    springNonlinear: 0.035,
+    springK: 0.0008,
+    springNonlinear: 0.018,
     damping: 0.993,
-    maxSpeed: 4.8,
-    apexThreshold: 0.9,
-    orbitBaseSpeed: 0.055,
+    maxSpeed: 2.4,
+    apexThreshold: 0.45,
+    orbitBaseSpeed: 0.035,
     orbitTransfer: 0.20,
   },
   HYPER_BOOMERANG: {
@@ -19,12 +19,12 @@ export const PHYSICS_PRESETS: Record<PhysicsPresetId, PhysicsPresetConfig> = {
     name: 'HYPER BOOMERANG',
     nameJa: '大遠投ブーメラン',
     descJa: '低空気抵抗で遠くへ伸びる大弧線突き',
-    springK: 0.0010,
-    springNonlinear: 0.022,
+    springK: 0.0005,
+    springNonlinear: 0.011,
     damping: 0.997,
-    maxSpeed: 5.6,
-    apexThreshold: 0.8,
-    orbitBaseSpeed: 0.045,
+    maxSpeed: 2.8,
+    apexThreshold: 0.40,
+    orbitBaseSpeed: 0.028,
     orbitTransfer: 0.16,
   },
   GIGANTIC_SPRING: {
@@ -32,12 +32,12 @@ export const PHYSICS_PRESETS: Record<PhysicsPresetId, PhysicsPresetConfig> = {
     name: 'GIGANTIC SPRING',
     nameJa: '超加速パチンコ (高反発)',
     descJa: '離すほど猛烈に火の玉化して突進する強力バネ',
-    springK: 0.0020,
-    springNonlinear: 0.065,
+    springK: 0.0010,
+    springNonlinear: 0.032,
     damping: 0.990,
-    maxSpeed: 6.2,
-    apexThreshold: 1.0,
-    orbitBaseSpeed: 0.065,
+    maxSpeed: 3.1,
+    apexThreshold: 0.50,
+    orbitBaseSpeed: 0.040,
     orbitTransfer: 0.24,
   },
   HEAVY_WRECKER: {
@@ -45,12 +45,12 @@ export const PHYSICS_PRESETS: Record<PhysicsPresetId, PhysicsPresetConfig> = {
     name: 'HEAVY WRECKER',
     nameJa: '重量分銅 (高質量)',
     descJa: '重い質量感。折り返しでの滞空時間が長く敵を押し戻す',
-    springK: 0.0012,
-    springNonlinear: 0.028,
+    springK: 0.0006,
+    springNonlinear: 0.014,
     damping: 0.995,
-    maxSpeed: 4.2,
-    apexThreshold: 1.1,
-    orbitBaseSpeed: 0.038,
+    maxSpeed: 2.1,
+    apexThreshold: 0.55,
+    orbitBaseSpeed: 0.024,
     orbitTransfer: 0.14,
   },
   RAPID_ORBIT: {
@@ -58,13 +58,13 @@ export const PHYSICS_PRESETS: Record<PhysicsPresetId, PhysicsPresetConfig> = {
     name: 'RAPID ORBIT',
     nameJa: '高速公転バリア',
     descJa: 'タップ時の光のロープ拘束と追従性が最も高い防御型',
-    springK: 0.0017,
-    springNonlinear: 0.032,
+    springK: 0.00085,
+    springNonlinear: 0.016,
     damping: 0.992,
-    maxSpeed: 4.5,
-    apexThreshold: 0.9,
-    orbitBaseSpeed: 0.080,
-    orbitTransfer: 0.30,
+    maxSpeed: 2.25,
+    apexThreshold: 0.45,
+    orbitBaseSpeed: 0.048,
+    orbitTransfer: 0.28,
   },
 };
 
@@ -210,28 +210,37 @@ export class GeminiOrbManager {
         const dx = orb.x - playerX;
         const dy = orb.y - playerY;
         const dist = Math.hypot(dx, dy) || 1;
-        // Lock tether to exact distance at this moment!
-        const r = Math.max(34, Math.min(220, dist));
+        // Lock tether to exact distance at this moment (Hammerfight style)
+        const r = Math.max(40, Math.min(180, dist));
+        orb.tetherLength = r;
         orb.orbitRadius = r;
         orb.orbitAngle = Math.atan2(dy, dx);
+
+        // Initial spin kick
+        const tx = -dy / dist;
+        const ty = dx / dist;
+        orb.vx += tx * 1.2;
+        orb.vy += ty * 1.2;
 
         // Tier classification: SHORT (< 65), MEDIUM (65 - 125), LONG (>= 125)
         if (r < 65) {
           orb.orbitTier = 'SHORT';
-          orb.orbitAngularVel = 0.080; // High speed barrier
+          orb.orbitAngularVel = 0.055;
         } else if (r < 125) {
           orb.orbitTier = 'MEDIUM';
-          orb.orbitAngularVel = 0.052; // Balanced crowd sweeper
+          orb.orbitAngularVel = 0.038;
         } else {
           orb.orbitTier = 'LONG';
-          orb.orbitAngularVel = 0.035; // Heavy flail (spin up with mouse motion)
+          orb.orbitAngularVel = 0.025;
         }
         lastTier = orb.orbitTier;
         lastRadius = Math.round(r);
         orb.isCharged = false;
+        orb.isHoveringApex = false;
       } else {
         orb.mode = 'SLING';
         orb.orbitTier = undefined;
+        orb.strokePhase = 'RETURN';
         orb.isCharged = false;
       }
     }
@@ -246,23 +255,30 @@ export class GeminiOrbManager {
           const dx = orb.x - playerX;
           const dy = orb.y - playerY;
           const dist = Math.hypot(dx, dy) || 1;
-          const r = Math.max(34, Math.min(220, dist));
+          const r = Math.max(40, Math.min(180, dist));
+          orb.tetherLength = r;
           orb.orbitRadius = r;
           orb.orbitAngle = Math.atan2(dy, dx);
+          const tx = -dy / dist;
+          const ty = dx / dist;
+          orb.vx += tx * 1.2;
+          orb.vy += ty * 1.2;
           if (r < 65) {
             orb.orbitTier = 'SHORT';
-            orb.orbitAngularVel = 0.080;
+            orb.orbitAngularVel = 0.055;
           } else if (r < 125) {
             orb.orbitTier = 'MEDIUM';
-            orb.orbitAngularVel = 0.052;
+            orb.orbitAngularVel = 0.038;
           } else {
             orb.orbitTier = 'LONG';
-            orb.orbitAngularVel = 0.035;
+            orb.orbitAngularVel = 0.025;
           }
           orb.isCharged = false;
+          orb.isHoveringApex = false;
         } else {
           orb.mode = 'SLING';
           orb.orbitTier = undefined;
+          orb.strokePhase = 'RETURN';
           orb.isCharged = false;
         }
       }
@@ -274,24 +290,20 @@ export class GeminiOrbManager {
     if (orb.mode === 'ORBIT') {
       // ② Tethered Flail
       if (orb.orbitTier === 'SHORT') {
-        // Small barrier: lower damage (0.75x)
         return Math.max(1, Math.round(baseDamage * 0.75));
       } else if (orb.orbitTier === 'LONG') {
-        // Gigantic heavy flail: massive damage (3.5x)!
         return Math.round(baseDamage * 3.5);
       } else {
-        // Medium sweep: solid damage (1.5x)
         return Math.round(baseDamage * 1.5);
       }
     } else {
       // ① Mode: Yo-yo / Spear Thrust
       if (orb.isCharged) {
-        // Super charged fiery thrust: 3.5x massive damage!
         return Math.round(baseDamage * 3.5);
       }
       const speed = Math.hypot(orb.vx, orb.vy);
-      if (speed > 1.8) {
-        const multiplier = 1 + (speed - 1.8) / 2.5;
+      if (speed > 0.9) {
+        const multiplier = 1 + (speed - 0.9) / 1.25;
         return Math.round(baseDamage * multiplier);
       }
       return baseDamage;
@@ -301,21 +313,19 @@ export class GeminiOrbManager {
   public getEffectiveRadius(orb: GeminiOrb): number {
     const baseR = orb.level === 1 ? 16 : orb.level === 2 ? 24 : 32;
     if (orb.mode === 'ORBIT') {
-      // ② Tethered Flail
       if (orb.orbitTier === 'SHORT') {
-        return baseR * 0.75; // Small, agile protective shield
+        return baseR * 0.75;
       } else if (orb.orbitTier === 'LONG') {
-        return baseR * 1.65; // GIGANTIC WRECKING BALL!
+        return baseR * 1.65;
       } else {
-        return baseR * 1.0; // Standard sweep
+        return baseR * 1.0;
       }
     } else {
-      // ① Mode: Yo-yo / Spear Thrust
       if (orb.isCharged) {
-        return baseR * 1.35; // Expands with blazing plasma flames!
+        return baseR * 1.35;
       }
       if (orb.isHoveringApex) {
-        return baseR * 1.25; // Apex dwell resonance
+        return baseR * 1.25;
       }
       return baseR;
     }
@@ -382,13 +392,13 @@ export class GeminiOrbManager {
     };
   }
 
-  public spawn(x: number, y: number, initialVx: number = 0, initialVy: number = -4.0): GeminiOrb {
+  public spawn(x: number, y: number, initialVx: number = 0, initialVy: number = -2.2): GeminiOrb {
     const orb: GeminiOrb = {
       id: `gemini_${++this.orbCounter}`,
       x,
       y,
-      vx: initialVx || (Math.random() - 0.5) * 2.0,
-      vy: initialVy || -4.5,
+      vx: initialVx || (Math.random() - 0.5) * 1.0,
+      vy: initialVy || -2.2,
       level: 1,
       radius: 16,
       damage: 1,
@@ -398,9 +408,13 @@ export class GeminiOrbManager {
       collisionMode: this.collisionMode,
       orbitRadius: this.tuning.orbitRadius,
       orbitAngle: -Math.PI / 2,
-      orbitAngularVel: 0.065,
+      orbitAngularVel: 0.045,
       apexDwellTimer: 0,
       isHoveringApex: false,
+      strokePhase: 'OUTWARD',
+      castTargetX: x,
+      castTargetY: y - 80,
+      tetherLength: this.tuning.orbitRadius,
     };
     this.orbs.push(orb);
     return orb;
@@ -436,91 +450,227 @@ export class GeminiOrbManager {
         orb.fuseTimer--;
       }
 
-      // Vector from Gemini to Player
-      const dx = playerX - orb.x;
-      const dy = playerY - orb.y;
-      const dist = Math.hypot(dx, dy) || 1;
-      const ux = dx / dist; // unit vector pointing toward player
-      const uy = dy / dist;
-
       if (orb.mode === 'ORBIT') {
-        // --- MODE ②: TETHERED ORBIT / WHIRLING FLAIL (公転紐ロック旋回) ---
+        // --- MODE ②: HAMMERFIGHT TETHERED FLAIL (物理ロープ＆分銅スイング) ---
         orb.isCharged = false;
         orb.chargeRatio = 0;
-
-        const tx = -Math.sin(orb.orbitAngle);
-        const ty = Math.cos(orb.orbitAngle);
-
-        const playerTangential = playerVx * tx + playerVy * ty;
-        orb.orbitAngularVel += (playerTangential / orb.orbitRadius) * cfg.orbitTransfer;
-
-        // Base idle rotation speed depending on tier
-        const baseSpeed = orb.orbitTier === 'SHORT' ? 0.080 : orb.orbitTier === 'LONG' ? 0.035 : 0.052;
-        orb.orbitAngularVel = orb.orbitAngularVel * 0.985 + (baseSpeed * 0.015);
-        orb.orbitAngularVel = Math.max(-0.20, Math.min(0.20, orb.orbitAngularVel));
-
-        orb.orbitAngle += orb.orbitAngularVel;
-
-        orb.x = playerX + Math.cos(orb.orbitAngle) * orb.orbitRadius;
-        orb.y = playerY + Math.sin(orb.orbitAngle) * orb.orbitRadius;
-
-        orb.vx = playerVx + tx * (orb.orbitRadius * orb.orbitAngularVel);
-        orb.vy = playerVy + ty * (orb.orbitRadius * orb.orbitAngularVel);
-
         orb.isHoveringApex = false;
         orb.apexDwellTimer = 0;
 
-      } else {
-        // --- MODE ①: YO-YO SPEAR THRUST & FIREBALL CHARGE ---
-        const stretch = Math.max(0, dist - 12);
-        // Attractive homing force towards player increases with distance!
-        const linearForce = stretch * springK;
-        const nonlinearForce = springNonlinear * Math.pow(stretch / 70, 2);
-        const totalAccel = Math.min(1.2, linearForce + nonlinearForce);
+        const fDx = orb.x - playerX;
+        const fDy = orb.y - playerY;
+        const fDist = Math.hypot(fDx, fDy) || 1;
+        const fUx = fDx / fDist; // unit vector pointing outward from ship to flail
+        const fUy = fDy / fDist;
+        const fTx = -fUy; // tangent unit vector
+        const fTy = fUx;
 
-        orb.vx += ux * totalAccel;
-        orb.vy += uy * totalAccel;
+        const maxL = (orb.tetherLength || orb.orbitRadius || 75) * (this.tuning.orbitRadius / 75);
+        const relVx = orb.vx - playerVx;
+        const relVy = orb.vy - playerVy;
+        const radialVel = relVx * fUx + relVy * fUy;
 
-        orb.vx *= cfg.damping;
-        orb.vy *= cfg.damping;
+        // Rope tension constraint (Hammerfight rope tension)
+        if (fDist > maxL) {
+          const stretch = fDist - maxL;
+          const kRope = 0.22;
+          const springForce = stretch * kRope;
+          const damperForce = Math.max(0, radialVel) * 0.70;
+          const tension = springForce + damperForce;
 
-        if (dist < 28 && Math.hypot(orb.vx, orb.vy) < 0.9) {
-          orb.vx *= 0.92;
-          orb.vy *= 0.92;
-        }
+          orb.vx -= fUx * tension;
+          orb.vy -= fUy * tension;
 
-        const curSpeed = Math.hypot(orb.vx, orb.vy);
-        const maxSpd = (cfg.maxSpeed + (orb.level - 1) * 0.8) * this.tuning.maxSpeedMultiplier;
-        if (curSpeed > maxSpd) {
-          orb.vx = (orb.vx / curSpeed) * maxSpd;
-          orb.vy = (orb.vy / curSpeed) * maxSpd;
-        }
-
-        // Velocity projection onto vector towards player
-        const dotTowardPlayer = orb.vx * ux + orb.vy * uy;
-
-        // CHARGE / FIREBALL DETECTION:
-        // 1. When Gemini is pulled far (dist > 60px) and accelerating fast toward player (dotTowardPlayer > 0.6)
-        if (dist > 60 && dotTowardPlayer > 0.6) {
-          orb.isCharged = true;
-          orb.chargeRatio = Math.min(1.0, (dist - 40) / 90);
-        }
-
-        // 2. When shooting past player on outward thrust, it stays charged until slowing down near apex!
-        if (orb.isCharged) {
-          if (curSpeed < apexThreshold * 1.1) {
-            orb.isCharged = false;
-            orb.chargeRatio = 0;
+          // Hard position constraint clamp
+          if (fDist > maxL * 1.22) {
+            orb.x = playerX + fUx * (maxL * 1.22);
+            orb.y = playerY + fUy * (maxL * 1.22);
+            if (radialVel > 0) {
+              orb.vx -= radialVel * fUx;
+              orb.vy -= radialVel * fUy;
+            }
           }
         }
 
-        // Apex Dwell Detection
-        if (dist > 45 && curSpeed < apexThreshold) {
-          orb.isHoveringApex = true;
-          orb.apexDwellTimer++;
-        } else {
-          orb.isHoveringApex = false;
+        // Whip momentum transfer: player ship motion adds directly to tangential swing
+        const playerTangential = playerVx * fTx + playerVy * fTy;
+        orb.vx += fTx * (playerTangential * 0.28);
+        orb.vy += fTy * (playerTangential * 0.28);
+
+        // Hammerfight rotational persistence (subtle momentum retention)
+        const curTangential = orb.vx * fTx + orb.vy * fTy;
+        const spinSign = curTangential >= 0 ? 1 : -1;
+        const targetBaseSpeed = orb.orbitTier === 'SHORT' ? 1.3 : orb.orbitTier === 'LONG' ? 0.85 : 1.05;
+        if (Math.abs(curTangential) < targetBaseSpeed) {
+          orb.vx += fTx * spinSign * 0.032;
+          orb.vy += fTy * spinSign * 0.032;
+        }
+
+        // Air drag
+        orb.vx *= 0.993;
+        orb.vy *= 0.993;
+
+        // Speed limit
+        const maxSpd = (cfg.maxSpeed * 1.2) * this.tuning.maxSpeedMultiplier;
+        const curSpd = Math.hypot(orb.vx, orb.vy);
+        if (curSpd > maxSpd) {
+          orb.vx = (orb.vx / curSpd) * maxSpd;
+          orb.vy = (orb.vy / curSpd) * maxSpd;
+        }
+
+        orb.x += orb.vx;
+        orb.y += orb.vy;
+
+        orb.orbitAngle = Math.atan2(orb.y - playerY, orb.x - playerX);
+        orb.orbitRadius = Math.hypot(orb.x - playerX, orb.y - playerY);
+
+        // Screen bounce in orbit mode if enabled
+        if (this.screenEdgeBounce) {
+          let bounced = false;
+          if (orb.x < 14) { orb.x = 14; orb.vx = Math.abs(orb.vx) * 0.9; bounced = true; }
+          if (orb.x > 346) { orb.x = 346; orb.vx = -Math.abs(orb.vx) * 0.9; bounced = true; }
+          if (orb.y < 24) { orb.y = 24; orb.vy = Math.abs(orb.vy) * 0.9; bounced = true; }
+          if (orb.y > 516) { orb.y = 516; orb.vy = -Math.abs(orb.vy) * 0.9; bounced = true; }
+          if (bounced && onWallHit) onWallHit(orb.x, orb.y);
+        }
+
+      } else {
+        // --- MODE ①: YO-YO SPEAR THRUST & ANALOG RHYTHM SWING ---
+        if (!orb.strokePhase) {
+          orb.strokePhase = 'RETURN';
+        }
+
+        const dist = Math.hypot(playerX - orb.x, playerY - orb.y) || 1;
+        const pSpeed = Math.hypot(playerVx, playerVy);
+
+        // 1. Throw / Thrust Launch Detection:
+        // When orb is near player and player pushes forward / darts:
+        if (dist < 44 && pSpeed > 0.40) {
+          const pUx = playerVx / pSpeed;
+          const pUy = playerVy / pSpeed;
+          const reach = Math.min(240, 95 + pSpeed * 55);
+          orb.castTargetX = playerX + pUx * reach;
+          orb.castTargetY = playerY + pUy * reach;
+          orb.vx += pUx * (pSpeed * 1.35 + 1.2);
+          orb.vy += pUy * (pSpeed * 1.35 + 1.2);
+          orb.strokePhase = 'OUTWARD';
+          orb.isCharged = true;
+          orb.chargeRatio = 1.0;
           orb.apexDwellTimer = 0;
+        }
+
+        // Advance target anchor if player continues pushing in the throw direction
+        if (orb.strokePhase === 'OUTWARD' && orb.castTargetX !== undefined && orb.castTargetY !== undefined) {
+          const advDx = orb.castTargetX - playerX;
+          const advDy = orb.castTargetY - playerY;
+          const dotAdv = playerVx * advDx + playerVy * advDy;
+          if (dotAdv > 0) {
+            orb.castTargetX += playerVx * 1.1;
+            orb.castTargetY += playerVy * 1.1;
+          }
+        }
+
+        if (orb.strokePhase === 'OUTWARD') {
+          // OUTWARD: Commits to flying towards cast apex!
+          // Moving player backwards does NOT cancel this outward flight!
+          const tDx = (orb.castTargetX ?? playerX) - orb.x;
+          const tDy = (orb.castTargetY ?? (playerY - 90)) - orb.y;
+          const tDist = Math.hypot(tDx, tDy) || 1;
+          const tUx = tDx / tDist;
+          const tUy = tDy / tDist;
+          const forwardVel = orb.vx * tUx + orb.vy * tUy;
+
+          // Drag and target tracking
+          orb.vx *= cfg.damping;
+          orb.vy *= cfg.damping;
+          const toApexAccel = Math.min(0.20, tDist * 0.002);
+          orb.vx += tUx * toApexAccel;
+          orb.vy += tUy * toApexAccel;
+
+          // If player pulls back while orb is flying out, string tightens -> FIREBALL CHARGE!
+          const rDx = playerX - orb.x;
+          const rDy = playerY - orb.y;
+          const rDist = Math.hypot(rDx, rDy) || 1;
+          if (rDist > 45) {
+            orb.isCharged = true;
+            orb.chargeRatio = Math.min(1.0, (rDist - 30) / 75);
+          }
+
+          // Apex Reach Condition:
+          // Near destination OR forward speed dropped below threshold
+          if (tDist < 16 || forwardVel < apexThreshold) {
+            orb.strokePhase = 'APEX';
+            orb.apexDwellTimer = Math.max(8, Math.round(18 * this.tuning.apexDwellMultiplier));
+            orb.isHoveringApex = true;
+          }
+
+        } else if (orb.strokePhase === 'APEX') {
+          // APEX: Hover in place, spin and deliver multi-hit damage
+          orb.vx *= 0.82;
+          orb.vy *= 0.82;
+          orb.isHoveringApex = true;
+          orb.apexDwellTimer--;
+          if (orb.apexDwellTimer <= 0) {
+            orb.strokePhase = 'RETURN';
+            orb.isHoveringApex = false;
+          }
+
+        } else {
+          // RETURN: Accelerates toward player's current position!
+          const rDx = playerX - orb.x;
+          const rDy = playerY - orb.y;
+          const rDist = Math.hypot(rDx, rDy) || 1;
+          const rUx = rDx / rDist;
+          const rUy = rDy / rDist;
+
+          const stretch = Math.max(0, rDist - 10);
+          const linearForce = stretch * springK;
+          const nonlinearForce = springNonlinear * Math.pow(stretch / 65, 2);
+          const totalAccel = Math.min(0.90, linearForce + nonlinearForce);
+
+          orb.vx += rUx * totalAccel;
+          orb.vy += rUy * totalAccel;
+          orb.vx *= cfg.damping;
+          orb.vy *= cfg.damping;
+
+          // Charge detection on return
+          const dotTowardPlayer = orb.vx * rUx + orb.vy * rUy;
+          if (rDist > 45 && dotTowardPlayer > 0.35) {
+            orb.isCharged = true;
+            orb.chargeRatio = Math.min(1.0, (rDist - 30) / 75);
+          }
+
+          // Crossing / approaching player
+          if (rDist < 36) {
+            const curSpd = Math.hypot(orb.vx, orb.vy);
+            if (pSpeed > 0.35 || curSpd > 0.7) {
+              // RHYTHMIC MOMENTUM TRANSFER! Player pumps the swing like a swing / yo-yo!
+              orb.vx += playerVx * 1.35;
+              orb.vy += playerVy * 1.35;
+              const newSpd = Math.hypot(orb.vx, orb.vy);
+              if (newSpd > 0.5) {
+                const throwReach = Math.min(250, 95 + newSpd * 50);
+                orb.castTargetX = orb.x + (orb.vx / newSpd) * throwReach;
+                orb.castTargetY = orb.y + (orb.vy / newSpd) * throwReach;
+                orb.strokePhase = 'OUTWARD';
+                orb.isCharged = true;
+                orb.apexDwellTimer = 0;
+              }
+            } else {
+              // Gentle hover near ship
+              orb.vx *= 0.88;
+              orb.vy *= 0.88;
+              orb.isCharged = false;
+            }
+          }
+        }
+
+        // Max speed clamp
+        const curSpeed = Math.hypot(orb.vx, orb.vy);
+        const maxSpd = (cfg.maxSpeed + (orb.level - 1) * 0.4) * this.tuning.maxSpeedMultiplier;
+        if (curSpeed > maxSpd) {
+          orb.vx = (orb.vx / curSpeed) * maxSpd;
+          orb.vy = (orb.vy / curSpeed) * maxSpd;
         }
 
         orb.x += orb.vx;
@@ -533,11 +683,15 @@ export class GeminiOrbManager {
           if (orb.x > 346) { orb.x = 346; orb.vx = -Math.abs(orb.vx) * 0.95; bounced = true; }
           if (orb.y < 24) { orb.y = 24; orb.vy = Math.abs(orb.vy) * 0.95; bounced = true; }
           if (orb.y > 516) { orb.y = 516; orb.vy = -Math.abs(orb.vy) * 0.95; bounced = true; }
-          if (bounced && onWallHit) {
-            onWallHit(orb.x, orb.y);
+          if (bounced) {
+            if (orb.strokePhase === 'OUTWARD') {
+              orb.strokePhase = 'APEX';
+              orb.apexDwellTimer = 10;
+            }
+            if (onWallHit) onWallHit(orb.x, orb.y);
           }
         } else {
-          // 画面端に当たり判定がない: pass-through beyond screen, gentle containment far offscreen
+          // Offscreen gentle drag
           if (orb.x < -120) { orb.x = -120; orb.vx *= 0.5; }
           if (orb.x > 480) { orb.x = 480; orb.vx *= 0.5; }
           if (orb.y < -120) { orb.y = -120; orb.vy *= 0.5; }

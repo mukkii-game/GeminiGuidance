@@ -120,6 +120,10 @@ export interface GeminiOrb {
   isCharged?: boolean;
   chargeRatio?: number;
   orbitTier?: 'SHORT' | 'MEDIUM' | 'LONG';
+  strokePhase?: 'OUTWARD' | 'APEX' | 'RETURN';
+  castTargetX?: number;
+  castTargetY?: number;
+  tetherLength?: number;
 }
 
 export type EnemyType = 
