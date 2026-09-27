@@ -5,13 +5,12 @@ import {
   FloatingText,
   GeminiDropItem,
   EnemyBullet,
-  PhysicsPresetId,
   EnemyType,
   MovementPattern,
   TestEnemySetup,
 } from '../types';
 import { Player } from '../entities/Player';
-import { GeminiOrbManager, PRESET_ORDER } from '../entities/GeminiOrb';
+import { GeminiOrbManager, PATTERN_ORDER } from '../entities/GeminiOrb';
 import { EnemyManager } from '../entities/Enemy';
 import { GroundTargetManager } from '../entities/GroundTarget';
 import { BossManager } from '../entities/Boss';
@@ -544,18 +543,17 @@ export class Game {
       );
     }
 
-    // Handle Preset Selection (KeyP, Digit1-5)
-    const presetChoice = this.input.consumePresetSelect();
-    if (presetChoice) {
-      if (presetChoice === 'CYCLE') {
-        const p = this.geminiManager.cyclePreset();
-        this.addFloatingText(this.player.state.x, this.player.state.y - 30, `MODE: ${p.nameJa}`, '#fde047');
-        this.audio.playGeminiBounce();
-      } else {
-        const p = this.geminiManager.setPreset(presetChoice as PhysicsPresetId);
-        this.addFloatingText(this.player.state.x, this.player.state.y - 30, `MODE: ${p.nameJa}`, '#fde047');
-        this.audio.playGeminiBounce();
-      }
+    // Handle Physics Pattern Selection (Digit1-5, KeyP)
+    const patternChoice = this.input.consumePatternSelect();
+    if (patternChoice) {
+      const info = this.geminiManager.setPattern(patternChoice);
+      this.addFloatingText(this.player.state.x, this.player.state.y - 30, `【${info.num}. ${info.nameJa}】`, '#fde047');
+      this.audio.playGeminiBounce();
+    }
+    if (this.input.consumePatternCycle()) {
+      const info = this.geminiManager.cyclePattern();
+      this.addFloatingText(this.player.state.x, this.player.state.y - 30, `【${info.num}. ${info.nameJa}】`, '#fde047');
+      this.audio.playGeminiBounce();
     }
 
     // Handle Level Up hotkey (KeyL)
@@ -1767,14 +1765,14 @@ export class Game {
         }
       }
 
-      // 4. Row 3: Preset Tabs (y: 37 to 52)
+      // 4. Row 3: 5 Physics Pattern Tabs (y: 37 to 52)
       if (y >= 37 && y <= 52) {
         const tabW = 64;
-        for (let i = 0; i < PRESET_ORDER.length; i++) {
+        for (let i = 0; i < PATTERN_ORDER.length; i++) {
           const tabX = 10 + i * (tabW + 5);
           if (x >= tabX && x <= tabX + tabW) {
-            const p = this.geminiManager.setPreset(PRESET_ORDER[i]);
-            this.addFloatingText(this.player.state.x, this.player.state.y - 30, `MODE: ${p.nameJa}`, '#fde047');
+            const info = this.geminiManager.setPattern(PATTERN_ORDER[i]);
+            this.addFloatingText(this.player.state.x, this.player.state.y - 30, `【${info.num}. ${info.nameJa}】`, '#fde047');
             this.audio.playGeminiBounce();
             return true;
           }
@@ -1867,10 +1865,10 @@ export class Game {
         return true;
       }
 
-      // Row 1: [1-5: PRESET] button (x: w - 134 to w - 48, y: 3 to 20)
+      // Row 1: [1-5: パターン切替] button (x: w - 134 to w - 48, y: 3 to 20)
       if (x >= w - 134 && x <= w - 48 && y >= 3 && y <= 20) {
-        const p = this.geminiManager.cyclePreset();
-        this.addFloatingText(this.player.state.x, this.player.state.y - 30, `MODE: ${p.nameJa}`, '#fde047');
+        const info = this.geminiManager.cyclePattern();
+        this.addFloatingText(this.player.state.x, this.player.state.y - 30, `【${info.num}. ${info.nameJa}】`, '#fde047');
         this.audio.playGeminiBounce();
         return true;
       }

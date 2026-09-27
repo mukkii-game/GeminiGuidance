@@ -16,6 +16,21 @@ export interface PhysicsPresetConfig {
   orbitTransfer: number;   // 自機移動から公転スピンへの加速度伝達
 }
 
+export type PhysicsPatternId = 
+  | 'YOYO_STROKE'        // ① 初代ヨーヨー（大ストローク突き抜け往復＋Apex滞空）
+  | 'COMET_GRAVITY'      // ② ハレー彗星（ケプラー重力スイングバイ＋近日点最速）
+  | 'ARC_HOMING'         // ③ 旋回制限ホーミング（角度制限円弧すり抜け＋緩減衰周回）
+  | 'PURE_FLAIL'         // ④ 常時純粋分銅（ゴム紐テザーぶん回しハンマー）
+  | 'HYBRID_COMET_FLAIL'; // ⑤ 統合ハイブリッド（通常ヨーヨー/彗星＋長押し分銅＋離して投擲）
+
+export interface PhysicsPatternInfo {
+  id: PhysicsPatternId;
+  num: number;
+  nameJa: string;
+  shortLabel: string;
+  summary: string;
+}
+
 export type GeminiCollisionMode = 'PENETRATE' | 'REFLECT';
 
 export type TestEnemySetup = 
@@ -37,6 +52,27 @@ export interface PhysicsTuningState {
   overshootRatio: number;      // 突き抜け余力
 }
 
+export interface GeminiTelemetry {
+  dist: number;
+  speed: number;
+  tangentSpeed: number;
+  mode: 'SLING' | 'ORBIT' | 'COMET';
+  isTethered: boolean;
+  collisionMode: GeminiCollisionMode;
+  isApex: boolean;
+  orbitRadius: number;
+  effectiveDamage: number;
+  screenEdgeBounce: boolean;
+  orbCount: number;
+  tuning: PhysicsTuningState;
+  isCharged: boolean;
+  chargeRatio: number;
+  orbitTier?: 'SHORT' | 'MEDIUM' | 'LONG';
+  spinLevel?: number;
+  patternId: PhysicsPatternId;
+  patternInfo: PhysicsPatternInfo;
+}
+
 export interface InputState {
   x: number;
   y: number;
@@ -48,6 +84,8 @@ export interface InputState {
   bgmTogglePressed?: boolean;
   seTogglePressed?: boolean;
   presetSelectPressed?: PhysicsPresetId;
+  patternSelectPressed?: PhysicsPatternId;
+  patternCyclePressed?: boolean;
   testStageTogglePressed?: boolean;
   levelUpPressed?: boolean;
   orbitTogglePressed?: boolean;

@@ -12,11 +12,11 @@ import {
   FloatingText,
   GameState,
   PhysicsPresetConfig,
-  PhysicsPresetId,
   GeminiCollisionMode,
   TestEnemySetup,
-  PhysicsTuningState,
   AudioSettings,
+  GeminiTelemetry,
+  PhysicsPatternId,
 } from '../types';
 import { SpriteSheet } from './Sprites';
 import { TerrainEngine } from './Terrain';
@@ -78,19 +78,7 @@ export class ArcadeRenderer {
     stageTick: number,
     elonIntroTimer: number = 0,
     presetConfig?: PhysicsPresetConfig,
-    telemetry?: {
-      dist: number;
-      speed: number;
-      tangentSpeed: number;
-      mode?: 'SLING' | 'ORBIT' | 'COMET';
-      collisionMode?: GeminiCollisionMode;
-      isApex?: boolean;
-      orbitRadius?: number;
-      effectiveDamage?: number;
-      screenEdgeBounce?: boolean;
-      orbCount?: number;
-      tuning?: PhysicsTuningState;
-    },
+    telemetry?: GeminiTelemetry,
     testBossDamage: number = 0,
     testEnemySetup: TestEnemySetup = 'SWARM_PENETRATE',
     testBossCollisionMode: 'PENETRATE' | 'REFLECT' = 'PENETRATE',
@@ -1143,18 +1131,8 @@ export class ArcadeRenderer {
     stage: number,
     geminiOrbs: GeminiOrb[],
     boss: BossEntity | null,
-    presetConfig?: PhysicsPresetConfig,
-    telemetry?: {
-      dist: number;
-      speed: number;
-      tangentSpeed: number;
-      mode?: 'SLING' | 'ORBIT' | 'COMET';
-      isTethered?: boolean;
-      collisionMode?: GeminiCollisionMode;
-      isApex?: boolean;
-      orbitRadius?: number;
-      effectiveDamage?: number;
-    },
+    _presetConfig?: PhysicsPresetConfig,
+    telemetry?: GeminiTelemetry,
     audioSettings?: AudioSettings
   ): void {
     const ctx = this.ctx;
@@ -1220,7 +1198,7 @@ export class ArcadeRenderer {
     ctx.strokeRect(btnPresetX, 4, 82, 15);
     ctx.fillStyle = '#fde047';
     ctx.font = '7px "DotGothic16", monospace';
-    ctx.fillText(`[1-5:${presetConfig?.nameJa.slice(0, 4) || '標準'}]`, btnPresetX + 41, 14);
+    ctx.fillText(`[1-5:${telemetry?.patternInfo?.shortLabel || '①ヨーヨー'}]`, btnPresetX + 41, 14);
 
     // Row 2 Buttons: Attack Mode (ヒモ保持 ⇄ 投擲リリース) & Attribute (貫通 / 反射)
     const isTethered = !!telemetry?.isTethered;
@@ -1234,7 +1212,7 @@ export class ArcadeRenderer {
     ctx.fillStyle = isTethered ? '#38bdf8' : '#fde047';
     ctx.font = '8px "DotGothic16", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(isTethered ? '⚡分銅ヒモ保持' : '☄️ハレー彗星', btnModeX + btnModeW / 2, 34);
+    ctx.fillText(isTethered ? '⚡分銅ヒモ保持' : (telemetry?.patternInfo?.shortLabel || '☄️ハレー彗星'), btnModeX + btnModeW / 2, 34);
 
     const curCol = telemetry?.collisionMode || 'PENETRATE';
     const isPen = curCol === 'PENETRATE';
@@ -1343,25 +1321,8 @@ export class ArcadeRenderer {
     player: PlayerState,
     geminiOrbs: GeminiOrb[],
     boss: BossEntity | null,
-    presetConfig?: PhysicsPresetConfig,
-    telemetry?: {
-      dist: number;
-      speed: number;
-      tangentSpeed: number;
-      mode?: 'SLING' | 'ORBIT' | 'COMET';
-      collisionMode?: GeminiCollisionMode;
-      isTethered?: boolean;
-      isApex?: boolean;
-      orbitRadius?: number;
-      effectiveDamage?: number;
-      screenEdgeBounce?: boolean;
-      orbCount?: number;
-      tuning?: PhysicsTuningState;
-      isCharged?: boolean;
-      chargeRatio?: number;
-      orbitTier?: 'SHORT' | 'MEDIUM' | 'LONG';
-      spinLevel?: number;
-    },
+    _presetConfig?: PhysicsPresetConfig,
+    telemetry?: GeminiTelemetry,
     testBossDamage: number = 0,
     testEnemySetup: TestEnemySetup = 'SWARM_PENETRATE',
     testBossCollisionMode: 'PENETRATE' | 'REFLECT' = 'PENETRATE',
@@ -1504,21 +1465,21 @@ export class ArcadeRenderer {
     ctx.textAlign = 'center';
     ctx.fillText(`ジェミニ:${orbCnt}機[O]`, 240 + btnOrbW / 2, 30);
 
-    // Row 3: 5 Preset Switcher Tabs (y: 37 to 51)
-    const tabs: Array<{ id: PhysicsPresetId; label: string; num: string }> = [
-      { id: 'SNAP_SLING', label: 'スリング', num: '1' },
-      { id: 'HYPER_BOOMERANG', label: 'ブーメラン', num: '2' },
-      { id: 'GIGANTIC_SPRING', label: '超ゴムバネ', num: '3' },
-      { id: 'HEAVY_WRECKER', label: '重量分銅', num: '4' },
-      { id: 'RAPID_ORBIT', label: '公転バリア', num: '5' },
+    // Row 3: 5 Physics Pattern Tabs (y: 37 to 51)
+    const patternTabs: Array<{ id: PhysicsPatternId; label: string; num: string }> = [
+      { id: 'YOYO_STROKE', label: 'ヨーヨー', num: '1' },
+      { id: 'COMET_GRAVITY', label: '彗星軌道', num: '2' },
+      { id: 'ARC_HOMING', label: '旋回制限', num: '3' },
+      { id: 'PURE_FLAIL', label: '常時分銅', num: '4' },
+      { id: 'HYBRID_COMET_FLAIL', label: '統合ハイブ', num: '5' },
     ];
     const tabW = 64;
     const tabH = 14;
     const tabY = 37;
-    for (let i = 0; i < tabs.length; i++) {
-      const t = tabs[i];
+    for (let i = 0; i < patternTabs.length; i++) {
+      const t = patternTabs[i];
       const tabX = 10 + i * (tabW + 5);
-      const isActive = presetConfig?.id === t.id;
+      const isActive = telemetry?.patternId === t.id;
       ctx.fillStyle = isActive ? 'rgba(234, 179, 8, 0.55)' : 'rgba(30, 41, 59, 0.85)';
       ctx.fillRect(tabX, tabY, tabW, tabH);
       ctx.strokeStyle = isActive ? '#fde047' : '#475569';

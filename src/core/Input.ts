@@ -1,4 +1,4 @@
-import { InputState, PhysicsPresetId } from '../types';
+import { InputState, PhysicsPresetId, PhysicsPatternId } from '../types';
 
 export class InputManager {
   public state: InputState = {
@@ -136,6 +136,7 @@ export class InputManager {
       }
       if (e.code === 'KeyP') {
         this.cyclePresetPressed = true;
+        this.state.patternCyclePressed = true;
       }
       if (e.code === 'Space' || e.code === 'KeyZ') {
         this.state.orbitTogglePressed = true;
@@ -171,19 +172,19 @@ export class InputManager {
         this.state.tuningResetPressed = true;
       }
       if (e.code === 'Digit1') {
-        this.state.presetSelectPressed = 'SNAP_SLING';
+        this.state.patternSelectPressed = 'YOYO_STROKE';
       }
       if (e.code === 'Digit2') {
-        this.state.presetSelectPressed = 'HYPER_BOOMERANG';
+        this.state.patternSelectPressed = 'COMET_GRAVITY';
       }
       if (e.code === 'Digit3') {
-        this.state.presetSelectPressed = 'GIGANTIC_SPRING';
+        this.state.patternSelectPressed = 'ARC_HOMING';
       }
       if (e.code === 'Digit4') {
-        this.state.presetSelectPressed = 'HEAVY_WRECKER';
+        this.state.patternSelectPressed = 'PURE_FLAIL';
       }
       if (e.code === 'Digit5') {
-        this.state.presetSelectPressed = 'RAPID_ORBIT';
+        this.state.patternSelectPressed = 'HYBRID_COMET_FLAIL';
       }
     });
 
@@ -279,6 +280,18 @@ export class InputManager {
     }
     const val = this.state.presetSelectPressed || null;
     this.state.presetSelectPressed = undefined;
+    return val;
+  }
+
+  public consumePatternSelect(): PhysicsPatternId | null {
+    const val = this.state.patternSelectPressed || null;
+    this.state.patternSelectPressed = undefined;
+    return val;
+  }
+
+  public consumePatternCycle(): boolean {
+    const val = !!this.state.patternCyclePressed;
+    this.state.patternCyclePressed = false;
     return val;
   }
 
