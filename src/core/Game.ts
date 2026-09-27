@@ -1629,15 +1629,30 @@ export class Game {
       }
     );
 
+    // Clean up any stray offscreen enemies in test stage
+    for (let i = this.enemyManager.enemies.length - 1; i >= 0; i--) {
+      const en = this.enemyManager.enemies[i];
+      if (en.x < -60 || en.x > this.canvas.width + 60 || en.y < -60 || en.y > this.canvas.height + 60) {
+        this.enemyManager.enemies.splice(i, 1);
+      }
+    }
+
     // Auto-respawn for all active test scenarios when cleared
     if (this.testEnemySetup !== 'NONE' && this.testEnemySetup !== 'BOSS_PENETRATE') {
       const remainingEnemies = this.enemyManager.enemies;
       if (remainingEnemies.length === 0) {
         this.testSwarmRespawnCooldown++;
-        if (this.testSwarmRespawnCooldown > 50) {
+        if (this.testSwarmRespawnCooldown === 1) {
+          this.addFloatingText(this.canvas.width / 2, 160, '★ 全滅！WIPED OUT! ★', '#22c55e');
+        }
+        if (this.testSwarmRespawnCooldown >= 20) {
           this.testSwarmRespawnCooldown = 0;
           this.applyTestEnemySetup(this.testEnemySetup);
+          this.audio.playGeminiBounce();
+          this.addFloatingText(this.canvas.width / 2, 140, '🔄 敵ウェーブ再出現！', '#38bdf8');
         }
+      } else {
+        this.testSwarmRespawnCooldown = 0;
       }
     }
 

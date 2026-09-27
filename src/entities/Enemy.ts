@@ -253,7 +253,16 @@ export class EnemyManager {
         if (e.x < -60 || e.x > canvasWidth + 60) {
           this.enemies.splice(i, 1);
         }
-      } else if (e.pattern !== 'INVADER' && e.pattern !== 'DUMMY') {
+      } else if (e.pattern === 'DUMMY') {
+        // Soft screen containment for test dummy targets
+        if (e.x < 24) { e.x = 24; e.knockbackVx = Math.abs(e.knockbackVx || 0) * 0.5; }
+        if (e.x > canvasWidth - 24) { e.x = canvasWidth - 24; e.knockbackVx = -Math.abs(e.knockbackVx || 0) * 0.5; }
+        if (e.y < 35) { e.y = 35; e.knockbackVy = Math.abs(e.knockbackVy || 0) * 0.5; }
+        if (e.y > canvasHeight - 70) { e.y = canvasHeight - 70; e.knockbackVy = -Math.abs(e.knockbackVy || 0) * 0.5; }
+        if (e.x < -80 || e.x > canvasWidth + 80 || e.y < -80 || e.y > canvasHeight + 80) {
+          this.enemies.splice(i, 1);
+        }
+      } else if (e.pattern !== 'INVADER') {
         if (e.y > canvasHeight + 100 || e.y < -160 || e.x < -120 || e.x > canvasWidth + 120) {
           this.enemies.splice(i, 1);
         }
