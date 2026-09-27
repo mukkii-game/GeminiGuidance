@@ -760,6 +760,12 @@ export class ArcadeRenderer {
         ctx.fillText('SPACEX', 0, 4);
         ctx.restore();
 
+        if (e.hitCooldown && e.hitCooldown > 0) {
+          const flashAlpha = (e.hitCooldown % 4 < 2) ? 0.75 : 0.25;
+          ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
+          ctx.fillRect(-e.width / 2, -e.height / 2, e.width, e.height);
+        }
+
         ctx.restore();
         continue;
       }
@@ -773,9 +779,10 @@ export class ArcadeRenderer {
         // Keep strictly upright (no rotation)
         ctx.drawImage(sprite, -sprite.width / 2, -sprite.height / 2);
 
-        // Damage flash if hit
-        if (e.hp < e.maxHp && e.maxHp > 1) {
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        // Damage flash if hit (無敵時間中の点滅・被弾フラッシュ)
+        if (e.hitCooldown && e.hitCooldown > 0) {
+          const flashAlpha = (e.hitCooldown % 4 < 2) ? 0.75 : 0.25;
+          ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
           ctx.fillRect(-e.width / 2, -e.height / 2, e.width, e.height);
         }
 

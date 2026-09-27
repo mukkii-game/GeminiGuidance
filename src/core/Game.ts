@@ -907,6 +907,9 @@ export class Game {
 
         if (dist < orbRadius + e.width * 0.45) {
           if (e.hitCooldown && e.hitCooldown > 0) {
+            // 同一通過中の多段ヒット防止: オーブが敵の当たり判定内に重なっている間は無敵時間を維持
+            // （敵の体を完全に通り抜けるまで次のダメージは発生しない）
+            e.hitCooldown = Math.max(e.hitCooldown, 14);
             continue;
           }
 
@@ -920,9 +923,9 @@ export class Game {
             isReflect = e.collisionType === 'REFLECT';
           }
 
-          // Damage application
+          // Damage application (1回の通過で1回のみダメージ判定)
           e.hp -= effectiveDmg;
-          e.hitCooldown = isReflect ? 7 : 4; // Faster 4-frame tick for penetrating!
+          e.hitCooldown = isReflect ? 10 : 22; // 反射時は10F、貫通時は通過完了まで無敵フレーム
 
           if (isReflect) {
             const nx = (orb.x - e.x) / (dist || 1);

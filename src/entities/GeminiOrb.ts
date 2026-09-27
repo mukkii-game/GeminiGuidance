@@ -281,39 +281,22 @@ export class GeminiOrbManager {
   }
 
   public getEffectiveDamage(orb: GeminiOrb): number {
-    const baseDamage = orb.level === 1 ? 1 : orb.level === 2 ? 3 : 8;
+    const baseDamage = orb.level === 1 ? 1 : orb.level === 2 ? 2 : 4;
     if (orb.mode === 'ORBIT') {
-      // ② Tethered Flail (Hammerfight / Murofushi kinetic scaling: E = 1/2 m v^2)
+      // ② 分銅 (Tethered Flail)
       const speed = Math.hypot(orb.vx, orb.vy);
-      const kineticFactor = Math.pow(speed / 1.10, 2);
-      let multiplier = 1.0 + kineticFactor * 1.4;
       if (orb.spinLevel === 2) {
-        multiplier += 2.2; // Massive bonus for Murofushi Giga Spin!
+        return baseDamage + 2; // Giga spin (室伏ジャイアントスイング): Lv1なら3ダメージ
+      } else if (orb.spinLevel === 1 || speed > 1.8) {
+        return baseDamage + 1; // High spin: Lv1なら2ダメージ
       }
-      let tierBase = baseDamage * 1.5;
-      if (orb.orbitTier === 'SHORT') tierBase = baseDamage * 0.9;
-      else if (orb.orbitTier === 'LONG') tierBase = baseDamage * 2.4;
-      return Math.max(1, Math.round(tierBase * multiplier));
-    } else if (orb.mode === 'COMET') {
-      // ③ Halley's Comet (速度二乗比例の重力運動エネルギー破壊)
-      const speed = Math.hypot(orb.vx, orb.vy);
-      const kineticFactor = Math.pow(speed / 1.35, 1.8);
-      let multiplier = 1.2 + kineticFactor * 1.5;
-      if (orb.isCharged) {
-        multiplier += 2.2; // 彗星光冠チャージボーナス！
-      }
-      return Math.max(1, Math.round(baseDamage * multiplier));
+      return baseDamage; // 通常旋回: Lv1なら1ダメージ
     } else {
-      // ① Mode: Yo-yo / Spear Thrust
+      // ① ハレー彗星 (COMET)
       if (orb.isCharged) {
-        return Math.round(baseDamage * 3.5);
+        return baseDamage + 1; // 高速スイングバイ火の玉チャージ: Lv1なら2ダメージ
       }
-      const speed = Math.hypot(orb.vx, orb.vy);
-      if (speed > 0.9) {
-        const multiplier = 1 + (speed - 0.9) / 1.25;
-        return Math.round(baseDamage * multiplier);
-      }
-      return baseDamage;
+      return baseDamage; // 通常突進: Lv1なら1ダメージ (HP2やHP3の敵がしっかり耐えて手応えが出る)
     }
   }
 
