@@ -214,6 +214,10 @@ export class InputManager {
     return click;
   }
 
+  public isTetherHeld(): boolean {
+    return !!this.state.isPointerDown || this.keysDown.has('Space') || this.keysDown.has('KeyZ');
+  }
+
   public consumeCrtToggle(): boolean {
     const val = !!this.state.crtTogglePressed;
     this.state.crtTogglePressed = false;

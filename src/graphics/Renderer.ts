@@ -435,12 +435,11 @@ export class ArcadeRenderer {
         ? (orb.orbitTier === 'SHORT' ? orb.radius * 0.75 : orb.orbitTier === 'LONG' ? orb.radius * 1.65 : orb.radius)
         : (isCharged ? orb.radius * 1.4 : orb.radius);
 
-      // 0. Energy Tether (Mode ② 光のロープ vs Mode ① 自由ホーミング)
+      // 0. Energy Tether (クリック長押しヒモ保持 vs フリー投擲ホーミング)
       ctx.save();
-      if (orb.mode === 'ORBIT') {
-        // --- MODE ②: のびのある細いゴム紐分銅 (Hammerfight Flail & Stretchy Rubber Cord) ---
-        // ユーザー指示: 「紐付きの方はひもをもっとほそいものにして、たしょうのびちじみのもうすこしするように
-        // のびのあるゴムで繋いで回している感じに」
+      const isTethered = !!orb.isTethered || orb.mode === 'ORBIT';
+      if (isTethered) {
+        // --- クリック長押し中: のびのある細いゴム紐分銅 (Hammerfight Flail & Stretchy Rubber Cord) ---
         const isGigaSpin = orb.spinLevel === 2;
         const isHighSpin = orb.spinLevel === 1;
 
@@ -525,25 +524,19 @@ export class ArcadeRenderer {
         ctx.arc(playerX, playerY, 12, 0, Math.PI * 2);
         ctx.stroke();
 
-
       } else {
-        // --- MODE ①: ヨーヨー突き攻撃 (自由ホーミング ＆ 火の玉チャージ) ---
-        // ユーザー指示: 「ひもをつけていないときは、もともとジェミニがホーミングで向かってくるのを
-        // 利用するものなので、ヒモは非表示に」
-        // -> ヒモ・接続線は一切描画しない！完全フリーなホーミング飛翔！
+        // --- クリックを離している時: 完全フリーなホーミング飛翔！ヒモは非表示 ---
       }
       ctx.restore();
 
       // =========================================================================
       // 1. HITODAMA (人魂) & DIRECTIONAL FLYING EMBERS (火の粉)
-      // ユーザー指示: 「よーよーーのとき、動きの方向がわかるような絵にしてください
-      // 人のたまがうしろに火の粉とか向かっている方向が目に見えるような」
       // =========================================================================
       ctx.save();
       const headingAngle = Math.atan2(orb.vy, orb.vx);
-      const isMoving = speed > 0.55; // 低速・頂点付近での急激な角度反転を防ぐ
+      const isMoving = speed > 0.55;
 
-      if (orb.mode !== 'ORBIT' && isMoving) {
+      if (!isTethered && isMoving) {
         // --- MODE ① 人魂（ひとだま）＆ 進行方向ビジュアル ---
         const tailLen = effectiveR * (1.2 + Math.min(speed * 0.75, 3.0));
         const headR = effectiveR * 0.95;
@@ -1149,6 +1142,7 @@ export class ArcadeRenderer {
       speed: number;
       tangentSpeed: number;
       mode?: 'SLING' | 'ORBIT' | 'COMET';
+      isTethered?: boolean;
       collisionMode?: GeminiCollisionMode;
       isApex?: boolean;
       orbitRadius?: number;
@@ -1221,21 +1215,19 @@ export class ArcadeRenderer {
     ctx.font = '7px "DotGothic16", monospace';
     ctx.fillText(`[1-5:${presetConfig?.nameJa.slice(0, 4) || '標準'}]`, btnPresetX + 41, 14);
 
-    // Row 2 Buttons: Attack Mode (ヨーヨー / 公転) & Attribute (貫通 / 反射)
-    const curMode = telemetry?.mode || 'SLING';
-    const isOrbit = curMode === 'ORBIT';
-    const isComet = curMode === 'COMET';
+    // Row 2 Buttons: Attack Mode (ヒモ保持 ⇄ 投擲リリース) & Attribute (貫通 / 反射)
+    const isTethered = !!telemetry?.isTethered;
     const btnModeX = w - 176;
     const btnModeW = 84;
-    ctx.fillStyle = isComet ? 'rgba(192, 132, 252, 0.45)' : isOrbit ? 'rgba(56, 189, 248, 0.45)' : 'rgba(234, 179, 8, 0.35)';
+    ctx.fillStyle = isTethered ? 'rgba(56, 189, 248, 0.45)' : 'rgba(234, 179, 8, 0.35)';
     ctx.fillRect(btnModeX, 23, btnModeW, 16);
-    ctx.strokeStyle = isComet ? '#c084fc' : isOrbit ? '#38bdf8' : '#fde047';
+    ctx.strokeStyle = isTethered ? '#38bdf8' : '#fde047';
     ctx.lineWidth = 1.2;
     ctx.strokeRect(btnModeX, 23, btnModeW, 16);
-    ctx.fillStyle = isComet ? '#c084fc' : isOrbit ? '#38bdf8' : '#fde047';
+    ctx.fillStyle = isTethered ? '#38bdf8' : '#fde047';
     ctx.font = '8px "DotGothic16", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(isComet ? '☄️ハレー彗星[Z]' : isOrbit ? '⚡室伏分銅[Z]' : '🚀ヨーヨー[Z]', btnModeX + btnModeW / 2, 34);
+    ctx.fillText(isTethered ? '⚡分銅ヒモ保持' : '🚀フリー投擲', btnModeX + btnModeW / 2, 34);
 
     const curCol = telemetry?.collisionMode || 'PENETRATE';
     const isPen = curCol === 'PENETRATE';
@@ -1351,6 +1343,7 @@ export class ArcadeRenderer {
       tangentSpeed: number;
       mode?: 'SLING' | 'ORBIT' | 'COMET';
       collisionMode?: GeminiCollisionMode;
+      isTethered?: boolean;
       isApex?: boolean;
       orbitRadius?: number;
       effectiveDamage?: number;
@@ -1466,19 +1459,17 @@ export class ArcadeRenderer {
     ctx.fillText('✕戻る(T)', 308 + 24, 12);
 
     // Row 2: Attack Mode, Gemini Attribute, Orb Count (y: 19 to 35)
-    const curMode = telemetry?.mode || 'SLING';
-    const isOrbit = curMode === 'ORBIT';
-    const isComet = curMode === 'COMET';
+    const isTethered = !!telemetry?.isTethered;
     const btnAtkW = 112;
-    ctx.fillStyle = isComet ? 'rgba(192, 132, 252, 0.50)' : isOrbit ? 'rgba(56, 189, 248, 0.50)' : 'rgba(234, 179, 8, 0.45)';
+    ctx.fillStyle = isTethered ? 'rgba(56, 189, 248, 0.50)' : 'rgba(234, 179, 8, 0.45)';
     ctx.fillRect(8, 19, btnAtkW, 16);
-    ctx.strokeStyle = isComet ? '#c084fc' : isOrbit ? '#38bdf8' : '#fde047';
+    ctx.strokeStyle = isTethered ? '#38bdf8' : '#fde047';
     ctx.lineWidth = 1.5;
     ctx.strokeRect(8, 19, btnAtkW, 16);
-    ctx.fillStyle = isComet ? '#c084fc' : isOrbit ? '#38bdf8' : '#fde047';
+    ctx.fillStyle = isTethered ? '#38bdf8' : '#fde047';
     ctx.font = '8px "DotGothic16", monospace';
     ctx.textAlign = 'center';
-    const modeLabel = isComet ? '☄️攻撃③:ハレー彗星[Z]' : isOrbit ? '⚡攻撃②:室伏分銅[Z]' : '🚀攻撃①:ヨーヨー槍[Z]';
+    const modeLabel = isTethered ? '⚡分銅ヒモ保持[長押]' : '🚀フリー投擲[離す]';
     ctx.fillText(modeLabel, 8 + btnAtkW / 2, 30);
 
     const curCol = telemetry?.collisionMode || 'PENETRATE';
@@ -1556,15 +1547,14 @@ export class ArcadeRenderer {
     }
 
     // Row 5: Real-time Physics Parameter Tuning (y: 71 to 86)
-    const tng = telemetry?.tuning || { tensionMultiplier: 1.0, apexDwellMultiplier: 1.0, maxSpeedMultiplier: 1.0, orbitRadius: 75, overshootRatio: 0.5 };
-    const overshootPct = Math.round((tng.overshootRatio || 0.5) * 100);
+    const tng = telemetry?.tuning || { tensionMultiplier: 1.0, maxTurnRate: 0.040, damping: 0.993, maxSpeedMultiplier: 1.0, orbitRadius: 75, overshootRatio: 0.5, apexDwellMultiplier: 1.0 };
+    const turnDeg = ((tng.maxTurnRate || 0.040) * 180 / Math.PI).toFixed(1);
     const tuningBtns = [
-      { label: `バネ:x${tng.tensionMultiplier}[J]`, x: 4, w: 56 },
-      { label: `滞空:x${tng.apexDwellMultiplier}[K]`, x: 62, w: 56 },
-      { label: `突き抜け:${overshootPct}%[Y]`, x: 120, w: 66 },
-      { label: `速度:x${tng.maxSpeedMultiplier}[U]`, x: 188, w: 56 },
-      { label: `半径:${tng.orbitRadius}`, x: 246, w: 48 },
-      { label: '↺初期[R]', x: 296, w: 58 },
+      { label: `加速:x${tng.tensionMultiplier.toFixed(1)}[J]`, x: 4, w: 60 },
+      { label: `曲がり:${turnDeg}°[K]`, x: 66, w: 68 },
+      { label: `減衰:${(tng.damping || 0.993).toFixed(3)}[Y]`, x: 136, w: 72 },
+      { label: `最高速:x${tng.maxSpeedMultiplier.toFixed(1)}[U]`, x: 210, w: 74 },
+      { label: '↺初期[R]', x: 286, w: 68 },
     ];
     for (const tb of tuningBtns) {
       ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
@@ -1618,15 +1608,13 @@ export class ArcadeRenderer {
     ctx.textAlign = 'left';
     ctx.fillText(`DIST:${telemetry?.dist || 0}px SPD:${telemetry?.speed || 0}`, 8, btmY + 15);
 
-    if (curMode === 'ORBIT') {
+    const isTetheredBar = !!telemetry?.isTethered;
+    if (isTetheredBar) {
       ctx.fillStyle = telemetry?.spinLevel === 2 ? '#ff3b00' : telemetry?.spinLevel === 1 ? '#fde047' : '#38bdf8';
-      ctx.fillText(telemetry?.spinLevel === 2 ? '🔥GIGA SPIN' : telemetry?.spinLevel === 1 ? '⚡HIGH SPIN' : 'FLAIL', 156, btmY + 15);
-    } else if (curMode === 'COMET') {
-      ctx.fillStyle = '#c084fc';
-      ctx.fillText('☄️HALLEY COMET', 156, btmY + 15);
-    } else if (telemetry?.isApex) {
-      ctx.fillStyle = '#fde047';
-      ctx.fillText('★APEX DWELL★', 160, btmY + 15);
+      ctx.fillText(telemetry?.spinLevel === 2 ? '🔥GIGA SPIN' : telemetry?.spinLevel === 1 ? '⚡HIGH SPIN' : '⚡TETHER FLAIL', 148, btmY + 15);
+    } else {
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillText('🚀FREE HOMING', 148, btmY + 15);
     }
 
     ctx.fillStyle = isWallBounce ? '#38bdf8' : '#64748b';

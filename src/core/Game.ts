@@ -183,21 +183,48 @@ export class Game {
     this.addFloatingText(
       this.player.state.x,
       this.player.state.y - 30,
-      `自機最高速度: x${spd.toFixed(1)}`,
+      `自機最高速度: x${spd.toFixed(1)} [V]`,
+      '#fde047'
+    );
+  }
+
+  public cycleTensionWithFeedback(): void {
+    const val = this.geminiManager.cycleTension();
+    this.audio.playGeminiBounce();
+    this.addFloatingText(
+      this.player.state.x,
+      this.player.state.y - 30,
+      `自機向引力加速度: x${val.toFixed(1)} [J]`,
+      '#fde047'
+    );
+  }
+
+  public cycleTurnRateWithFeedback(): void {
+    const val = this.geminiManager.cycleTurnRate();
+    this.audio.playGeminiBounce();
+    const deg = (val * 180 / Math.PI).toFixed(1);
+    this.addFloatingText(
+      this.player.state.x,
+      this.player.state.y - 30,
+      `曲がり角度(旋回制限): ${deg}°/f [K]`,
+      '#fde047'
+    );
+  }
+
+  public cycleDampingWithFeedback(): void {
+    const val = this.geminiManager.cycleDamping();
+    this.audio.playGeminiBounce();
+    const desc = val >= 0.996 ? '弱減衰(遠投)' : val >= 0.992 ? '標準' : '強減衰(早期周回)';
+    this.addFloatingText(
+      this.player.state.x,
+      this.player.state.y - 30,
+      `減衰率: ${val.toFixed(3)} (${desc}) [Y]`,
       '#fde047'
     );
   }
 
   public cycleOvershootWithFeedback(): void {
-    const ratio = this.geminiManager.cycleOvershoot();
-    this.audio.playGeminiBounce();
-    const percent = Math.round(ratio * 100);
-    this.addFloatingText(
-      this.player.state.x,
-      this.player.state.y - 30,
-      `突き抜け勢い: ${percent}% (10m離れて自機通過+${(10 * ratio).toFixed(1)}m)`,
-      '#fde047'
-    );
+    this.cycleDampingWithFeedback();
   }
 
   public cycleMaxSpeedWithFeedback(direction: number = 1): void {
@@ -552,17 +579,13 @@ export class Game {
 
     // Handle Parameter Tuning hotkeys in playing
     if (this.input.consumeTuningTension()) {
-      const val = this.geminiManager.cycleTension();
-      this.audio.playGeminiBounce();
-      this.addFloatingText(this.player.state.x, this.player.state.y - 30, `バネ張力: x${val}`, '#fde047');
+      this.cycleTensionWithFeedback();
     }
     if (this.input.consumeTuningApex()) {
-      const val = this.geminiManager.cycleApexDwell();
-      this.audio.playGeminiBounce();
-      this.addFloatingText(this.player.state.x, this.player.state.y - 30, `滞空時間: x${val}`, '#fde047');
+      this.cycleTurnRateWithFeedback();
     }
     if (this.input.consumeTuningOvershoot()) {
-      this.cycleOvershootWithFeedback();
+      this.cycleDampingWithFeedback();
     }
     if (this.input.consumeTuningSpeed()) {
       this.cycleMaxSpeedWithFeedback();
@@ -573,13 +596,10 @@ export class Game {
       this.addFloatingText(this.player.state.x, this.player.state.y - 30, 'パラメータ初期値にリセット', '#38bdf8');
     }
 
-    // Handle Click/Touch on HUD Buttons or Field Toggle
+    // Handle Click/Touch on HUD Buttons
     const click = this.input.consumeClick();
     if (click) {
-      const handled = this.handlePointerClick(click.x, click.y);
-      if (!handled && this.state !== 'STAGE_CLEAR') {
-        this.toggleOrbitWithFeedback();
-      }
+      this.handlePointerClick(click.x, click.y);
     }
 
     // Test Stage Update Dispatch
@@ -645,6 +665,7 @@ export class Game {
     }
 
     // Update Gemini Orbs (ジェミニ誘導 & 合体 - 分銅旋回)
+    const isTetherHeld = this.input.isTetherHeld();
     this.geminiManager.update(
       this.player.state.x,
       this.player.state.y,
@@ -656,6 +677,16 @@ export class Game {
         this.addExplosion(x, y, 24 * level, false);
         this.addFloatingText(x, y - 20, level === 3 ? 'MEGA FUSION! Lv.3' : 'FUSION! Lv.2', '#ec4899');
         this.player.addScore(level === 3 ? 5000 : 2000);
+      },
+      (_x, _y) => {
+        // Wall Bounce Callback
+        this.audio.playGeminiBounce();
+      },
+      isTetherHeld,
+      (_rx, _ry, _rvx, _rvy) => {
+        // Throw / Release Callback
+        this.audio.playGeminiBounce();
+        this.addFloatingText(this.player.state.x, this.player.state.y - 25, '🚀 投擲リリース!', '#fde047');
       }
     );
 
@@ -1544,17 +1575,13 @@ export class Game {
       this.audio.playGeminiBounce();
     }
     if (this.input.consumeTuningTension()) {
-      const val = this.geminiManager.cycleTension();
-      this.audio.playGeminiBounce();
-      this.addFloatingText(this.player.state.x, this.player.state.y - 30, `バネ張力: x${val}`, '#fde047');
+      this.cycleTensionWithFeedback();
     }
     if (this.input.consumeTuningApex()) {
-      const val = this.geminiManager.cycleApexDwell();
-      this.audio.playGeminiBounce();
-      this.addFloatingText(this.player.state.x, this.player.state.y - 30, `滞空時間: x${val}`, '#fde047');
+      this.cycleTurnRateWithFeedback();
     }
     if (this.input.consumeTuningOvershoot()) {
-      this.cycleOvershootWithFeedback();
+      this.cycleDampingWithFeedback();
     }
     if (this.input.consumeTuningSpeed()) {
       this.cycleMaxSpeedWithFeedback();
@@ -1576,7 +1603,8 @@ export class Game {
       this.cyclePlayerSpeedWithFeedback();
     }
 
-    // Update Gemini Orbs (passing onWallHit callback)
+    // Update Gemini Orbs (passing onWallHit and isTetherHeld callback)
+    const isTetherHeld = this.input.isTetherHeld();
     this.geminiManager.update(
       this.player.state.x,
       this.player.state.y,
@@ -1590,6 +1618,11 @@ export class Game {
       (wx, wy) => {
         this.audio.playBlockHit();
         this.addExplosion(wx, wy, 12, false);
+      },
+      isTetherHeld,
+      (_rx, _ry, _rvx, _rvy) => {
+        this.audio.playGeminiBounce();
+        this.addFloatingText(this.player.state.x, this.player.state.y - 25, '🚀 投擲リリース!', '#fde047');
       }
     );
 
@@ -1752,39 +1785,28 @@ export class Game {
 
       // 6. Row 5: Parameter Quick Tuning (y: 71 to 88)
       if (y >= 71 && y <= 88) {
-        // [バネ: x..[J]] (x: 4 to 60)
+        // [加速: x..[J]] (x: 4 to 60)
         if (x >= 4 && x <= 60) {
-          const val = this.geminiManager.cycleTension();
-          this.audio.playGeminiBounce();
-          this.addFloatingText(this.player.state.x, this.player.state.y - 30, `バネ張力: x${val}`, '#fde047');
+          this.cycleTensionWithFeedback();
           return true;
         }
-        // [滞空: x..[K]] (x: 61 to 118)
-        if (x >= 61 && x <= 118) {
-          const val = this.geminiManager.cycleApexDwell();
-          this.audio.playGeminiBounce();
-          this.addFloatingText(this.player.state.x, this.player.state.y - 30, `滞空時間: x${val}`, '#fde047');
+        // [曲がり角: ..°[K]] (x: 61 to 125)
+        if (x >= 61 && x <= 125) {
+          this.cycleTurnRateWithFeedback();
           return true;
         }
-        // [突き抜け: ..%[Y]] (x: 119 to 186)
-        if (x >= 119 && x <= 186) {
-          this.cycleOvershootWithFeedback();
+        // [減衰率: ..[Y]] (x: 126 to 195)
+        if (x >= 126 && x <= 195) {
+          this.cycleDampingWithFeedback();
           return true;
         }
-        // [速度: x..[U]] (x: 187 to 244)
-        if (x >= 187 && x <= 244) {
+        // [最高速: x..[U]] (x: 196 to 260)
+        if (x >= 196 && x <= 260) {
           this.cycleMaxSpeedWithFeedback();
           return true;
         }
-        // [半径: ..] (x: 245 to 296)
-        if (x >= 245 && x <= 296) {
-          const val = this.geminiManager.cycleOrbitRadius();
-          this.audio.playGeminiBounce();
-          this.addFloatingText(this.player.state.x, this.player.state.y - 30, `公転半径: ${val}px`, '#fde047');
-          return true;
-        }
-        // [↺初期[R]] (x: 297 to 356)
-        if (x >= 297 && x <= 356) {
+        // [↺初期[R]] (x: 261 to 356)
+        if (x >= 261 && x <= 356) {
           this.geminiManager.resetTuning();
           this.audio.playGeminiBounce();
           this.addFloatingText(this.player.state.x, this.player.state.y - 30, 'パラメータ初期化!', '#38bdf8');

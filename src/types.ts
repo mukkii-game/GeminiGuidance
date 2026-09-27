@@ -28,11 +28,13 @@ export type TestEnemySetup =
   | 'BOSS_PENETRATE';
 
 export interface PhysicsTuningState {
-  tensionMultiplier: number;   // 0.5 (弱), 1.0 (標準), 1.8 (強), 3.0 (猛烈)
-  apexDwellMultiplier: number; // 0.0 (なし), 0.5 (短), 1.0 (標準), 2.5 (長)
-  maxSpeedMultiplier: number;  // 0.7 (低速), 1.0 (標準), 1.4 (高速), 2.0 (超光速)
-  orbitRadius: number;         // 55 (短), 75 (標準), 110 (長)
-  overshootRatio: number;      // 0.3 (30%), 0.5 (50% 標準:10m離れて自機通過後+5m), 0.8 (80%), 1.0 (100% 往復)
+  tensionMultiplier: number;   // 加速度倍率: 0.6, 0.8, 1.0 (標準), 1.3, 1.6, 2.0
+  maxTurnRate: number;         // 1フレーム最大曲がり角度: 0.02, 0.03, 0.04 (標準約2.3°), 0.055, 0.075, 0.10
+  damping: number;             // 減衰率: 0.985 (強減衰), 0.990 (中), 0.993 (標準), 0.996 (弱), 0.998 (極弱)
+  maxSpeedMultiplier: number;  // 最高速度倍率: 0.6, 0.8, 1.0 (標準), 1.3, 1.6, 2.0
+  apexDwellMultiplier: number; // 互換性保持
+  orbitRadius: number;         // テザー基本長
+  overshootRatio: number;      // 突き抜け余力
 }
 
 export interface InputState {
@@ -124,6 +126,7 @@ export interface GeminiOrb {
   orbitAngularVel: number;
   apexDwellTimer: number;
   isHoveringApex: boolean;
+  isTethered?: boolean; // クリック長押し中にヒモで捉えられているか
   collisionMode?: GeminiCollisionMode;
   isCharged?: boolean;
   chargeRatio?: number;
