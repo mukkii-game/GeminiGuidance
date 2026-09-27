@@ -1227,7 +1227,7 @@ export class ArcadeRenderer {
     ctx.fillStyle = isTethered ? '#38bdf8' : '#fde047';
     ctx.font = '8px "DotGothic16", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(isTethered ? '⚡分銅ヒモ保持' : '🚀フリー投擲', btnModeX + btnModeW / 2, 34);
+    ctx.fillText(isTethered ? '⚡分銅ヒモ保持' : '☄️ハレー彗星', btnModeX + btnModeW / 2, 34);
 
     const curCol = telemetry?.collisionMode || 'PENETRATE';
     const isPen = curCol === 'PENETRATE';
@@ -1469,7 +1469,7 @@ export class ArcadeRenderer {
     ctx.fillStyle = isTethered ? '#38bdf8' : '#fde047';
     ctx.font = '8px "DotGothic16", monospace';
     ctx.textAlign = 'center';
-    const modeLabel = isTethered ? '⚡分銅ヒモ保持[長押]' : '🚀フリー投擲[離す]';
+    const modeLabel = isTethered ? '⚡分銅ヒモ保持[長押]' : '☄️ハレー彗星[デフォ]';
     ctx.fillText(modeLabel, 8 + btnAtkW / 2, 30);
 
     const curCol = telemetry?.collisionMode || 'PENETRATE';
@@ -1614,7 +1614,7 @@ export class ArcadeRenderer {
       ctx.fillText(telemetry?.spinLevel === 2 ? '🔥GIGA SPIN' : telemetry?.spinLevel === 1 ? '⚡HIGH SPIN' : '⚡TETHER FLAIL', 148, btmY + 15);
     } else {
       ctx.fillStyle = '#38bdf8';
-      ctx.fillText('🚀FREE HOMING', 148, btmY + 15);
+      ctx.fillText('☄️COMET SWING', 148, btmY + 15);
     }
 
     ctx.fillStyle = isWallBounce ? '#38bdf8' : '#64748b';

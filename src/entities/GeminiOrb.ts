@@ -422,7 +422,8 @@ export class GeminiOrbManager {
       damage: 1,
       trail: [],
       fuseTimer: 20,
-      mode: 'SLING',
+      mode: 'COMET',
+      isTethered: false,
       collisionMode: this.collisionMode,
       orbitRadius: this.tuning.orbitRadius,
       orbitAngle: -Math.PI / 2,
@@ -477,15 +478,15 @@ export class GeminiOrbManager {
       // --- 状態遷移 (ホールド ⇄ リリース) ---
       const wasTethered = !!orb.isTethered;
       if (isTetherHeld && !wasTethered) {
-        // === ② クリックし続けている時：ヒモでジェミニを捉える ===
+        // === ② クリックし続けている時：ヒモでジェミニを捉える (分銅) ===
         orb.isTethered = true;
         orb.mode = 'ORBIT';
         const curDist = Math.hypot(orb.x - playerX, orb.y - playerY) || 1;
-        orb.tetherLength = Math.max(45, Math.min(160, curDist));
+        orb.tetherLength = Math.max(35, Math.min(180, curDist));
       } else if (!isTetherHeld && wasTethered) {
-        // === ③ クリックを離すとその加速度を持ってジェミニをリリースする ===
+        // === ③ クリックを離すとその加速度を持ってジェミニをリリースする (ハレー彗星) ===
         orb.isTethered = false;
-        orb.mode = 'SLING';
+        orb.mode = 'COMET';
         // 投擲感: 遠心力による投げ飛ばし初速ボーナス (1.20倍)
         const spd = Math.hypot(orb.vx, orb.vy);
         if (spd > 0.4) {
@@ -499,167 +500,143 @@ export class GeminiOrbManager {
 
       if (orb.isTethered) {
         // =========================================================================
-        // ② クリックし続けている時は、ヒモでジェミニを捉える (分銅振り回し物理)
-        // ユーザー指示:
-        // 「ひもなので、基本はその長さを維持 ほんの少しジェミニや高い速度により引っ張られて長くもなる
-        //  分銅を振り回しているような動きになるようにする
-        //  ゲームなのでまずはリアルにやるが、気持ち悪いようだと思い通り回せるような補填を入れる
-        //  適当に自機を回しても、自機を回しているという判定をしたときに、適当やってもうまく回転速度が上がるようにするとか」
+        // ② クリックし続けている時：ヒモでジェミニを捉える (純粋弾性テザー分銅物理)
         // =========================================================================
         orb.isHoveringApex = false;
         orb.apexDwellTimer = 0;
 
+        // 自機からジェミニへの相対位置
         const fDx = orb.x - playerX;
         const fDy = orb.y - playerY;
         const fDist = Math.hypot(fDx, fDy) || 1;
-        const fUx = fDx / fDist; // 動径単位ベクトル（外向き）
+        const fUx = fDx / fDist; // 自機→ジェミニの単位ベクトル（動径方向外向き）
         const fUy = fDy / fDist;
-        const tX = -fUy; // 接線単位ベクトル（反時計回り）
-        const tY = fUx;
 
-        const L0 = orb.tetherLength || 75;
+        // 紐の自然長 L0
+        const chainLen = (orb.tetherLength || 75) * (this.tuning.orbitRadius / 75);
 
-        // 1. ヒモの長さ維持＆わずかな弾性（張力）
-        if (fDist > L0) {
-          const stretch = fDist - L0;
+        // 1. 紐の状態判定（たるんでいるか、張っているか）
+        if (fDist > chainLen) {
+          // 【ヒモが張った時】
+          // ゴムとして伸びる量
+          const stretch = fDist - chainLen;
+
+          // 自機とジェミニの相対速度（離れる速度成分）
           const relVx = orb.vx - playerVx;
           const relVy = orb.vy - playerVy;
-          const vRadial = relVx * fUx + relVy * fUy;
+          const radialSpeed = relVx * fUx + relVy * fUy;
 
-          const tensionK = 0.045 * this.tuning.tensionMultiplier;
+          // 物理的張力：Euler振動のカクカクしたチャタリングを起こさない滑らかな張力定数
+          const tensionK = 0.035 * this.tuning.tensionMultiplier;
           const tensionForce = stretch * tensionK;
-          const radialDamp = vRadial * 0.20; // 伸びきった時の外向き逃げを抑える
 
-          const totalPull = Math.max(-0.2, Math.min(1.6, tensionForce + radialDamp));
-          orb.vx -= fUx * totalPull;
-          orb.vy -= fUy * totalPull;
+          // 連続動径ダンピング（内外の振動跳ね返りを吸収し、滑らかな円運動にする）
+          const dampForce = radialSpeed * 0.16;
+
+          // 1フレームあたりの過度な急加減速をクリップして滑らかさを担保
+          const totalTension = Math.max(-0.15, Math.min(1.2, tensionForce + dampForce));
+          orb.vx -= fUx * totalTension;
+          orb.vy -= fUy * totalTension;
         }
 
-        // 2. 自機の移動による分銅スピンアシスト（補填）
-        const curRelVx = orb.vx - playerVx;
-        const curRelVy = orb.vy - playerVy;
-        const vTangential = curRelVx * tX + curRelVy * tY; // 現在の接線速度
-        const pTangential = playerVx * tX + playerVy * tY; // 自機の接線入力
+        // 2. 微小重力（自然な垂れ下がり感）
+        orb.vy += 0.012;
 
-        if (Math.abs(pTangential) > 0.2) {
-          // 自機を回そうとする入力がある場合、接線方向へ力強く加速！
-          const spinInputSign = Math.sign(pTangential);
-          const assistForce = spinInputSign * Math.min(2.2, Math.abs(pTangential) * 0.45);
-          orb.vx += tX * assistForce;
-          orb.vy += tY * assistForce;
-        } else if (pSpeed > 0.4 && Math.abs(vTangential) < 1.2) {
-          // 自機が動いているのに分銅が止まりそうな時、自然に回頭をアシスト
-          const crossProduct = playerVx * fDy - playerVy * fDx;
-          const autoDir = crossProduct >= 0 ? 1 : -1;
-          orb.vx += tX * (autoDir * 0.18);
-          orb.vy += tY * (autoDir * 0.18);
-        }
-
-        // 自機の移動慣性伝達
-        if (pSpeed > 0.2) {
-          orb.vx += playerVx * 0.16;
-          orb.vy += playerVy * 0.16;
-        }
-
-        // 自然な空気抵抗
+        // 3. 自然な空気抵抗
         orb.vx *= 0.997;
         orb.vy *= 0.997;
 
-        // 最高速度クランプ
-        const curSpd = Math.hypot(orb.vx, orb.vy);
-        const maxSpd = (cfg.maxSpeed * 1.5) * this.tuning.maxSpeedMultiplier;
-        if (curSpd > maxSpd) {
-          orb.vx = (orb.vx / curSpd) * maxSpd;
-          orb.vy = (orb.vy / curSpd) * maxSpd;
+        // 4. 最高速度クランプ（自然な重量感・視認できる速度感: 3.2px/frame基準）
+        const absSpeed = Math.hypot(orb.vx, orb.vy);
+        const maxSpd = (cfg.maxSpeed * 1.35) * this.tuning.maxSpeedMultiplier;
+        if (absSpeed > maxSpd) {
+          orb.vx = (orb.vx / absSpeed) * maxSpd;
+          orb.vy = (orb.vy / absSpeed) * maxSpd;
         }
 
+        // 5. 位置更新
         orb.x += orb.vx;
         orb.y += orb.vy;
 
-        orb.orbitAngle = Math.atan2(orb.y - playerY, orb.x - playerX);
-        orb.orbitRadius = fDist;
+        // 6. 接線速度とスピンレベル計算
+        const relX = orb.x - playerX;
+        const relY = orb.y - playerY;
+        const rDist = Math.hypot(relX, relY) || 1;
+        const tx = -relY / rDist;
+        const ty = relX / rDist;
+        const tangentV = (orb.vx - playerVx) * tx + (orb.vy - playerVy) * ty;
 
-        // スピン判定 & チャージ
-        const currentSpin = Math.abs(vTangential);
-        if (currentSpin >= 2.4) {
+        // スピンレベル判定（激しい回転で室伏ジャイアントスイング）
+        if (Math.abs(tangentV) > 1.85) {
+          orb.spinLevel = 2; // GIGA SPIN
           orb.isCharged = true;
-          orb.chargeRatio = Math.min(1.0, (currentSpin - 2.4) / 1.5);
-          orb.spinLevel = 2;
-        } else if (currentSpin >= 1.4) {
+          orb.chargeRatio = 1.0;
+        } else if (Math.abs(tangentV) > 0.90) {
+          orb.spinLevel = 1; // ACTIVE SPIN
           orb.isCharged = false;
           orb.chargeRatio = 0.5;
-          orb.spinLevel = 1;
         } else {
+          orb.spinLevel = 0; // IDLE
           orb.isCharged = false;
           orb.chargeRatio = 0;
-          orb.spinLevel = 0;
         }
 
+        orb.orbitAngle = Math.atan2(orb.y - playerY, orb.x - playerX);
+        orb.orbitRadius = rDist;
 
       } else {
         // =========================================================================
-        // ① 自分に加速度つけて向かってくるジェミニ (フリーホーミング ＆ 旋回角制限)
+        // ① クリックを離している時：ハレー彗星スイングバイ・ホーミング (デフォルト)
         // ユーザー指示:
-        // 「ホーミング。
-        //  実質バネのような動きになるが、飛びながら一度に曲がる角度に制限があるため、
-        //  直線よりは少し曲線を描いて、自機にはぎり当たらない程度の横をすり抜ける感じになる
-        //  むろんジェミニ自身のベクトルが自機へのベクトルと同じないし真逆のときは、直線移動になりバネ動きのようになる
-        //  このるーるで、あとは曲がり角度の調整や、加速度の調整、減衰率、を調整して行きたいと
-        //  このルールだと、ある程度の時間で、自機に近いところでゆっくり周回になるはず
-        //  一度向かい始めると、たとえ自分を通り過ぎてもすぐに止まらずある程度進む」
+        // 「ハレー彗星がデフォ、押している間分銅、の挙動にして ボタン操作はいまのまま そこから調整しよう」
         // =========================================================================
         orb.isHoveringApex = false;
         orb.apexDwellTimer = 0;
 
-        // 自機への相対ベクトル
-        const toDx = playerX - orb.x;
-        const toDy = playerY - orb.y;
-        const toDist = Math.hypot(toDx, toDy) || 1;
-        const toUx = toDx / toDist;
-        const toUy = toDy / toDist;
+        const cDx = playerX - orb.x;
+        const cDy = playerY - orb.y;
+        const cDist = Math.hypot(cDx, cDy) || 1;
+        const cUx = cDx / cDist;
+        const cUy = cDy / cDist;
 
+        // 1. 角度的ホーミング旋回 (Proportional Navigation Steering)
         let curSpd = Math.hypot(orb.vx, orb.vy);
-
-        // 1. 旋回角制限（飛びながら一度に曲がる角度に制限）
         if (curSpd > 0.05) {
           const curAngle = Math.atan2(orb.vy, orb.vx);
-          const targetAngle = Math.atan2(toDy, toDx);
+          const targetAngle = Math.atan2(cDy, cDx);
           let angleDiff = targetAngle - curAngle;
           while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
           while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
 
-          // 自機と同じベクトル(diff ≈ 0)または真逆(diff ≈ ±π)のときは直線のバネ運動になる
-          // 横から向かうときは曲がり角の制限により、直線ではなく曲線を描き、自機の横をすり抜ける！
-          // 通り過ぎた瞬間も急旋回できないため、そのまま向こう側へ勢いよく突き抜ける（オーバーラン）
-          const maxTurn = this.tuning.maxTurnRate; // 標準 0.040 rad (約2.3°/フレーム)
-          const turnAmount = Math.sign(angleDiff) * Math.min(Math.abs(angleDiff), maxTurn);
-          const newAngle = curAngle + turnAmount;
+          // 旋回角速度: 距離が離れている時は確実に自機を捉え、通過時もキュッと鋭くUターン
+          const turnRate = (0.08 + 0.04 * Math.min(1.0, cDist / 120)) * this.tuning.tensionMultiplier;
+          const turnStep = Math.sign(angleDiff) * Math.min(Math.abs(angleDiff), turnRate);
+          const steeredAngle = curAngle + turnStep;
 
-          orb.vx = Math.cos(newAngle) * curSpd;
-          orb.vy = Math.sin(newAngle) * curSpd;
+          orb.vx = Math.cos(steeredAngle) * curSpd;
+          orb.vy = Math.sin(steeredAngle) * curSpd;
         }
 
-        // 2. 自機へ加速度をつけて向かってくる（バネ・引力加速度）
-        // 距離に応じた引き戻し加速度
-        const baseAccel = 0.065 * this.tuning.tensionMultiplier;
-        const springPull = (toDist * 0.00045) * this.tuning.tensionMultiplier;
-        const totalAccel = baseAccel + springPull;
+        // 2. 重力・ホーミング加速度（万有引力 + ホーミング突撃力）
+        // 引力加速度を底上げし、遠くでも自機へ力強く引き戻し、至近距離（近日点）でスイングバイ加速
+        const gravBase = 0.075 * this.tuning.tensionMultiplier;
+        const gravSwing = (5.2 * this.tuning.tensionMultiplier) / (cDist + 35);
+        const gravAccel = gravBase + gravSwing;
 
-        orb.vx += toUx * totalAccel;
-        orb.vy += toUy * totalAccel;
+        orb.vx += cUx * gravAccel;
+        orb.vy += cUy * gravAccel;
 
-        // 3. 減衰率（Damping）
-        // このルールにより、ある程度の時間で自機に近いところでゆっくり周回に落ち着く
-        orb.vx *= this.tuning.damping;
-        orb.vy *= this.tuning.damping;
-
-        // 4. 自機移動による慣性連動
-        if (pSpeed > 0.25) {
-          orb.vx += playerVx * 0.035;
-          orb.vy += playerVy * 0.035;
+        // 3. 自機の移動ベクトルによる慣性連動（プレイヤーが動くと彗星の焦点がずれて美しい放物線を描く）
+        if (pSpeed > 0.3) {
+          orb.vx += playerVx * 0.045;
+          orb.vy += playerVy * 0.045;
         }
 
-        // 5. 最高速度クランプ
+        // 4. 宇宙空間の微小空気抵抗（軌道エネルギーの長期安定）
+        orb.vx *= 0.9982;
+        orb.vy *= 0.9982;
+
+        // 5. 最高速度クランプ（近日点でのスイングバイ最高速: 3.6px/frame基準）
         curSpd = Math.hypot(orb.vx, orb.vy);
         const maxSpd = (cfg.maxSpeed * 1.5) * this.tuning.maxSpeedMultiplier;
         if (curSpd > maxSpd) {
@@ -667,18 +644,18 @@ export class GeminiOrbManager {
           orb.vy = (orb.vy / curSpd) * maxSpd;
         }
 
-        // 6. 座標更新
+        // 6. 位置更新
         orb.x += orb.vx;
         orb.y += orb.vy;
 
-        // 7. テレメトリ
+        // 7. テレメトリ情報
         orb.orbitAngle = Math.atan2(orb.y - playerY, orb.x - playerX);
-        orb.orbitRadius = toDist;
+        orb.orbitRadius = cDist;
 
-        // 火の玉チャージ判定（高速突き抜け時）
-        if (curSpd > 2.0) {
+        // 8. 火の玉・彗星の光球チャージ判定（高速スイングバイ時に燃え盛る）
+        if (curSpd > 1.8) {
           orb.isCharged = true;
-          orb.chargeRatio = Math.min(1.0, (curSpd - 2.0) / 1.4);
+          orb.chargeRatio = Math.min(1.0, (curSpd - 1.8) / 1.4);
         } else {
           orb.isCharged = false;
           orb.chargeRatio = 0;
