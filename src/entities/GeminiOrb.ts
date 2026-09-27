@@ -569,80 +569,209 @@ export class GeminiOrbManager {
 
       } else {
         // =========================================================================
-        // ① クリックを離している時：ハレー彗星スイングバイ・ホーミング (デフォルト)
+        // ① クリックを離している時：ヨーヨー / ハレー彗星 大ストローク往復物理
         // ユーザー指示:
-        // 「ハレー彗星がデフォ、押している間分銅、の挙動にして ボタン操作はいまのまま そこから調整しよう」
+        // 「ハレー彗星がやはりじぶんのちかくにすぐまわりすぎる 減衰速度が大きすぎるのか？
+        //   最初のヨーヨーの時のような方がハレー彗星ぽかった」
+        //
+        // 【物理モデル】
+        // 自機を通過した後は急旋回や公転せず、そのまま前方へドカンと突き抜ける（OVERSHOOT +50%）！
+        // 遠日点（APEX）でフワッと滞空・減速してから、再び自機めがけて一直線に猛スピードで突進する！
         // =========================================================================
-        orb.isHoveringApex = false;
-        orb.apexDwellTimer = 0;
+        const playerDist = Math.hypot(orb.x - playerX, orb.y - playerY);
+        const curSpd = Math.hypot(orb.vx, orb.vy);
 
-        const cDx = playerX - orb.x;
-        const cDy = playerY - orb.y;
-        const cDist = Math.hypot(cDx, cDy) || 1;
-        const cUx = cDx / cDist;
-        const cUy = cDy / cDist;
-
-        // 1. 角度的ホーミング旋回 (Proportional Navigation Steering)
-        let curSpd = Math.hypot(orb.vx, orb.vy);
-        if (curSpd > 0.05) {
-          const curAngle = Math.atan2(orb.vy, orb.vx);
-          const targetAngle = Math.atan2(cDy, cDx);
-          let angleDiff = targetAngle - curAngle;
-          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-
-          // 旋回角速度: 距離が離れている時は確実に自機を捉え、通過時もキュッと鋭くUターン
-          const turnRate = (0.08 + 0.04 * Math.min(1.0, cDist / 120)) * this.tuning.tensionMultiplier;
-          const turnStep = Math.sign(angleDiff) * Math.min(Math.abs(angleDiff), turnRate);
-          const steeredAngle = curAngle + turnStep;
-
-          orb.vx = Math.cos(steeredAngle) * curSpd;
-          orb.vy = Math.sin(steeredAngle) * curSpd;
+        // フェーズ初期化
+        if (!orb.strokePhase || orb.strokePhase === 'OUTWARD' || orb.strokePhase === 'RETURN') {
+          orb.strokePhase = 'INWARD';
+          orb.launchStartX = orb.x;
+          orb.launchStartY = orb.y;
+          orb.castTargetX = playerX;
+          orb.castTargetY = playerY;
+          orb.strokeDist = Math.max(40, playerDist);
+          orb.apexDwellTimer = 0;
+          orb.isHoveringApex = false;
         }
 
-        // 2. 重力・ホーミング加速度（万有引力 + ホーミング突撃力）
-        // 引力加速度を底上げし、遠くでも自機へ力強く引き戻し、至近距離（近日点）でスイングバイ加速
-        const gravBase = 0.075 * this.tuning.tensionMultiplier;
-        const gravSwing = (5.2 * this.tuning.tensionMultiplier) / (cDist + 35);
-        const gravAccel = gravBase + gravSwing;
+        // 基準ストローク距離 D0 と 目標オーバーシュート距離（50% = +5m）
+        const D0 = Math.max(40, orb.strokeDist || playerDist);
+        const targetOvershoot = Math.max(50, D0 * (this.tuning.overshootRatio || 0.6));
 
-        orb.vx += cUx * gravAccel;
-        orb.vy += cUy * gravAccel;
+        if (orb.strokePhase === 'APEX') {
+          // --- APEX滞空フェーズ ---
+          // 放物線の頂点のようにフワッと微小な慣性で漂う（フワッとした滞空感）
+          orb.isHoveringApex = true;
+          orb.vx *= 0.88;
+          orb.vy *= 0.88;
+          orb.apexDwellTimer = (orb.apexDwellTimer || 0) - 1;
 
-        // 3. 自機の移動ベクトルによる慣性連動（プレイヤーが動くと彗星の焦点がずれて美しい放物線を描く）
-        if (pSpeed > 0.3) {
-          orb.vx += playerVx * 0.045;
-          orb.vy += playerVy * 0.045;
+          if (orb.apexDwellTimer <= 0) {
+            // 滞空完了: 次のストローク開始！
+            // 最新の自機位置を通過目標にセットし、INWARDフェーズへ
+            orb.strokePhase = 'INWARD';
+            orb.isHoveringApex = false;
+            orb.launchStartX = orb.x;
+            orb.launchStartY = orb.y;
+            orb.castTargetX = playerX;
+            orb.castTargetY = playerY;
+            orb.strokeDist = Math.max(40, playerDist);
+
+            const dx = playerX - orb.x;
+            const dy = playerY - orb.y;
+            const d = Math.hypot(dx, dy) || 1;
+            orb.strokeDirX = dx / d;
+            orb.strokeDirY = dy / d;
+          }
+
+        } else if (orb.strokePhase === 'REST') {
+          // --- REST静止フェーズ ---
+          orb.isHoveringApex = false;
+          orb.vx *= 0.90;
+          orb.vy *= 0.90;
+
+          // プレイヤーが動くか距離が離れたら強力発進
+          if (playerDist > 35 || pSpeed > 0.40) {
+            orb.strokePhase = 'INWARD';
+            orb.launchStartX = orb.x;
+            orb.launchStartY = orb.y;
+            orb.castTargetX = playerX;
+            orb.castTargetY = playerY;
+            orb.strokeDist = Math.max(40, playerDist);
+            const dx = playerX - orb.x;
+            const dy = playerY - orb.y;
+            const d = Math.hypot(dx, dy) || 1;
+            orb.strokeDirX = dx / d;
+            orb.strokeDirY = dy / d;
+          }
+
+        } else if (orb.strokePhase === 'OVERSHOOT') {
+          // --- OVERSHOOT突き抜けフェーズ ---
+          // 自機通過後、勢いそのままに深宇宙（前方彼方）へ突き抜ける！
+          // 紐はたるんでいるため、自機が動いたり交差しても急停止や公転は起きない！
+          orb.isHoveringApex = false;
+
+          const anchorX = orb.castTargetX ?? playerX;
+          const anchorY = orb.castTargetY ?? playerY;
+          const dirX = orb.strokeDirX ?? (curSpd > 0.01 ? orb.vx / curSpd : 0);
+          const dirY = orb.strokeDirY ?? (curSpd > 0.01 ? orb.vy / curSpd : -1);
+
+          // 通過点からの進行方向の距離 s
+          const s = (orb.x - anchorX) * dirX + (orb.y - anchorY) * dirY;
+
+          // 進行方向の前進速度
+          const forwardV = orb.vx * dirX + orb.vy * dirY;
+
+          // 目標オーバーシュート距離 targetOvershoot に向けて滑らかにブレーキ減速
+          const peakV = Math.max(2.2, orb.peakSpeed || curSpd);
+          const brakeAccel = (peakV * peakV) / (2 * Math.max(25, targetOvershoot));
+          orb.vx -= dirX * brakeAccel * 0.90;
+          orb.vy -= dirY * brakeAccel * 0.90;
+
+          // 直線整流: 横ブレを自然に抑制
+          const perpVx = orb.vx - forwardV * dirX;
+          const perpVy = orb.vy - forwardV * dirY;
+          orb.vx = forwardV * dirX + perpVx * 0.86;
+          orb.vy = forwardV * dirY + perpVy * 0.86;
+
+          // 自機が元の距離 D0 以上改めて離れた場合のみ、紐が張って自機への引力が加算
+          if (playerDist > D0 * 1.20) {
+            const tautF = Math.min(0.8, (playerDist - D0) * 0.02 * this.tuning.tensionMultiplier);
+            orb.vx += ((playerX - orb.x) / playerDist) * tautF;
+            orb.vy += ((playerY - orb.y) / playerDist) * tautF;
+          }
+
+          // 頂点到達判定！オーバーシュート完了、または前進速度がほぼゼロになった時
+          if (s >= targetOvershoot || forwardV <= 0.15) {
+            orb.strokePhase = 'APEX';
+            orb.apexDwellTimer = Math.round(9 * this.tuning.apexDwellMultiplier);
+            orb.isHoveringApex = true;
+          }
+
+        } else {
+          // --- INWARD接近フェーズ ---
+          // 離れた距離 D0 に応じた強烈なパチンコ・重力加速！
+          orb.isHoveringApex = false;
+
+          const anchorX = orb.castTargetX ?? playerX;
+          const anchorY = orb.castTargetY ?? playerY;
+          const dx = anchorX - orb.x;
+          const dy = anchorY - orb.y;
+          const distToAnchor = Math.hypot(dx, dy) || 1;
+          const dirX = dx / distToAnchor;
+          const dirY = dy / distToAnchor;
+          orb.strokeDirX = dirX;
+          orb.strokeDirY = dirY;
+
+          // 距離に応じた推進力
+          const linearF = distToAnchor * cfg.springK * this.tuning.tensionMultiplier * 1.35;
+          const slingshotBonus = D0 > 45 ? Math.pow((D0 - 45) / 55, 1.6) * 0.055 * this.tuning.tensionMultiplier : 0;
+          const accel = Math.min(1.6, linearF + slingshotBonus);
+
+          orb.vx += dirX * accel;
+          orb.vy += dirY * accel;
+
+          // 直線整流
+          if (curSpd > 0.15) {
+            const alongV = orb.vx * dirX + orb.vy * dirY;
+            const perpVx = orb.vx - alongV * dirX;
+            const perpVy = orb.vy - alongV * dirY;
+            orb.vx = alongV * dirX + perpVx * 0.88;
+            orb.vy = alongV * dirY + perpVy * 0.88;
+          }
+
+          // 自機が同方向に引いた時の共鳴ポンピング加速
+          if (pSpeed > 0.4 && curSpd > 0.1) {
+            const forwardP = playerVx * dirX + playerVy * dirY;
+            if (forwardP > 0) {
+              const boost = Math.min(2.0, forwardP * 0.25);
+              orb.vx += dirX * boost;
+              orb.vy += dirY * boost;
+            }
+          }
+
+          // 通過点到達判定（アンカーを通過したか、14px以内に接近した時）
+          const forwardAlongDir = (orb.x - anchorX) * dirX + (orb.y - anchorY) * dirY;
+          if (forwardAlongDir >= -2.0 || distToAnchor <= 14) {
+            orb.strokePhase = 'OVERSHOOT';
+            orb.peakSpeed = Math.hypot(orb.vx, orb.vy);
+
+            // 自機が静止していて距離がごく小さい場合のみ自然にRESTへ移行
+            if (D0 < 22 && pSpeed < 0.2) {
+              orb.strokePhase = 'REST';
+              orb.vx *= 0.3;
+              orb.vy *= 0.3;
+            }
+          }
         }
 
-        // 4. 宇宙空間の微小空気抵抗（軌道エネルギーの長期安定）
+        // 自然な空気抵抗
         orb.vx *= 0.9982;
         orb.vy *= 0.9982;
 
-        // 5. 最高速度クランプ（近日点でのスイングバイ最高速: 3.6px/frame基準）
-        curSpd = Math.hypot(orb.vx, orb.vy);
-        const maxSpd = (cfg.maxSpeed * 1.5) * this.tuning.maxSpeedMultiplier;
-        if (curSpd > maxSpd) {
-          orb.vx = (orb.vx / curSpd) * maxSpd;
-          orb.vy = (orb.vy / curSpd) * maxSpd;
+        // 最高速度クランプ
+        const updatedSpeed = Math.hypot(orb.vx, orb.vy);
+        const maxSpd = (cfg.maxSpeed * 2.8 + (orb.level - 1) * 0.6) * this.tuning.maxSpeedMultiplier;
+        if (updatedSpeed > maxSpd) {
+          orb.vx = (orb.vx / updatedSpeed) * maxSpd;
+          orb.vy = (orb.vy / updatedSpeed) * maxSpd;
         }
 
-        // 6. 位置更新
-        orb.x += orb.vx;
-        orb.y += orb.vy;
-
-        // 7. テレメトリ情報
-        orb.orbitAngle = Math.atan2(orb.y - playerY, orb.x - playerX);
-        orb.orbitRadius = cDist;
-
-        // 8. 火の玉・彗星の光球チャージ判定（高速スイングバイ時に燃え盛る）
-        if (curSpd > 1.8) {
+        // 火の玉チャージ判定（十分に離れて猛スピードで突進している時のみ点火）
+        if (playerDist > 55 && updatedSpeed > 1.4) {
           orb.isCharged = true;
-          orb.chargeRatio = Math.min(1.0, (curSpd - 1.8) / 1.4);
+          orb.chargeRatio = Math.min(1.0, (playerDist - 40) / 80);
         } else {
           orb.isCharged = false;
           orb.chargeRatio = 0;
         }
+
+        // 位置更新
+        orb.x += orb.vx;
+        orb.y += orb.vy;
+
+        // テレメトリ情報
+        orb.orbitAngle = Math.atan2(orb.y - playerY, orb.x - playerX);
+        orb.orbitRadius = playerDist;
       }
 
       // 画面端反射（設定時）
