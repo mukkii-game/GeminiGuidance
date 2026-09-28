@@ -1302,7 +1302,7 @@ export class ArcadeRenderer {
     ctx.fillStyle = '#fde047';
     ctx.textAlign = 'center';
     ctx.fillText(
-      `[J]引力:x${(tng?.tensionMultiplier || 0.8).toFixed(1)}  [K]旋角:${turnD}°  [Y]減衰:${(tng?.damping || 0.993).toFixed(3)}  [U]最高速:x${(tng?.maxSpeedMultiplier || 0.8).toFixed(1)}  [R]初期`,
+      `⚡SPD:${telemetry?.speed || 0}  [J]引力:x${(tng?.tensionMultiplier || 0.8).toFixed(1)}  [K]旋角:${turnD}°  [Y]減衰:${(tng?.damping || 0.993).toFixed(3)}  [U]最高速:x${(tng?.maxSpeedMultiplier || 0.8).toFixed(1)}  [R]初期`,
       w / 2,
       tuneBarY + 11
     );
