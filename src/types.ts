@@ -56,6 +56,7 @@ export interface GeminiTelemetry {
   dist: number;
   speed: number;
   tangentSpeed: number;
+  accel: number;              // リアルタイム実測加速度 (px/f²)
   mode: 'SLING' | 'ORBIT' | 'COMET';
   isTethered: boolean;
   collisionMode: GeminiCollisionMode;
@@ -183,6 +184,9 @@ export interface GeminiOrb {
   strokeDirY?: number;
   strokeDist?: number;
   peakSpeed?: number;
+  lastVx?: number;
+  lastVy?: number;
+  currentAccel?: number;
 }
 
 export type EnemyType = 

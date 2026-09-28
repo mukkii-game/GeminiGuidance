@@ -194,7 +194,7 @@ export class Game {
     this.addFloatingText(
       this.player.state.x,
       this.player.state.y - 30,
-      `引力・加速度: x${val.toFixed(1)} (${desc}) [J]`,
+      `加速度倍率: x${val.toFixed(1)} (${desc}) [J]`,
       '#fde047'
     );
   }

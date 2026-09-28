@@ -1320,23 +1320,34 @@ export class ArcadeRenderer {
     this.setFont('6px "Press Start 2P", monospace');
     ctx.fillText(`${player.hp}%`, gaugeX + barW + 5, shieldY + 5);
 
-    // Compact Tuning Bar in Normal Play (y: height - 31 to height - 17)
-    const tuneBarY = this.canvas.height - 31;
-    ctx.fillStyle = 'rgba(2, 6, 23, 0.88)';
-    ctx.fillRect(6, tuneBarY, w - 12, 15);
-    ctx.strokeStyle = '#334155';
+    // Real-time Telemetry & Compact Tuning Bar in Normal Play (y: height - 38 to height - 16, h: 22)
+    const tuneBarY = this.canvas.height - 38;
+    const tuneBarH = 22;
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.92)';
+    ctx.fillRect(6, tuneBarY, w - 12, tuneBarH);
+    ctx.strokeStyle = '#38bdf8';
     ctx.lineWidth = 1;
-    ctx.strokeRect(6, tuneBarY, w - 12, 15);
+    ctx.strokeRect(6, tuneBarY, w - 12, tuneBarH);
 
     const tng = telemetry?.tuning;
     const turnD = ((tng?.maxTurnRate || 0.035) * 180 / Math.PI).toFixed(1);
+
+    // Line 1: Live Measured Telemetry (SPD & ACC)
     this.setFont('7px "DotGothic16", monospace');
-    ctx.fillStyle = '#fde047';
+    ctx.fillStyle = '#38bdf8';
     ctx.textAlign = 'center';
     ctx.fillText(
-      `⚡SPD:${telemetry?.speed || 0}  [J]引力:x${(tng?.tensionMultiplier || 0.8).toFixed(1)}  [K]旋角:${turnD}°  [Y]減衰:${(tng?.damping || 0.993).toFixed(3)}  [U]最高速:x${(tng?.maxSpeedMultiplier || 0.8).toFixed(1)}  [R]初期`,
+      `⚡現在速度: ${(telemetry?.speed || 0).toFixed(1)} px/f   ⚡現在加速度: ${(telemetry?.accel || 0).toFixed(2)} px/f²`,
       w / 2,
-      tuneBarY + 11
+      tuneBarY + 9
+    );
+
+    // Line 2: Physics Tuning Multipliers
+    ctx.fillStyle = '#fde047';
+    ctx.fillText(
+      `[J]加速度:x${(tng?.tensionMultiplier || 0.8).toFixed(1)}  [K]旋角:${turnD}°  [Y]減衰:${(tng?.damping || 0.993).toFixed(3)}  [U]最高速:x${(tng?.maxSpeedMultiplier || 0.8).toFixed(1)}  [R]初期`,
+      w / 2,
+      tuneBarY + 19
     );
 
     // Bottom Bar: Lives, Stage Indicator, Gemini Power Level
@@ -1624,9 +1635,9 @@ export class ArcadeRenderer {
     const tng = telemetry?.tuning || { tensionMultiplier: 0.8, maxTurnRate: 0.035, damping: 0.993, maxSpeedMultiplier: 0.8, orbitRadius: 75, overshootRatio: 0.5, apexDwellMultiplier: 1.0 };
     const turnDeg = ((tng.maxTurnRate || 0.035) * 180 / Math.PI).toFixed(1);
     const tuningBtns = [
-      { label: `引力:x${tng.tensionMultiplier.toFixed(1)}[J]`, x: 4, w: 60 },
-      { label: `旋角:${turnDeg}°[K]`, x: 66, w: 68 },
-      { label: `減衰:${(tng.damping || 0.993).toFixed(3)}[Y]`, x: 136, w: 72 },
+      { label: `加速度:x${tng.tensionMultiplier.toFixed(1)}[J]`, x: 4, w: 64 },
+      { label: `旋角:${turnDeg}°[K]`, x: 70, w: 66 },
+      { label: `減衰:${(tng.damping || 0.993).toFixed(3)}[Y]`, x: 138, w: 70 },
       { label: `最高速:x${tng.maxSpeedMultiplier.toFixed(1)}[U]`, x: 210, w: 74 },
       { label: '↺初期[R]', x: 286, w: 68 },
     ];
@@ -1677,26 +1688,26 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1;
     ctx.strokeRect(0, btmY, w, 24);
 
-    this.setFont('7px "Press Start 2P", monospace');
+    this.setFont('6px "Press Start 2P", monospace');
     ctx.fillStyle = '#38bdf8';
     ctx.textAlign = 'left';
-    ctx.fillText(`DIST:${telemetry?.dist || 0}px SPD:${telemetry?.speed || 0}`, 8, btmY + 15);
+    ctx.fillText(`DIST:${telemetry?.dist || 0} SPD:${(telemetry?.speed || 0).toFixed(1)} ACC:${(telemetry?.accel || 0).toFixed(2)}`, 6, btmY + 15);
 
     const isTetheredBar = !!telemetry?.isTethered;
     if (isTetheredBar) {
       ctx.fillStyle = telemetry?.spinLevel === 2 ? '#ff3b00' : telemetry?.spinLevel === 1 ? '#fde047' : '#38bdf8';
-      ctx.fillText(telemetry?.spinLevel === 2 ? '🔥GIGA SPIN' : telemetry?.spinLevel === 1 ? '⚡HIGH SPIN' : '⚡TETHER FLAIL', 148, btmY + 15);
+      ctx.fillText(telemetry?.spinLevel === 2 ? '🔥GIGA' : telemetry?.spinLevel === 1 ? '⚡HIGH' : '⚡FLAIL', 178, btmY + 15);
     } else {
       ctx.fillStyle = '#38bdf8';
-      ctx.fillText('☄️COMET SWING', 148, btmY + 15);
+      ctx.fillText('☄️COMET', 178, btmY + 15);
     }
 
     ctx.fillStyle = isWallBounce ? '#38bdf8' : '#64748b';
-    ctx.fillText(`[壁:${isWallBounce ? '反射' : 'なし'}]`, 236, btmY + 15);
+    ctx.fillText(`[壁:${isWallBounce ? 'ON' : 'OFF'}]`, 238, btmY + 15);
 
     ctx.fillStyle = '#22c55e';
     ctx.textAlign = 'right';
-    ctx.fillText(`DMG:${testBossDamage}`, w - 8, btmY + 15);
+    ctx.fillText(`DMG:${testBossDamage}`, w - 6, btmY + 15);
 
     // Boss HP Bar in Test Stage if boss active (y = 96)
     if (boss && boss.y > 0) {

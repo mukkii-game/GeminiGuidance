@@ -407,6 +407,7 @@ export class GeminiOrbManager {
         dist: 0,
         speed: 0,
         tangentSpeed: 0,
+        accel: 0,
         mode: 'SLING',
         isTethered: false,
         collisionMode: this.collisionMode,
@@ -437,6 +438,7 @@ export class GeminiOrbManager {
       dist: Math.round(dist),
       speed: Math.round(speed * 10) / 10,
       tangentSpeed: Math.round(tangentSpeed * 10) / 10,
+      accel: Math.round((orb.currentAccel || 0) * 100) / 100,
       mode: orb.mode,
       isTethered: !!orb.isTethered,
       collisionMode: orb.collisionMode || this.collisionMode,
@@ -518,6 +520,9 @@ export class GeminiOrbManager {
         orb.fuseTimer--;
       }
 
+      const prevVx = orb.vx;
+      const prevVy = orb.vy;
+
       // 各物理パターンの専任処理
       switch (this.currentPatternId) {
         case 'YOYO_STROKE':
@@ -537,6 +542,11 @@ export class GeminiOrbManager {
           this.updateHybrid(orb, playerX, playerY, playerVx, playerVy, cfg, isTetherHeld, onRelease);
           break;
       }
+
+      // 加速度の実測計測 (Δv / Δt)
+      const dvx = orb.vx - prevVx;
+      const dvy = orb.vy - prevVy;
+      orb.currentAccel = Math.hypot(dvx, dvy);
 
       // 画面端処理
       this.applyScreenBoundaries(orb, onWallHit);
