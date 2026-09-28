@@ -190,10 +190,11 @@ export class Game {
   public cycleTensionWithFeedback(): void {
     const val = this.geminiManager.cycleTension();
     this.audio.playGeminiBounce();
+    const desc = val <= 0.4 ? '極弱(超ゆったり)' : val <= 0.6 ? '弱(マイルド)' : val <= 0.8 ? '標準(快適)' : val <= 1.0 ? 'やや強' : val <= 1.3 ? '強' : '猛烈';
     this.addFloatingText(
       this.player.state.x,
       this.player.state.y - 30,
-      `自機向引力加速度: x${val.toFixed(1)} [J]`,
+      `引力・加速度: x${val.toFixed(1)} (${desc}) [J]`,
       '#fde047'
     );
   }
@@ -202,10 +203,11 @@ export class Game {
     const val = this.geminiManager.cycleTurnRate();
     this.audio.playGeminiBounce();
     const deg = (val * 180 / Math.PI).toFixed(1);
+    const desc = val <= 0.022 ? '大回り円弧' : val <= 0.030 ? 'ゆったりカーブ' : val <= 0.038 ? '標準カーブ' : val <= 0.050 ? '急ターン' : '超小回り';
     this.addFloatingText(
       this.player.state.x,
       this.player.state.y - 30,
-      `曲がり角度(旋回制限): ${deg}°/f [K]`,
+      `旋回制限: ${deg}°/f (${desc}) [K]`,
       '#fde047'
     );
   }
@@ -213,7 +215,7 @@ export class Game {
   public cycleDampingWithFeedback(): void {
     const val = this.geminiManager.cycleDamping();
     this.audio.playGeminiBounce();
-    const desc = val >= 0.996 ? '弱減衰(遠投)' : val >= 0.992 ? '標準' : '強減衰(早期周回)';
+    const desc = val >= 0.996 ? '弱減衰(宇宙空間・遠投)' : val >= 0.992 ? '標準減衰' : '強減衰(早期周回)';
     this.addFloatingText(
       this.player.state.x,
       this.player.state.y - 30,
@@ -229,7 +231,7 @@ export class Game {
   public cycleMaxSpeedWithFeedback(direction: number = 1): void {
     const val = this.geminiManager.cycleMaxSpeed(direction);
     this.audio.playGeminiBounce();
-    const desc = val <= 0.6 ? '極重・低速' : val <= 0.8 ? '重厚・ゆったり' : val <= 1.0 ? '標準' : val <= 1.3 ? '快速' : val <= 1.6 ? '高速' : '超高速';
+    const desc = val <= 0.5 ? '極重・低速' : val <= 0.65 ? '落ち着いた速度' : val <= 0.8 ? '標準(快適)' : val <= 1.0 ? '快速' : val <= 1.2 ? '高速' : '超高速';
     this.addFloatingText(
       this.player.state.x,
       this.player.state.y - 30,
@@ -1890,6 +1892,33 @@ export class Game {
           col === 'PENETRATE' ? '#22c55e' : '#f97316'
         );
         return true;
+      }
+
+      // Compact Tuning Bar in Normal HUD (y: height - 32 to height - 16)
+      const tuneBarY = this.canvas.height - 32;
+      if (y >= tuneBarY && y <= tuneBarY + 16) {
+        if (x >= 6 && x <= 76) {
+          this.cycleTensionWithFeedback();
+          return true;
+        }
+        if (x >= 77 && x <= 146) {
+          this.cycleTurnRateWithFeedback();
+          return true;
+        }
+        if (x >= 147 && x <= 220) {
+          this.cycleDampingWithFeedback();
+          return true;
+        }
+        if (x >= 221 && x <= 298) {
+          this.cycleMaxSpeedWithFeedback();
+          return true;
+        }
+        if (x >= 299 && x <= 354) {
+          this.geminiManager.resetTuning();
+          this.audio.playGeminiBounce();
+          this.addFloatingText(this.player.state.x, this.player.state.y - 30, 'パラメータ初期化!', '#38bdf8');
+          return true;
+        }
       }
 
       return false;

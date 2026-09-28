@@ -1288,14 +1288,33 @@ export class ArcadeRenderer {
     ctx.font = '6px "Press Start 2P", monospace';
     ctx.fillText(`${player.hp}%`, gaugeX + barW + 5, shieldY + 5);
 
+    // Compact Tuning Bar in Normal Play (y: height - 31 to height - 17)
+    const tuneBarY = this.canvas.height - 31;
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.88)';
+    ctx.fillRect(6, tuneBarY, w - 12, 15);
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(6, tuneBarY, w - 12, 15);
+
+    const tng = telemetry?.tuning;
+    const turnD = ((tng?.maxTurnRate || 0.035) * 180 / Math.PI).toFixed(1);
+    ctx.font = '7px "DotGothic16", monospace';
+    ctx.fillStyle = '#fde047';
+    ctx.textAlign = 'center';
+    ctx.fillText(
+      `[J]引力:x${(tng?.tensionMultiplier || 0.8).toFixed(1)}  [K]旋角:${turnD}°  [Y]減衰:${(tng?.damping || 0.993).toFixed(3)}  [U]最高速:x${(tng?.maxSpeedMultiplier || 0.8).toFixed(1)}  [R]初期`,
+      w / 2,
+      tuneBarY + 11
+    );
+
     // Bottom Bar: Lives, Stage Indicator, Gemini Power Level
-    const btmY = this.canvas.height - 10;
+    const btmY = this.canvas.height - 4;
 
     // Mini Lives Ships (Emergency Hull Restores)
     const shipSprite = this.sprites.get('PLAYER_CENTER');
     if (shipSprite) {
       for (let i = 0; i < player.lives - 1; i++) {
-        ctx.drawImage(shipSprite, 16 + i * 16, btmY - 14, 12, 12);
+        ctx.drawImage(shipSprite, 16 + i * 16, btmY - 10, 10, 10);
       }
     }
 
@@ -1303,23 +1322,23 @@ export class ArcadeRenderer {
     ctx.font = '6px "Press Start 2P", monospace';
     ctx.fillStyle = player.controlMode === 'LIMITED' ? '#fde047' : '#38bdf8';
     ctx.textAlign = 'left';
-    ctx.fillText(player.controlMode === 'LIMITED' ? `LIM(x${(player.speedMultiplier || 3).toFixed(1)})[M]` : 'DIR[M]', 68, btmY - 4);
+    ctx.fillText(player.controlMode === 'LIMITED' ? `LIM(x${(player.speedMultiplier || 3).toFixed(1)})[M]` : 'DIR[M]', 68, btmY - 2);
 
     // Stage Display
     ctx.fillStyle = '#38bdf8';
     ctx.textAlign = 'center';
-    ctx.font = '9px "Press Start 2P", monospace';
-    ctx.fillText(`STAGE ${stage}`, w / 2, btmY - 4);
+    ctx.font = '8px "Press Start 2P", monospace';
+    ctx.fillText(`STAGE ${stage}`, w / 2, btmY - 2);
 
     // Gemini Orb count & MAX Level indicator
     ctx.textAlign = 'right';
     if (geminiOrbs.length > 0) {
       const maxLv = Math.max(...geminiOrbs.map(o => o.level));
       ctx.fillStyle = maxLv === 3 ? '#ec4899' : maxLv === 2 ? '#a855f7' : '#38bdf8';
-      ctx.fillText(`GEMINI:Lv.${maxLv} [x${geminiOrbs.length}]`, w - 12, btmY - 4);
+      ctx.fillText(`GEMINI:Lv.${maxLv} [x${geminiOrbs.length}]`, w - 12, btmY - 2);
     } else {
       ctx.fillStyle = '#64748b';
-      ctx.fillText('GEMINI:0', w - 12, btmY - 4);
+      ctx.fillText('GEMINI:0', w - 12, btmY - 2);
     }
 
     // Boss HP Bar
@@ -1546,11 +1565,11 @@ export class ArcadeRenderer {
     }
 
     // Row 5: Real-time Physics Parameter Tuning (y: 71 to 86)
-    const tng = telemetry?.tuning || { tensionMultiplier: 1.0, maxTurnRate: 0.040, damping: 0.993, maxSpeedMultiplier: 1.0, orbitRadius: 75, overshootRatio: 0.5, apexDwellMultiplier: 1.0 };
-    const turnDeg = ((tng.maxTurnRate || 0.040) * 180 / Math.PI).toFixed(1);
+    const tng = telemetry?.tuning || { tensionMultiplier: 0.8, maxTurnRate: 0.035, damping: 0.993, maxSpeedMultiplier: 0.8, orbitRadius: 75, overshootRatio: 0.5, apexDwellMultiplier: 1.0 };
+    const turnDeg = ((tng.maxTurnRate || 0.035) * 180 / Math.PI).toFixed(1);
     const tuningBtns = [
-      { label: `加速:x${tng.tensionMultiplier.toFixed(1)}[J]`, x: 4, w: 60 },
-      { label: `曲がり:${turnDeg}°[K]`, x: 66, w: 68 },
+      { label: `引力:x${tng.tensionMultiplier.toFixed(1)}[J]`, x: 4, w: 60 },
+      { label: `旋角:${turnDeg}°[K]`, x: 66, w: 68 },
       { label: `減衰:${(tng.damping || 0.993).toFixed(3)}[Y]`, x: 136, w: 72 },
       { label: `最高速:x${tng.maxSpeedMultiplier.toFixed(1)}[U]`, x: 210, w: 74 },
       { label: '↺初期[R]', x: 286, w: 68 },
