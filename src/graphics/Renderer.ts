@@ -512,6 +512,37 @@ export class ArcadeRenderer {
         ctx.arc(playerX, playerY, 12, 0, Math.PI * 2);
         ctx.stroke();
 
+        // 4. エグゼリカ式 投擲予測ベクトル（今離すと飛ぶ方向のガイド矢印）
+        if (speed > 0.8) {
+          const arrowLen = Math.min(38, speed * 13);
+          const dirX = orb.vx / speed;
+          const dirY = orb.vy / speed;
+          ctx.strokeStyle = isGigaSpin ? '#ff3b00' : isHighSpin ? '#fde047' : 'rgba(56, 189, 248, 0.7)';
+          ctx.lineWidth = 1.4;
+          ctx.setLineDash([2, 3]);
+          ctx.beginPath();
+          ctx.moveTo(orb.x, orb.y);
+          ctx.lineTo(orb.x + dirX * arrowLen, orb.y + dirY * arrowLen);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // 矢印ヘッド
+          const headLen = 4;
+          const angle = Math.atan2(dirY, dirX);
+          ctx.beginPath();
+          ctx.moveTo(orb.x + dirX * arrowLen, orb.y + dirY * arrowLen);
+          ctx.lineTo(
+            orb.x + dirX * arrowLen - headLen * Math.cos(angle - Math.PI / 6),
+            orb.y + dirY * arrowLen - headLen * Math.sin(angle - Math.PI / 6)
+          );
+          ctx.moveTo(orb.x + dirX * arrowLen, orb.y + dirY * arrowLen);
+          ctx.lineTo(
+            orb.x + dirX * arrowLen - headLen * Math.cos(angle + Math.PI / 6),
+            orb.y + dirY * arrowLen - headLen * Math.sin(angle + Math.PI / 6)
+          );
+          ctx.stroke();
+        }
+
       } else {
         // --- クリックを離している時: 完全フリーなホーミング飛翔！ヒモは非表示 ---
       }
@@ -1471,7 +1502,7 @@ export class ArcadeRenderer {
       { id: 'COMET_GRAVITY', label: '彗星軌道', num: '2' },
       { id: 'ARC_HOMING', label: '旋回制限', num: '3' },
       { id: 'PURE_FLAIL', label: '常時分銅', num: '4' },
-      { id: 'HYBRID_COMET_FLAIL', label: '統合ハイブ', num: '5' },
+      { id: 'HYBRID_COMET_FLAIL', label: 'エグゼリカ', num: '5' },
     ];
     const tabW = 64;
     const tabH = 14;
