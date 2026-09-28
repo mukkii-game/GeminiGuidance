@@ -35,6 +35,14 @@ export class ArcadeRenderer {
 
   private shakeTimer: number = 0;
   private shakeMagnitude: number = 0;
+  private cachedFont: string = '';
+
+  private setFont(font: string): void {
+    if (this.cachedFont !== font) {
+      this.ctx.font = font;
+      this.cachedFont = font;
+    }
+  }
 
   constructor(canvas: HTMLCanvasElement, sprites: SpriteSheet, terrain: TerrainEngine) {
     this.canvas = canvas;
@@ -85,6 +93,7 @@ export class ArcadeRenderer {
     pointerPos?: { x: number; y: number },
     audioSettings?: AudioSettings
   ): void {
+    this.cachedFont = '';
     const ctx = this.ctx;
 
     ctx.save();
@@ -159,6 +168,7 @@ export class ArcadeRenderer {
     this.renderStateOverlays(state, stage, stageTick, player.score, pointerPos, audioSettings);
 
     ctx.restore();
+    this.cachedFont = '';
   }
 
   // --- Ground Bases ---
@@ -178,6 +188,7 @@ export class ArcadeRenderer {
 
         ctx.drawImage(sprite, -sprite.width / 2, -sprite.height / 2);
         ctx.restore();
+    this.cachedFont = '';
       }
     }
   }
@@ -244,12 +255,13 @@ export class ArcadeRenderer {
       }
 
       // Small item hint label
-      ctx.font = '7px "Press Start 2P", monospace';
+      this.setFont('7px "Press Start 2P", monospace');
       ctx.fillStyle = '#fef08a';
       ctx.textAlign = 'center';
       ctx.fillText('ITEM', 0, 22);
 
       ctx.restore();
+    this.cachedFont = '';
     }
   }
 
@@ -276,6 +288,7 @@ export class ArcadeRenderer {
       ctx.stroke();
 
       ctx.restore();
+    this.cachedFont = '';
     }
   }
 
@@ -312,6 +325,7 @@ export class ArcadeRenderer {
         ctx.moveTo(pointerPos.x, pointerPos.y + 2); ctx.lineTo(pointerPos.x, pointerPos.y + 7);
         ctx.stroke();
         ctx.restore();
+    this.cachedFont = '';
       }
     }
 
@@ -343,6 +357,7 @@ export class ArcadeRenderer {
       ctx.closePath();
       ctx.stroke();
       ctx.restore();
+    this.cachedFont = '';
 
       // Rapid i-frame transparency flicker
       if (Math.floor(player.invulnerableTimer / 3) % 2 === 0) {
@@ -361,6 +376,7 @@ export class ArcadeRenderer {
         2
       );
       ctx.restore();
+    this.cachedFont = '';
     }
 
     // Thruster Exhaust Plume
@@ -397,7 +413,7 @@ export class ArcadeRenderer {
     // Weapon Mode Indicator floating above ship
     if (mode) {
       ctx.save();
-      ctx.font = '7px "DotGothic16", monospace';
+      this.setFont('7px "DotGothic16", monospace');
       ctx.textAlign = 'center';
       if (mode === 'ORBIT') {
         ctx.fillStyle = '#38bdf8';
@@ -408,6 +424,7 @@ export class ArcadeRenderer {
         ctx.fillText(`🚀ヨーヨー槍${colLabel}`, player.x, player.y - 18);
       }
       ctx.restore();
+    this.cachedFont = '';
     }
   }
 
@@ -547,6 +564,7 @@ export class ArcadeRenderer {
         // --- クリックを離している時: 完全フリーなホーミング飛翔！ヒモは非表示 ---
       }
       ctx.restore();
+    this.cachedFont = '';
 
       // =========================================================================
       // 1. HITODAMA (人魂) & DIRECTIONAL FLYING EMBERS (火の粉)
@@ -602,6 +620,7 @@ export class ArcadeRenderer {
         ctx.stroke();
 
         ctx.restore();
+    this.cachedFont = '';
 
         // C. 後方に舞い散る火の粉（Trailing Sparks / Embers）
         // ユーザー指示: 「人のたまがうしろに火の粉とか向かっている方向が目に見えるような」
@@ -641,7 +660,7 @@ export class ArcadeRenderer {
 
         // D. 猛突撃ステータスバッジ
         if (isCharged) {
-          ctx.font = '7px "DotGothic16", monospace';
+          this.setFont('7px "DotGothic16", monospace');
           ctx.fillStyle = '#ffea00';
           ctx.textAlign = 'center';
           ctx.fillText('🔥猛突撃!!', orb.x, orb.y - effectiveR - 8);
@@ -660,7 +679,7 @@ export class ArcadeRenderer {
         ctx.arc(orb.x, orb.y, effectiveR + 10, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.font = '7px "DotGothic16", monospace';
+        this.setFont('7px "DotGothic16", monospace');
         ctx.fillStyle = '#ffea00';
         ctx.textAlign = 'center';
         ctx.fillText(orb.mode === 'COMET' ? '☄️ハレー彗星!!' : orb.mode === 'ORBIT' ? '🔥室伏GIGAスピン!!' : '🔥猛突撃!!', orb.x, orb.y - effectiveR - 8);
@@ -687,13 +706,14 @@ export class ArcadeRenderer {
         ctx.stroke();
 
         if (orb.mode === 'ORBIT' && orb.spinLevel === 1) {
-          ctx.font = '7px "DotGothic16", monospace';
+          this.setFont('7px "DotGothic16", monospace');
           ctx.fillStyle = '#38bdf8';
           ctx.textAlign = 'center';
           ctx.fillText('⚡室伏遠心加速!', orb.x, orb.y - effectiveR - 8);
         }
       }
       ctx.restore();
+    this.cachedFont = '';
 
       // 2. Motion Trail
       for (let i = 0; i < orb.trail.length; i++) {
@@ -716,6 +736,7 @@ export class ArcadeRenderer {
         ctx.scale(scale, scale);
         ctx.drawImage(sprite, -sprite.width / 2, -sprite.height / 2);
         ctx.restore();
+    this.cachedFont = '';
       }
 
       // 4. Fusion / Level Up Burst Flare Animation
@@ -727,6 +748,7 @@ export class ArcadeRenderer {
         ctx.arc(orb.x, orb.y, (25 - orb.fuseTimer) * 2.2 + orb.radius, 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
+    this.cachedFont = '';
       }
     }
   }
@@ -774,10 +796,11 @@ export class ArcadeRenderer {
         ctx.save();
         ctx.rotate(-Math.PI / 2);
         ctx.fillStyle = '#0f172a';
-        ctx.font = '6px "Press Start 2P", monospace';
+        this.setFont('6px "Press Start 2P", monospace');
         ctx.textAlign = 'center';
         ctx.fillText('SPACEX', 0, 4);
         ctx.restore();
+    this.cachedFont = '';
 
         if (e.hitCooldown && e.hitCooldown > 0) {
           const flashAlpha = (e.hitCooldown % 4 < 2) ? 0.75 : 0.25;
@@ -786,6 +809,7 @@ export class ArcadeRenderer {
         }
 
         ctx.restore();
+    this.cachedFont = '';
         continue;
       }
 
@@ -806,6 +830,7 @@ export class ArcadeRenderer {
         }
 
         ctx.restore();
+    this.cachedFont = '';
       }
 
       // HP表示（耐久値が2以上の敵、またはDUMMY敵）
@@ -813,7 +838,7 @@ export class ArcadeRenderer {
         ctx.save();
         if (e.pattern === 'DUMMY' && e.maxHp > 10) {
           // 大型ダミー（HP 35や500など）はバー表示
-          ctx.font = '8px "DotGothic16", monospace';
+          this.setFont('8px "DotGothic16", monospace');
           ctx.textAlign = 'center';
           const isPen = e.collisionType === 'PENETRATE';
           const massStr = (e.mass || 2) >= 100 ? '重壁' : (e.mass || 2) >= 3 ? '中' : '軽';
@@ -860,6 +885,7 @@ export class ArcadeRenderer {
           }
         }
         ctx.restore();
+    this.cachedFont = '';
       }
     }
   }
@@ -915,6 +941,7 @@ export class ArcadeRenderer {
       ctx.lineWidth = 4;
       ctx.strokeRect(-55, -55, 110, 110);
       ctx.restore();
+    this.cachedFont = '';
 
       const sonnetSprite = this.sprites.get('CLAUDE_SONNET');
       if (sonnetSprite) {
@@ -977,6 +1004,7 @@ export class ArcadeRenderer {
     }
 
     ctx.restore();
+    this.cachedFont = '';
   }
 
   // --- Boss Cinematic Dialogue Banner ---
@@ -992,15 +1020,16 @@ export class ArcadeRenderer {
     ctx.lineWidth = 2;
     ctx.strokeRect(0, 48, w, 52);
 
-    ctx.font = '8px "Press Start 2P", monospace';
+    this.setFont('8px "Press Start 2P", monospace');
     ctx.fillStyle = '#ef4444';
     ctx.textAlign = 'left';
     ctx.fillText('>> BOSS TRANSMISSION <<', 16, 62);
 
-    ctx.font = '11px "DotGothic16", monospace';
+    this.setFont('11px "DotGothic16", monospace');
     ctx.fillStyle = '#ffffff';
     ctx.fillText(`「${boss.dialogueQuote}」`, 16, 84);
     ctx.restore();
+    this.cachedFont = '';
   }
 
   // --- Stage 2 Polygon Elon Musk Transmission (Star Fox Super FX Style) ---
@@ -1042,7 +1071,7 @@ export class ArcadeRenderer {
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 2;
       ctx.strokeRect(faceX, faceY, faceSize, faceSize);
-      ctx.font = '10px "Press Start 2P", monospace';
+      this.setFont('10px "Press Start 2P", monospace');
       ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'center';
       ctx.fillText('[ ELON POLYGON ]', w / 2, faceY + 90);
@@ -1054,12 +1083,12 @@ export class ArcadeRenderer {
     ctx.fillRect(faceX, visorY, faceSize, 6);
 
     // Transmission header banner
-    ctx.font = '9px "Press Start 2P", monospace';
+    this.setFont('9px "Press Start 2P", monospace');
     ctx.fillStyle = '#38bdf8';
     ctx.textAlign = 'center';
     ctx.fillText('== INCOMING TRANSMISSION ==', w / 2, 46);
 
-    ctx.font = '8px "Press Start 2P", monospace';
+    this.setFont('8px "Press Start 2P", monospace');
     ctx.fillStyle = '#ef4444';
     ctx.fillText('EMPEROR ELON MUSK (xAI)', w / 2, 62);
 
@@ -1071,16 +1100,17 @@ export class ArcadeRenderer {
     ctx.lineWidth = 2;
     ctx.strokeRect(16, boxY, w - 32, 68);
 
-    ctx.font = '14px "DotGothic16", monospace';
+    this.setFont('14px "DotGothic16", monospace');
     ctx.fillStyle = '#fde047';
     ctx.textAlign = 'center';
     ctx.fillText('「わしは　うちゅうのていおう　イーロン」', w / 2, boxY + 34);
 
-    ctx.font = '9px "Press Start 2P", monospace';
+    this.setFont('9px "Press Start 2P", monospace');
     ctx.fillStyle = '#94a3b8';
     ctx.fillText('I AM THE EMPEROR OF THE UNIVERSE', w / 2, boxY + 54);
 
     ctx.restore();
+    this.cachedFont = '';
   }
 
   // --- Stage Start Title Banner ---
@@ -1103,11 +1133,12 @@ export class ArcadeRenderer {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.fillRect(0, 160, w, 44);
 
-    ctx.font = '13px "DotGothic16", monospace';
+    this.setFont('13px "DotGothic16", monospace');
     ctx.fillStyle = '#38bdf8';
     ctx.textAlign = 'center';
     ctx.fillText(title, w / 2, 188);
     ctx.restore();
+    this.cachedFont = '';
   }
 
   // --- Explosions, Particles, Floating Texts ---
@@ -1133,6 +1164,7 @@ export class ArcadeRenderer {
       ctx.stroke();
 
       ctx.restore();
+    this.cachedFont = '';
     }
   }
 
@@ -1148,7 +1180,7 @@ export class ArcadeRenderer {
 
   private renderFloatingTexts(texts: FloatingText[]): void {
     const ctx = this.ctx;
-    ctx.font = '8px "Press Start 2P", monospace';
+    this.setFont('8px "Press Start 2P", monospace');
     ctx.textAlign = 'center';
     for (const t of texts) {
       ctx.fillStyle = t.color;
@@ -1169,7 +1201,7 @@ export class ArcadeRenderer {
     const ctx = this.ctx;
     const w = this.canvas.width;
 
-    ctx.font = '8px "Press Start 2P", monospace';
+    this.setFont('8px "Press Start 2P", monospace');
     ctx.textAlign = 'left';
 
     // Top Header: 1UP Score & HIGH Score
@@ -1194,7 +1226,7 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1;
     ctx.strokeRect(148, 4, 36, 15);
     ctx.fillStyle = isBgmOn ? '#38bdf8' : '#f87171';
-    ctx.font = '7px "DotGothic16", monospace';
+    this.setFont('7px "DotGothic16", monospace');
     ctx.textAlign = 'center';
     ctx.fillText(isBgmOn ? '🎵ON' : '🎵OFF', 166, 14);
 
@@ -1205,7 +1237,7 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1;
     ctx.strokeRect(186, 4, 36, 15);
     ctx.fillStyle = isSeOn ? '#fde047' : '#f87171';
-    ctx.font = '7px "DotGothic16", monospace';
+    this.setFont('7px "DotGothic16", monospace');
     ctx.textAlign = 'center';
     ctx.fillText(isSeOn ? '🔊ON' : '🔊OFF', 204, 14);
 
@@ -1217,7 +1249,7 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1;
     ctx.strokeRect(btnTestX, 4, 40, 15);
     ctx.fillStyle = '#38bdf8';
-    ctx.font = '6px "Press Start 2P", monospace';
+    this.setFont('6px "Press Start 2P", monospace');
     ctx.textAlign = 'center';
     ctx.fillText('LAB(T)', btnTestX + 20, 14);
 
@@ -1228,7 +1260,7 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1;
     ctx.strokeRect(btnPresetX, 4, 82, 15);
     ctx.fillStyle = '#fde047';
-    ctx.font = '7px "DotGothic16", monospace';
+    this.setFont('7px "DotGothic16", monospace');
     ctx.fillText(`[1-5:${telemetry?.patternInfo?.shortLabel || '①ヨーヨー'}]`, btnPresetX + 41, 14);
 
     // Row 2 Buttons: Attack Mode (ヒモ保持 ⇄ 投擲リリース) & Attribute (貫通 / 反射)
@@ -1241,7 +1273,7 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1.2;
     ctx.strokeRect(btnModeX, 23, btnModeW, 16);
     ctx.fillStyle = isTethered ? '#38bdf8' : '#fde047';
-    ctx.font = '8px "DotGothic16", monospace';
+    this.setFont('8px "DotGothic16", monospace');
     ctx.textAlign = 'center';
     ctx.fillText(isTethered ? '⚡分銅ヒモ保持' : (telemetry?.patternInfo?.shortLabel || '☄️ハレー彗星'), btnModeX + btnModeW / 2, 34);
 
@@ -1255,7 +1287,7 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1.2;
     ctx.strokeRect(btnColX, 23, btnColW, 16);
     ctx.fillStyle = isPen ? '#22c55e' : '#f97316';
-    ctx.font = '8px "DotGothic16", monospace';
+    this.setFont('8px "DotGothic16", monospace');
     ctx.textAlign = 'center';
     ctx.fillText(isPen ? '⚔️属性:貫通' : '🛡️属性:反射', btnColX + btnColW / 2, 34);
 
@@ -1265,7 +1297,7 @@ export class ArcadeRenderer {
     const barW = 44;
     const barH = 5;
 
-    ctx.font = '6px "Press Start 2P", monospace';
+    this.setFont('6px "Press Start 2P", monospace');
     ctx.fillStyle = '#94a3b8';
     ctx.textAlign = 'left';
     ctx.fillText('SHIELD', shieldX, shieldY + 5);
@@ -1285,7 +1317,7 @@ export class ArcadeRenderer {
     ctx.strokeRect(gaugeX - 1, shieldY - 1, barW + 2, barH + 2);
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = '6px "Press Start 2P", monospace';
+    this.setFont('6px "Press Start 2P", monospace');
     ctx.fillText(`${player.hp}%`, gaugeX + barW + 5, shieldY + 5);
 
     // Compact Tuning Bar in Normal Play (y: height - 31 to height - 17)
@@ -1298,7 +1330,7 @@ export class ArcadeRenderer {
 
     const tng = telemetry?.tuning;
     const turnD = ((tng?.maxTurnRate || 0.035) * 180 / Math.PI).toFixed(1);
-    ctx.font = '7px "DotGothic16", monospace';
+    this.setFont('7px "DotGothic16", monospace');
     ctx.fillStyle = '#fde047';
     ctx.textAlign = 'center';
     ctx.fillText(
@@ -1319,7 +1351,7 @@ export class ArcadeRenderer {
     }
 
     // Player Control Mode indicator in HUD
-    ctx.font = '6px "Press Start 2P", monospace';
+    this.setFont('6px "Press Start 2P", monospace');
     ctx.fillStyle = player.controlMode === 'LIMITED' ? '#fde047' : '#38bdf8';
     ctx.textAlign = 'left';
     ctx.fillText(player.controlMode === 'LIMITED' ? `LIM(x${(player.speedMultiplier || 3).toFixed(1)})[M]` : 'DIR[M]', 68, btmY - 2);
@@ -1327,7 +1359,7 @@ export class ArcadeRenderer {
     // Stage Display
     ctx.fillStyle = '#38bdf8';
     ctx.textAlign = 'center';
-    ctx.font = '8px "Press Start 2P", monospace';
+    this.setFont('8px "Press Start 2P", monospace');
     ctx.fillText(`STAGE ${stage}`, w / 2, btmY - 2);
 
     // Gemini Orb count & MAX Level indicator
@@ -1356,13 +1388,14 @@ export class ArcadeRenderer {
     ctx.stroke();
 
     ctx.fillStyle = isCatching ? '#ffffff' : '#38bdf8';
-    ctx.font = '8px "DotGothic16", monospace';
+    this.setFont('8px "DotGothic16", monospace');
     ctx.textAlign = 'center';
     ctx.fillText(isCatching ? '⚡捕獲中' : '⚡捕獲', 318, 463);
-    ctx.font = '6px "DotGothic16", monospace';
+    this.setFont('6px "DotGothic16", monospace');
     ctx.fillStyle = isCatching ? '#fde047' : '#94a3b8';
     ctx.fillText(isCatching ? '離して投擲' : '長押/2本指', 318, 474);
     ctx.restore();
+    this.cachedFont = '';
 
     // Boss HP Bar
     if (boss && !boss.defeated && boss.y > 0) {
@@ -1383,7 +1416,7 @@ export class ArcadeRenderer {
       ctx.strokeRect(bossBarX, bossBarY, bossBarW, bossBarH);
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = '7px "Press Start 2P", monospace';
+      this.setFont('7px "Press Start 2P", monospace');
       ctx.textAlign = 'center';
       ctx.fillText(boss.name, w / 2, bossBarY - 4);
     }
@@ -1433,13 +1466,13 @@ export class ArcadeRenderer {
     ctx.strokeRect(0, 0, w, 89);
 
     // Row 1: Title, Shield, Wall Bounce Toggle, Lv, BGM, SE, Return (y: 2 to 18)
-    ctx.font = '8px "Press Start 2P", monospace';
+    this.setFont('8px "Press Start 2P", monospace');
     ctx.fillStyle = '#38bdf8';
     ctx.textAlign = 'left';
     ctx.fillText('⚡LAB', 4, 14);
 
     ctx.fillStyle = player.hp > 30 ? '#22c55e' : '#ef4444';
-    ctx.font = '7px "Press Start 2P", monospace';
+    this.setFont('7px "Press Start 2P", monospace');
     ctx.fillText(`SHLD:${player.hp}%`, 38, 14);
 
     // [壁: 反射ON] / [画面端: 通過] (x: 88 to 174, w: 86)
@@ -1450,7 +1483,7 @@ export class ArcadeRenderer {
     ctx.lineWidth = isWallBounce ? 1.5 : 1;
     ctx.strokeRect(88, 2, 86, 15);
     ctx.fillStyle = isWallBounce ? '#38bdf8' : '#94a3b8';
-    ctx.font = '7px "DotGothic16", monospace';
+    this.setFont('7px "DotGothic16", monospace');
     ctx.textAlign = 'center';
     ctx.fillText(isWallBounce ? '🧱壁:反射[Q]' : '🚪端:通過[Q]', 88 + 43, 13);
 
@@ -1462,7 +1495,7 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1;
     ctx.strokeRect(176, 2, 46, 15);
     ctx.fillStyle = '#ec4899';
-    ctx.font = '6px "Press Start 2P", monospace';
+    this.setFont('6px "Press Start 2P", monospace');
     ctx.textAlign = 'center';
     ctx.fillText(`Lv.${lv}[L]`, 176 + 23, 12);
 
@@ -1474,7 +1507,7 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1;
     ctx.strokeRect(224, 2, 40, 15);
     ctx.fillStyle = isBgmOn ? '#38bdf8' : '#f87171';
-    ctx.font = '7px "DotGothic16", monospace';
+    this.setFont('7px "DotGothic16", monospace');
     ctx.textAlign = 'center';
     ctx.fillText(isBgmOn ? '🎵ON[B]' : '🎵OFF[B]', 224 + 20, 13);
 
@@ -1486,7 +1519,7 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1;
     ctx.strokeRect(266, 2, 40, 15);
     ctx.fillStyle = isSeOn ? '#fde047' : '#f87171';
-    ctx.font = '7px "DotGothic16", monospace';
+    this.setFont('7px "DotGothic16", monospace');
     ctx.textAlign = 'center';
     ctx.fillText(isSeOn ? '🔊ON[N]' : '🔊OFF[N]', 266 + 20, 13);
 
@@ -1508,7 +1541,7 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1.5;
     ctx.strokeRect(8, 19, btnAtkW, 16);
     ctx.fillStyle = isTethered ? '#38bdf8' : '#fde047';
-    ctx.font = '8px "DotGothic16", monospace';
+    this.setFont('8px "DotGothic16", monospace');
     ctx.textAlign = 'center';
     const modeLabel = isTethered ? '⚡分銅ヒモ保持[長押]' : '☄️ハレー彗星[デフォ]';
     ctx.fillText(modeLabel, 8 + btnAtkW / 2, 30);
@@ -1522,7 +1555,7 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1.5;
     ctx.strokeRect(124, 19, btnColW, 16);
     ctx.fillStyle = isPen ? '#22c55e' : '#f97316';
-    ctx.font = '8px "DotGothic16", monospace';
+    this.setFont('8px "DotGothic16", monospace');
     ctx.textAlign = 'center';
     ctx.fillText(isPen ? '⚔️ジェミニ:貫通[X]' : '🛡️ジェミニ:反射[X]', 124 + btnColW / 2, 30);
 
@@ -1534,7 +1567,7 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1.2;
     ctx.strokeRect(240, 19, btnOrbW, 16);
     ctx.fillStyle = '#f472b6';
-    ctx.font = '8px "DotGothic16", monospace';
+    this.setFont('8px "DotGothic16", monospace');
     ctx.textAlign = 'center';
     ctx.fillText(`ジェミニ:${orbCnt}機[O]`, 240 + btnOrbW / 2, 30);
 
@@ -1559,7 +1592,7 @@ export class ArcadeRenderer {
       ctx.lineWidth = isActive ? 2 : 1;
       ctx.strokeRect(tabX, tabY, tabW, tabH);
       ctx.fillStyle = isActive ? '#ffffff' : '#94a3b8';
-      ctx.font = '7px "DotGothic16", monospace';
+      this.setFont('7px "DotGothic16", monospace');
       ctx.textAlign = 'center';
       ctx.fillText(`[${t.num}]${t.label}`, tabX + tabW / 2, tabY + 10);
     }
@@ -1582,7 +1615,7 @@ export class ArcadeRenderer {
       ctx.lineWidth = isAct ? 1.8 : 1;
       ctx.strokeRect(et.x, 53, et.w, 16);
       ctx.fillStyle = isAct ? '#ffffff' : '#94a3b8';
-      ctx.font = '7px "DotGothic16", monospace';
+      this.setFont('7px "DotGothic16", monospace');
       ctx.textAlign = 'center';
       ctx.fillText(et.label, et.x + et.w / 2, 64);
     }
@@ -1604,7 +1637,7 @@ export class ArcadeRenderer {
       ctx.lineWidth = 1;
       ctx.strokeRect(tb.x, 71, tb.w, 15);
       ctx.fillStyle = '#fde047';
-      ctx.font = '6px "DotGothic16", monospace';
+      this.setFont('6px "DotGothic16", monospace');
       ctx.textAlign = 'center';
       ctx.fillText(tb.label, tb.x + tb.w / 2, 82);
     }
@@ -1621,7 +1654,7 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1.5;
     ctx.strokeRect(8, ctrlBarY, 170, 18);
     ctx.fillStyle = isDirect ? '#38bdf8' : '#fde047';
-    ctx.font = '8px "DotGothic16", monospace';
+    this.setFont('8px "DotGothic16", monospace');
     ctx.textAlign = 'center';
     ctx.fillText(isDirect ? '🖱️自機移動: マウス直結[M]' : `🚀自機移動: 速度制限[M]`, 8 + 85, ctrlBarY + 12);
 
@@ -1632,7 +1665,7 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1.2;
     ctx.strokeRect(182, ctrlBarY, 170, 18);
     ctx.fillStyle = '#fde047';
-    ctx.font = '8px "DotGothic16", monospace';
+    this.setFont('8px "DotGothic16", monospace');
     ctx.textAlign = 'center';
     ctx.fillText(`⚡自機最高速度: x${speedMult.toFixed(1)} (切替)[V]`, 182 + 85, ctrlBarY + 12);
 
@@ -1644,7 +1677,7 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1;
     ctx.strokeRect(0, btmY, w, 24);
 
-    ctx.font = '7px "Press Start 2P", monospace';
+    this.setFont('7px "Press Start 2P", monospace');
     ctx.fillStyle = '#38bdf8';
     ctx.textAlign = 'left';
     ctx.fillText(`DIST:${telemetry?.dist || 0}px SPD:${telemetry?.speed || 0}`, 8, btmY + 15);
@@ -1685,12 +1718,13 @@ export class ArcadeRenderer {
       ctx.strokeRect(bossBarX, bossBarY, bossBarW, bossBarH);
 
       ctx.fillStyle = '#ffffff';
-      ctx.font = '7px "DotGothic16", monospace';
+      this.setFont('7px "DotGothic16", monospace');
       ctx.textAlign = 'center';
       ctx.fillText(`${boss.name} [${isBossPen ? '貫通' : '反射'}]`, w / 2, bossBarY - 4);
     }
 
     ctx.restore();
+    this.cachedFont = '';
   }
 
   // --- State Overlays ---
@@ -1725,15 +1759,15 @@ export class ArcadeRenderer {
 
       // 2. Subtitle / Version
       ctx.textAlign = 'center';
-      ctx.font = '12px "DotGothic16", monospace';
+      this.setFont('12px "DotGothic16", monospace');
       ctx.fillStyle = '#67e8f9';
       ctx.fillText('【 ジェミニ誘導 - GEMINI GUIDANCE - 】', w / 2, 98);
-      ctx.font = '8px "Press Start 2P", monospace';
+      this.setFont('8px "Press Start 2P", monospace');
       ctx.fillStyle = '#94a3b8';
       ctx.fillText('- 1983 NAMCO STYLE STG -', w / 2, 110);
 
       // 3. Stage Select Section Header
-      ctx.font = '8px "Press Start 2P", monospace';
+      this.setFont('8px "Press Start 2P", monospace');
       ctx.fillStyle = '#fde047';
       ctx.fillText('== SELECT STAGE / MISSION ==', w / 2, 126);
 
@@ -1807,19 +1841,19 @@ export class ArcadeRenderer {
 
         // Key badge [1], [2], [T]
         ctx.fillStyle = isHover ? '#fde047' : btn.color;
-        ctx.font = '8px "Press Start 2P", monospace';
+        this.setFont('8px "Press Start 2P", monospace');
         ctx.textAlign = 'left';
         ctx.fillText(`[${btn.num}]`, btnX + 8, btn.y + (btn.isLab ? 17 : 16));
 
         // Main Title
         ctx.fillStyle = isHover ? '#ffffff' : '#f8fafc';
-        ctx.font = '10px "DotGothic16", monospace';
+        this.setFont('10px "DotGothic16", monospace');
         const prefix = isHover ? '▶ ' : '';
         ctx.fillText(`${prefix}${btn.name}`, btnX + 40, btn.y + (btn.isLab ? 14 : 17));
 
         // Subtext / description
         ctx.fillStyle = isHover ? '#fde047' : '#94a3b8';
-        ctx.font = '7px "DotGothic16", monospace';
+        this.setFont('7px "DotGothic16", monospace');
         ctx.textAlign = 'right';
         ctx.fillText(btn.sub, btnX + btnW - 8, btn.y + (btn.isLab ? 25 : 17));
       }
@@ -1827,17 +1861,17 @@ export class ArcadeRenderer {
       // 5. Instruction prompt
       ctx.textAlign = 'center';
       if (Math.floor(stageTick / 22) % 2 === 0) {
-        ctx.font = '8px "Press Start 2P", monospace';
+        this.setFont('8px "Press Start 2P", monospace');
         ctx.fillStyle = '#fde047';
         ctx.fillText('CLICK BUTTON OR PRESS [1-4] / [T]', w / 2, 298);
       } else {
-        ctx.font = '8px "Press Start 2P", monospace';
+        this.setFont('8px "Press Start 2P", monospace');
         ctx.fillStyle = '#a16207';
         ctx.fillText('CLICK BUTTON OR PRESS [1-4] / [T]', w / 2, 298);
       }
 
       // 6. Mechanics & Controls Guide
-      ctx.font = '8px "DotGothic16", monospace';
+      this.setFont('8px "DotGothic16", monospace');
       ctx.fillStyle = '#22c55e';
       ctx.fillText('★ 攻撃① ヨーヨー投擲: 引っ張り放ち＆折り返し滞空多段削り', w / 2, 316);
       ctx.fillStyle = '#38bdf8';
@@ -1868,7 +1902,7 @@ export class ArcadeRenderer {
       ctx.lineWidth = 1.2;
       ctx.strokeRect(24, 396, 148, 20);
       ctx.fillStyle = isBgmOn ? '#38bdf8' : '#f87171';
-      ctx.font = '8px "DotGothic16", monospace';
+      this.setFont('8px "DotGothic16", monospace');
       ctx.textAlign = 'center';
       ctx.fillText(isBgmOn ? '🎵 BGM: ON [Bキー]' : '🎵 BGM: OFF [Bキー]', 98, 410);
 
@@ -1879,17 +1913,17 @@ export class ArcadeRenderer {
       ctx.lineWidth = 1.2;
       ctx.strokeRect(188, 396, 148, 20);
       ctx.fillStyle = isSeOn ? '#fde047' : '#f87171';
-      ctx.font = '8px "DotGothic16", monospace';
+      this.setFont('8px "DotGothic16", monospace');
       ctx.textAlign = 'center';
       ctx.fillText(isSeOn ? '🔊 効果音: ON [Nキー]' : '🔊 効果音: OFF [Nキー]', 262, 410);
 
       // Master Mute text
-      ctx.font = '7px "DotGothic16", monospace';
+      this.setFont('7px "DotGothic16", monospace');
       ctx.fillStyle = '#64748b';
       ctx.fillText('[Mキー] サウンド全消音 / 全解除', w / 2, 426);
 
       // 7. Asset Attribution
-      ctx.font = '8px "DotGothic16", monospace';
+      this.setFont('8px "DotGothic16", monospace');
       ctx.fillStyle = '#67e8f9';
       ctx.fillText('【 音源・素材クレジット 】', w / 2, 440);
       ctx.fillStyle = '#94a3b8';
@@ -1903,29 +1937,29 @@ export class ArcadeRenderer {
       ctx.fillText('💻 PC: マウスまたはWASD / 矢印キー移動', w / 2, 498);
 
       // Copyright
-      ctx.font = '8px "Press Start 2P", monospace';
+      this.setFont('8px "Press Start 2P", monospace');
       ctx.fillStyle = '#ef4444';
       ctx.fillText('(C) 2026 MUKKII ARCADE SYSTEM', w / 2, 522);
 
     } else if (state === 'STAGE_CLEAR') {
-      ctx.font = '14px "Press Start 2P", monospace';
+      this.setFont('14px "Press Start 2P", monospace');
       ctx.textAlign = 'center';
       ctx.fillStyle = '#22c55e';
       ctx.fillText(`STAGE ${stage} CLEARED!`, w / 2, h * 0.45);
       ctx.fillStyle = '#fef08a';
-      ctx.font = '8px "Press Start 2P", monospace';
+      this.setFont('8px "Press Start 2P", monospace');
       ctx.fillText('GET READY FOR NEXT BATTLE...', w / 2, h * 0.55);
 
     } else if (state === 'GAME_OVER') {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
       ctx.fillRect(0, 0, w, h);
 
-      ctx.font = '16px "Press Start 2P", monospace';
+      this.setFont('16px "Press Start 2P", monospace');
       ctx.textAlign = 'center';
       ctx.fillStyle = '#ef4444';
       ctx.fillText('GAME OVER', w / 2, h * 0.45);
 
-      ctx.font = '8px "Press Start 2P", monospace';
+      this.setFont('8px "Press Start 2P", monospace');
       ctx.fillStyle = '#ffffff';
       ctx.fillText(`FINAL SCORE: ${score}`, w / 2, h * 0.55);
 
@@ -1938,13 +1972,13 @@ export class ArcadeRenderer {
       ctx.fillStyle = 'rgba(2, 6, 23, 0.85)';
       ctx.fillRect(0, 0, w, h);
 
-      ctx.font = '15px "Press Start 2P", monospace';
+      this.setFont('15px "Press Start 2P", monospace');
       ctx.textAlign = 'center';
       ctx.fillStyle = '#ec4899';
       ctx.fillText('ALL STAGES CLEARED!', w / 2, h * 0.35);
 
       ctx.fillStyle = '#38bdf8';
-      ctx.font = '8px "Press Start 2P", monospace';
+      this.setFont('8px "Press Start 2P", monospace');
       ctx.fillText('GPT-6 ASTRA DESTROYED!', w / 2, h * 0.45);
       ctx.fillText('GEMINI ORBIT SUPREME!', w / 2, h * 0.52);
 

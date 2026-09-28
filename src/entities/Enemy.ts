@@ -69,8 +69,8 @@ export class EnemyManager {
       formationId,
       x,
       y,
-      vx: pattern === 'UFO_FLYBY' ? 0.35 : 0,
-      vy: pattern === 'ROCKET_ASCENT' ? -0.21 : pattern === 'INVADER' || pattern === 'UFO_FLYBY' ? 0 : 0.16,
+      vx: pattern === 'UFO_FLYBY' ? 1.6 : 0,
+      vy: pattern === 'ROCKET_ASCENT' ? -2.0 : pattern === 'INVADER' || pattern === 'UFO_FLYBY' ? 0 : 1.2,
       width,
       height,
       hp,
@@ -191,8 +191,10 @@ export class EnemyManager {
           const minDist = (e.width + other.width) * 0.52;
           const dx = e.x - other.x;
           const dy = e.y - other.y;
-          const dist = Math.hypot(dx, dy);
-          if (dist < minDist && dist > 0.001) {
+          const distSq = dx * dx + dy * dy;
+          const minDistSq = minDist * minDist;
+          if (distSq < minDistSq && distSq > 0.0001) {
+            const dist = Math.sqrt(distSq);
             const overlap = (minDist - dist) * 0.5;
             const nx = dx / dist;
             const ny = dy / dist;
@@ -214,7 +216,7 @@ export class EnemyManager {
             // 3-way fan spread
             for (const offset of [-0.35, 0, 0.35]) {
               const ang = baseAngle + offset;
-              const spd = 0.18;
+              const spd = 1.5;
               onSpawnBullet(e.x, e.y + 12, Math.cos(ang) * spd, Math.sin(ang) * spd);
             }
           }
@@ -225,7 +227,7 @@ export class EnemyManager {
             const bdx = playerX - e.x;
             const bdy = playerY - e.y;
             const bdist = Math.hypot(bdx, bdy) || 1;
-            const spd = 0.26; // sniper aimed shot
+            const spd = 2.0; // sniper aimed shot
             onSpawnBullet(e.x, e.y + 16, (bdx / bdist) * spd, (bdy / bdist) * spd);
           }
         } else {
@@ -237,7 +239,7 @@ export class EnemyManager {
               const bdx = playerX - e.x;
               const bdy = playerY - e.y;
               const bdist = Math.hypot(bdx, bdy) || 1;
-              const bspeed = 0.18;
+              const bspeed = 1.5;
               onSpawnBullet(e.x, e.y, (bdx / bdist) * bspeed, (bdy / bdist) * bspeed);
             }
           }
@@ -338,12 +340,12 @@ export class EnemyManager {
       case 'DUMMY': {
         // Stationary target dummy with gentle hover bobbing
         e.vx = 0;
-        e.vy = Math.sin(t * 0.05) * 0.15;
+        e.vy = Math.sin(t * 0.05) * 0.4;
         break;
       }
 
       case 'UFO_FLYBY': {
-        // Horizontal cruise across top
+        e.vx = 1.6;
         break;
       }
 
@@ -356,11 +358,11 @@ export class EnemyManager {
         // Enters to targetY (default ~100) and hovers with sinusoidal drift
         const targetY = e.targetY ?? 100;
         if (e.y < targetY) {
-          e.vy = 0.18;
+          e.vy = 1.2;
           e.vx = 0;
         } else {
-          e.vy = Math.sin(t * 0.04) * 0.06;
-          e.vx = Math.sin(t * 0.025) * 0.19;
+          e.vy = Math.sin(t * 0.04) * 0.3;
+          e.vx = Math.sin(t * 0.025) * 1.0;
         }
         break;
       }
@@ -369,11 +371,11 @@ export class EnemyManager {
         // Stays high at y ~ 52, slides horizontally
         const targetY = e.targetY ?? 52;
         if (e.y < targetY) {
-          e.vy = 0.14;
+          e.vy = 1.2;
           e.vx = 0;
         } else {
           e.vy = 0;
-          e.vx = Math.sin(t * 0.03) * 0.22;
+          e.vx = Math.sin(t * 0.03) * 1.2;
         }
         break;
       }
@@ -382,27 +384,27 @@ export class EnemyManager {
         // Heavy advancing bulwark
         const targetY = e.targetY ?? 150;
         if (e.y < targetY) {
-          e.vy = 0.11;
+          e.vy = 0.8;
         } else {
-          e.vy = Math.sin(t * 0.03) * 0.04;
+          e.vy = Math.sin(t * 0.03) * 0.25;
         }
-        e.vx = Math.sin(t * 0.02) * 0.09;
+        e.vx = Math.sin(t * 0.02) * 0.6;
         break;
       }
 
       case 'RUSH_DIVE': {
-        // Phase 1 (t < 40): Hover at spawn, lock onto player vector
-        // Phase 2 (t >= 40): Accelerate in straight line towards target
-        if (t < 40) {
+        // Phase 1 (t < 30): Hover at spawn, lock onto player vector
+        // Phase 2 (t >= 30): Accelerate in straight line towards target
+        if (t < 30) {
           e.vx = 0;
-          e.vy = 0.04;
+          e.vy = 0.4;
           e.targetX = playerX;
           e.targetY = _playerY;
-        } else if (t === 40) {
+        } else if (t === 30) {
           const dx = (e.targetX ?? playerX) - e.x;
           const dy = (e.targetY ?? _playerY) - e.y;
           const dist = Math.hypot(dx, dy) || 1;
-          const rushSpeed = 0.58;
+          const rushSpeed = 2.4;
           e.vx = (dx / dist) * rushSpeed;
           e.vy = (dy / dist) * rushSpeed;
         }
@@ -421,7 +423,7 @@ export class EnemyManager {
         // Orbits around (orbitCenterX, orbitCenterY) with radius 48px
         const cx = e.orbitCenterX ?? (canvasWidth / 2);
         const cy = e.orbitCenterY ?? 130;
-        const ang = (e.angle || 0) + 0.018;
+        const ang = (e.angle || 0) + 0.04;
         e.angle = ang;
         const r = 48;
         e.x = cx + Math.cos(ang) * r;
@@ -432,76 +434,78 @@ export class EnemyManager {
       }
 
       case 'TOROID_SWOOP': {
-        if (t < 70) {
-          e.vy = 0.19;
+        if (t < 45) {
+          e.vy = 1.6;
           e.vx = 0;
-        } else if (t < 130) {
-          const progress = (t - 70) / 60;
+        } else if (t < 95) {
+          const progress = (t - 45) / 50;
           const angle = progress * Math.PI;
           const dir = e.x < canvasWidth / 2 ? -1 : 1;
-          e.vx = Math.sin(angle) * dir * 0.32;
-          e.vy = Math.cos(angle) * 0.19;
+          e.vx = Math.sin(angle) * dir * 1.8;
+          e.vy = Math.cos(angle) * 1.4;
         } else {
-          e.vy = -0.22;
-          e.vx = e.x < canvasWidth / 2 ? -0.11 : 0.11;
+          e.vy = -1.5;
+          e.vx = e.x < canvasWidth / 2 ? -0.8 : 0.8;
         }
         break;
       }
 
       case 'TORKAN_TRACK_DASH': {
-        if (t < 65) {
-          e.vy = 0.12;
-          e.vx = (playerX - e.x) * 0.006;
-        } else if (t < 120) {
-          e.vy = 0.35;
+        if (t < 40) {
+          e.vy = 1.0;
+          e.vx = (playerX - e.x) * 0.02;
+        } else if (t < 80) {
+          e.vy = 2.2;
           e.vx = 0;
         } else {
-          e.vy = 0.22;
+          e.vy = 1.5;
         }
         break;
       }
 
       case 'ZOSHI_REACTIVE_SWOOP': {
-        if (t < 50) {
+        if (t < 35) {
           const dir = e.x < canvasWidth / 2 ? 1 : -1;
-          e.vx = dir * 0.35;
-          e.vy = 0.15;
+          e.vx = dir * 2.0;
+          e.vy = 1.1;
         } else {
           e.vx *= 0.98;
-          e.vy = 0.21;
+          e.vy = 1.8;
         }
         break;
       }
 
       case 'GALAGA_LOOP': {
-        if (t < 50) {
-          e.vy = 0.18;
-          e.vx = (canvasWidth / 2 - e.x) * 0.004;
-        } else if (t < 140) {
-          const loopAngle = (t - 50) * 0.025;
-          e.vx = Math.cos(loopAngle) * 0.32;
-          e.vy = Math.sin(loopAngle) * 0.21 + 0.09;
+        if (t < 40) {
+          e.vy = 1.4;
+          e.vx = (canvasWidth / 2 - e.x) * 0.02;
+        } else if (t < 90) {
+          const loopProg = (t - 40) / 50;
+          const loopAngle = loopProg * Math.PI * 2;
+          const loopDir = e.x < canvasWidth / 2 ? 1 : -1;
+          e.vx = Math.cos(loopAngle) * 1.8 * loopDir;
+          e.vy = Math.sin(loopAngle) * 1.8;
         } else {
+          e.vy = 2.0;
           e.vx = 0;
-          e.vy = 0.18;
         }
         break;
       }
 
       case 'SPAROID_CRUISE': {
-        e.vy = 0.28;
-        e.vx = Math.sin(t * 0.03) * 0.30;
+        e.vy = 1.4;
+        e.vx = Math.sin(t * 0.04) * 1.5;
         break;
       }
 
       case 'ROCKET_ASCENT': {
-        e.vy = -0.38;
+        e.vy = -2.2;
         e.vx = 0;
         break;
       }
 
       default: {
-        e.vy = 0.30;
+        e.vy = 1.4;
         break;
       }
     }
