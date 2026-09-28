@@ -862,78 +862,15 @@ export class GeminiOrbManager {
     playerVy: number,
     cfg: PhysicsPresetConfig
   ): void {
-    orb.mode = 'ORBIT';
-    orb.isTethered = true;
-    orb.isHoveringApex = false;
-
-    const fDx = orb.x - playerX;
-    const fDy = orb.y - playerY;
-    const fDist = Math.hypot(fDx, fDy) || 1;
-    const fUx = fDx / fDist;
-    const fUy = fDy / fDist;
-
-    const chainLen = (this.tuning.orbitRadius || 75);
-
-    if (fDist > chainLen) {
-      const stretch = fDist - chainLen;
-      const relVx = orb.vx - playerVx;
-      const relVy = orb.vy - playerVy;
-      const radialSpeed = relVx * fUx + relVy * fUy;
-
-      const tensionK = 0.038 * this.tuning.tensionMultiplier;
-      const tensionForce = stretch * tensionK;
-      const dampForce = radialSpeed * 0.16;
-
-      const totalTension = Math.max(-0.15, Math.min(1.4, tensionForce + dampForce));
-      orb.vx -= fUx * totalTension;
-      orb.vy -= fUy * totalTension;
-    }
-
-    orb.vy += 0.012;
-    orb.vx *= 0.997;
-    orb.vy *= 0.997;
-
-    const absSpeed = Math.hypot(orb.vx, orb.vy);
-    const maxSpd = (cfg.maxSpeed * 1.5) * this.tuning.maxSpeedMultiplier;
-    if (absSpeed > maxSpd) {
-      orb.vx = (orb.vx / absSpeed) * maxSpd;
-      orb.vy = (orb.vy / absSpeed) * maxSpd;
-    }
-
-    orb.x += orb.vx;
-    orb.y += orb.vy;
-
-    const relX = orb.x - playerX;
-    const relY = orb.y - playerY;
-    const rDist = Math.hypot(relX, relY) || 1;
-    const tx = -relY / rDist;
-    const ty = relX / rDist;
-    const tangentV = (orb.vx - playerVx) * tx + (orb.vy - playerVy) * ty;
-
-    if (Math.abs(tangentV) > 1.85) {
-      orb.spinLevel = 2;
-      orb.isCharged = true;
-      orb.chargeRatio = 1.0;
-    } else if (Math.abs(tangentV) > 0.90) {
-      orb.spinLevel = 1;
-      orb.isCharged = false;
-      orb.chargeRatio = 0.5;
-    } else {
-      orb.spinLevel = 0;
-      orb.isCharged = false;
-      orb.chargeRatio = 0;
-    }
-
-    orb.orbitAngle = Math.atan2(orb.y - playerY, orb.x - playerX);
-    orb.orbitRadius = rDist;
+    this.updateExelicaFlail(orb, playerX, playerY, playerVx, playerVy, cfg);
   }
 
   /**
-   * エグゼリカ式分銅物理 (Triggerheart Exelica Physics)
-   * 1. 自機の90度横移動（接線入力）をダイレクトに角加速度へと変換して鋭くスピン
-   * 2. 自機がジェミニより90度先行するように動かすと猛烈な回転加速（室伏スピン / GIGA SPIN）
-   * 3. 引き寄せ（短縮）時にフィギュアスケート効果で角速度ブースト
-   * 4. ゴム紐テザーによる適度な遠心力追従
+   * エグゼリカ式分銅物理 (Triggerheart Exelica Orbital Physics)
+   * 1. 自機を中心とした極座標 (R, θ, ω) による滑らかで確実な公転軌道
+   * 2. 自機の横移動・旋回入力をダイレクトに角加速度 ω へ変換（エグゼリカの操作感）
+   * 3. 停滞せず常に生き生きと回転し、入力に合わせて超高速スピン（室伏剛撃）へ加速
+   * 4. 離した瞬間、接線方向の物理慣性ベクトルで狙った方向へ正確に射出
    */
   private updateExelicaFlail(
     orb: GeminiOrb,
@@ -941,93 +878,80 @@ export class GeminiOrbManager {
     playerY: number,
     playerVx: number,
     playerVy: number,
-    cfg: PhysicsPresetConfig
+    _cfg: PhysicsPresetConfig
   ): void {
     orb.mode = 'ORBIT';
     orb.isTethered = true;
     orb.isHoveringApex = false;
     orb.apexDwellTimer = 0;
 
-    const fDx = orb.x - playerX;
-    const fDy = orb.y - playerY;
-    const fDist = Math.hypot(fDx, fDy) || 1;
-    const fUx = fDx / fDist; // 動径外向き (自機→ジェミニ)
-    const fUy = fDy / fDist;
-
-    const tx = -fUy; // 接線方向（反時計回り）
-    const ty = fUx;
-
     const chainLen = (this.tuning.orbitRadius || 75);
 
-    // 1. エグゼリカの核心: 自機の横移動（接線成分）による回転トルク注入
-    // 「敵と反対に引いても回らない、敵に対して90度横に引くことで強い回転加速度を得る」
-    const playerTangentV = playerVx * tx + playerVy * ty;
-    if (Math.abs(playerTangentV) > 0.06) {
-      const torqueAccel = playerTangentV * 0.32 * this.tuning.tensionMultiplier;
-      orb.vx += tx * torqueAccel;
-      orb.vy += ty * torqueAccel;
+    // 初回キャッチ時の角度と半径初期化
+    if (orb.orbitAngle === undefined || isNaN(orb.orbitAngle)) {
+      orb.orbitAngle = Math.atan2(orb.y - playerY, orb.x - playerX);
+    }
+    if (!orb.orbitRadius || orb.orbitRadius < 20) {
+      orb.orbitRadius = Math.max(35, Math.hypot(orb.x - playerX, orb.y - playerY));
+    }
+    if (!orb.orbitAngularVel) {
+      orb.orbitAngularVel = 0.045; // 基本公転速度 (約2.6°/frame)
     }
 
-    // 2. 紐の張力（ゴム紐テザー）
-    if (fDist > chainLen) {
-      const stretch = fDist - chainLen;
-      const relVx = orb.vx - playerVx;
-      const relVy = orb.vy - playerVy;
-      const radialSpeed = relVx * fUx + relVy * fUy;
+    // 1. 自機の移動による角加速度（エグゼリカのトルク注入）
+    // 接線方向単位ベクトル (-sin θ, cos θ)
+    const sinA = Math.sin(orb.orbitAngle);
+    const cosA = Math.cos(orb.orbitAngle);
+    const tangentialShipMotion = -playerVx * sinA + playerVy * cosA;
 
-      const tensionK = 0.040 * this.tuning.tensionMultiplier;
-      const tensionForce = stretch * tensionK;
-      const dampForce = radialSpeed * 0.16;
-
-      const totalTension = Math.max(-0.15, Math.min(1.5, tensionForce + dampForce));
-      orb.vx -= fUx * totalTension;
-      orb.vy -= fUy * totalTension;
-    } else {
-      // 紐がたるんでいる時: 緩やかな求心引力で自然な長さを維持
-      orb.vx -= fUx * 0.02;
-      orb.vy -= fUy * 0.02;
+    if (Math.abs(tangentialShipMotion) > 0.04) {
+      // 自機が横に動いた時、強力に回転を加速
+      const torque = (tangentialShipMotion / chainLen) * 0.45 * this.tuning.tensionMultiplier;
+      orb.orbitAngularVel += torque;
     }
 
-    // 3. フィギュアスケート効果（引き寄せ時の角速度ブースト）
-    if (fDist < chainLen * 0.85) {
-      const tangentV = (orb.vx - playerVx) * tx + (orb.vy - playerVy) * ty;
-      if (Math.abs(tangentV) > 0.3) {
-        const spinBonus = (tangentV > 0 ? 1 : -1) * 0.08;
-        orb.vx += tx * spinBonus;
-        orb.vy += ty * spinBonus;
-      }
+    // 2. 緩やかな角速度慣性と基本公転速度の維持
+    // 完全に止まらず、エグゼリカ特有の生き生きとした回転を維持
+    orb.orbitAngularVel *= 0.993;
+
+    const minSpin = 0.040; // 停滞防止の最低公転速度 (約2.3°/frame)
+    if (Math.abs(orb.orbitAngularVel) < minSpin) {
+      orb.orbitAngularVel = (orb.orbitAngularVel >= 0 ? 1 : -1) * minSpin;
     }
 
-    // 4. 空気抵抗 & 微小重力
-    orb.vx *= 0.996;
-    orb.vy *= 0.996;
-    orb.vy += 0.010;
-
-    // 5. 最高速度クランプ
-    const absSpeed = Math.hypot(orb.vx, orb.vy);
-    const maxSpd = (cfg.maxSpeed * 1.6) * this.tuning.maxSpeedMultiplier;
-    if (absSpeed > maxSpd) {
-      orb.vx = (orb.vx / absSpeed) * maxSpd;
-      orb.vy = (orb.vy / absSpeed) * maxSpd;
+    // 角速度クランプ（最高スピン速度）
+    const maxOmega = 0.185 * this.tuning.maxSpeedMultiplier; // 約10.6°/frame
+    if (Math.abs(orb.orbitAngularVel) > maxOmega) {
+      orb.orbitAngularVel = Math.sign(orb.orbitAngularVel) * maxOmega;
     }
 
-    // 6. 位置更新
-    orb.x += orb.vx;
-    orb.y += orb.vy;
+    // 3. 半径のゴム伸縮（自機との距離を自然長へスムーズに追従）
+    const targetR = chainLen;
+    orb.orbitRadius += (targetR - orb.orbitRadius) * 0.12;
 
-    // 7. 接線速度とスピンレベル判定
-    const relX = orb.x - playerX;
-    const relY = orb.y - playerY;
-    const rDist = Math.hypot(relX, relY) || 1;
-    const curTx = -relY / rDist;
-    const curTy = relX / rDist;
-    const tangentV = (orb.vx - playerVx) * curTx + (orb.vy - playerVy) * curTy;
+    // 4. 角度更新
+    orb.orbitAngle += orb.orbitAngularVel;
+    while (orb.orbitAngle > Math.PI) orb.orbitAngle -= Math.PI * 2;
+    while (orb.orbitAngle < -Math.PI) orb.orbitAngle += Math.PI * 2;
 
-    if (Math.abs(tangentV) > 1.85) {
+    // 5. 実際の位置と速度ベクトルを計算（接線速度を完全に反映）
+    const currentCos = Math.cos(orb.orbitAngle);
+    const currentSin = Math.sin(orb.orbitAngle);
+    orb.x = playerX + orb.orbitRadius * currentCos;
+    orb.y = playerY + orb.orbitRadius * currentSin;
+
+    // 接線速度（離した時にそのまま射出ベクトルとなる）
+    const linearTangentialSpeed = orb.orbitAngularVel * orb.orbitRadius;
+    orb.vx = -currentSin * linearTangentialSpeed + playerVx * 0.4;
+    orb.vy = currentCos * linearTangentialSpeed + playerVy * 0.4;
+
+    // 6. スピンレベル判定（激しい回転で室伏ジャイアントスイング）
+    const absOmega = Math.abs(orb.orbitAngularVel);
+    if (absOmega > 0.11) {
       orb.spinLevel = 2; // 🔥 GIGA SPIN (室伏剛撃)
       orb.isCharged = true;
       orb.chargeRatio = 1.0;
-    } else if (Math.abs(tangentV) > 0.85) {
+    } else if (absOmega > 0.065) {
       orb.spinLevel = 1; // ⚡ ACTIVE SPIN
       orb.isCharged = false;
       orb.chargeRatio = 0.5;
@@ -1036,9 +960,6 @@ export class GeminiOrbManager {
       orb.isCharged = false;
       orb.chargeRatio = 0;
     }
-
-    orb.orbitAngle = Math.atan2(orb.y - playerY, orb.x - playerX);
-    orb.orbitRadius = rDist;
   }
 
   /**
