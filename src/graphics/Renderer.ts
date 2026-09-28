@@ -1180,7 +1180,7 @@ export class ArcadeRenderer {
 
   private renderFloatingTexts(texts: FloatingText[]): void {
     const ctx = this.ctx;
-    this.setFont('8px "Press Start 2P", monospace');
+    this.setFont('8px "DotGothic16", monospace');
     ctx.textAlign = 'center';
     for (const t of texts) {
       ctx.fillStyle = t.color;

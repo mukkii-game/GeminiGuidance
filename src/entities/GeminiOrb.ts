@@ -1023,17 +1023,10 @@ export class GeminiOrbManager {
       }
 
     } else if (orb.strokePhase === 'APEX') {
-      // --- APEX滞空フェーズ ---
-      orb.isHoveringApex = true;
-      orb.vx *= 0.90;
-      orb.vy *= 0.90;
-      orb.apexDwellTimer = (orb.apexDwellTimer || 0) - 1;
-
-      if (orb.apexDwellTimer <= 0) {
-        orb.strokePhase = 'INWARD';
-        orb.isHoveringApex = false;
-        orb.strokeDist = Math.max(45, distToPlayer);
-      }
+      // 滞空停止させず即座に自機ホーミングへ移行（敵衝突時のフリーズ・停止感を完全解消）
+      orb.strokePhase = 'INWARD';
+      orb.isHoveringApex = false;
+      orb.strokeDist = Math.max(45, distToPlayer);
 
     } else if (orb.strokePhase === 'OVERSHOOT') {
       // --- OVERSHOOTオーバーラン突き抜けフェーズ ---
@@ -1062,11 +1055,11 @@ export class GeminiOrbManager {
       orb.vx = forwardV * dirX + perpVx * 0.88;
       orb.vy = forwardV * dirY + perpVy * 0.88;
 
-      // 目標距離到達または前進速度停止でAPEX滞空へ
+      // 目標距離到達または前進速度停止でスムーズに自機ホーミングへ移行（停止なし）
       if (s >= targetOvershoot || forwardV <= 0.18) {
-        orb.strokePhase = 'APEX';
-        orb.apexDwellTimer = Math.round(9 * this.tuning.apexDwellMultiplier);
-        orb.isHoveringApex = true;
+        orb.strokePhase = 'INWARD';
+        orb.isHoveringApex = false;
+        orb.strokeDist = Math.max(45, distToPlayer);
       }
 
     } else {
