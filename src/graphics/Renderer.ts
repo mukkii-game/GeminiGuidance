@@ -1341,6 +1341,29 @@ export class ArcadeRenderer {
       ctx.fillText('GEMINI:0', w - 12, btmY - 2);
     }
 
+    // Mobile Virtual Catch / Throw Button (Right thumb area, x: 318, y: 466, r: 24)
+    const isCatching = !!telemetry?.isTethered;
+    ctx.save();
+    ctx.fillStyle = isCatching ? 'rgba(56, 189, 248, 0.38)' : 'rgba(15, 23, 42, 0.60)';
+    ctx.beginPath();
+    ctx.arc(318, 466, 24, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = isCatching ? '#fde047' : '#38bdf8';
+    ctx.lineWidth = isCatching ? 2.2 : 1.3;
+    ctx.beginPath();
+    ctx.arc(318, 466, 24, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = isCatching ? '#ffffff' : '#38bdf8';
+    ctx.font = '8px "DotGothic16", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(isCatching ? '⚡捕獲中' : '⚡捕獲', 318, 463);
+    ctx.font = '6px "DotGothic16", monospace';
+    ctx.fillStyle = isCatching ? '#fde047' : '#94a3b8';
+    ctx.fillText(isCatching ? '離して投擲' : '長押/2本指', 318, 474);
+    ctx.restore();
+
     // Boss HP Bar
     if (boss && !boss.defeated && boss.y > 0) {
       const bossBarW = 160;

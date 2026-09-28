@@ -19,6 +19,7 @@ export class InputManager {
   private keysDown: Set<string> = new Set();
   private lastClick: { x: number; y: number } | null = null;
   private cyclePresetPressed: boolean = false;
+  private touchCatchHeld: boolean = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -65,33 +66,65 @@ export class InputManager {
     // Touch Events: Relative Delta Dragging (Ergonomic 1-finger control)
     this.canvas.addEventListener('touchstart', (e) => {
       e.preventDefault();
-      if (e.touches.length > 1) {
-        // Multi-finger tap: Second finger taps while moving -> toggle orbit flail!
-        this.state.orbitTogglePressed = true;
+      this.state.active = true;
+      this.state.isTouch = true;
+
+      const rect = this.canvas.getBoundingClientRect();
+      const scaleX = this.canvas.width / rect.width;
+      const scaleY = this.canvas.height / rect.height;
+      const touches = Array.from(e.touches);
+
+      // Check if any touch hit the virtual Catch Button (bottom-right: x: 318, y: 468, r: 30)
+      let hitCatchBtn = false;
+      for (const t of touches) {
+        const tx = (t.clientX - rect.left) * scaleX;
+        const ty = (t.clientY - rect.top) * scaleY;
+        if (Math.hypot(tx - 318, ty - 468) <= 30) {
+          hitCatchBtn = true;
+        }
       }
-      if (e.touches.length > 0) {
-        const touch = e.touches[0];
-        const rect = this.canvas.getBoundingClientRect();
-        const scaleX = this.canvas.width / rect.width;
-        const scaleY = this.canvas.height / rect.height;
-        this.lastTouchX = (touch.clientX - rect.left) * scaleX;
-        this.lastTouchY = (touch.clientY - rect.top) * scaleY;
-        this.state.active = true;
-        this.state.isTouch = true;
-        this.state.isPointerDown = true;
-        this.lastClick = { x: this.lastTouchX, y: this.lastTouchY };
-      }
+
+      // 2本指タッチ、またはキャッチボタン押下で「ヒモ保持・捕獲」状態へ
+      this.touchCatchHeld = touches.length >= 2 || hitCatchBtn;
+
+      // 操縦用の主タッチ（キャッチボタン以外の指を優先）
+      const steerTouch = touches.find(t => {
+        const tx = (t.clientX - rect.left) * scaleX;
+        const ty = (t.clientY - rect.top) * scaleY;
+        return Math.hypot(tx - 318, ty - 468) > 30;
+      }) || touches[0];
+
+      this.lastTouchX = (steerTouch.clientX - rect.left) * scaleX;
+      this.lastTouchY = (steerTouch.clientY - rect.top) * scaleY;
+      this.lastClick = { x: this.lastTouchX, y: this.lastTouchY };
     }, { passive: false });
 
     this.canvas.addEventListener('touchmove', (e) => {
       e.preventDefault();
-      if (e.touches.length > 0) {
-        const touch = e.touches[0];
-        const rect = this.canvas.getBoundingClientRect();
-        const scaleX = this.canvas.width / rect.width;
-        const scaleY = this.canvas.height / rect.height;
-        const currentX = (touch.clientX - rect.left) * scaleX;
-        const currentY = (touch.clientY - rect.top) * scaleY;
+      const rect = this.canvas.getBoundingClientRect();
+      const scaleX = this.canvas.width / rect.width;
+      const scaleY = this.canvas.height / rect.height;
+      const touches = Array.from(e.touches);
+
+      let hitCatchBtn = false;
+      for (const t of touches) {
+        const tx = (t.clientX - rect.left) * scaleX;
+        const ty = (t.clientY - rect.top) * scaleY;
+        if (Math.hypot(tx - 318, ty - 468) <= 30) {
+          hitCatchBtn = true;
+        }
+      }
+      this.touchCatchHeld = touches.length >= 2 || hitCatchBtn;
+
+      const steerTouch = touches.find(t => {
+        const tx = (t.clientX - rect.left) * scaleX;
+        const ty = (t.clientY - rect.top) * scaleY;
+        return Math.hypot(tx - 318, ty - 468) > 30;
+      }) || touches[0];
+
+      if (steerTouch) {
+        const currentX = (steerTouch.clientX - rect.left) * scaleX;
+        const currentY = (steerTouch.clientY - rect.top) * scaleY;
 
         const dx = currentX - this.lastTouchX;
         const dy = currentY - this.lastTouchY;
@@ -106,7 +139,25 @@ export class InputManager {
 
     this.canvas.addEventListener('touchend', (e) => {
       e.preventDefault();
-      this.state.isPointerDown = false;
+      const rect = this.canvas.getBoundingClientRect();
+      const scaleX = this.canvas.width / rect.width;
+      const scaleY = this.canvas.height / rect.height;
+      const touches = Array.from(e.touches);
+
+      let hitCatchBtn = false;
+      for (const t of touches) {
+        const tx = (t.clientX - rect.left) * scaleX;
+        const ty = (t.clientY - rect.top) * scaleY;
+        if (Math.hypot(tx - 318, ty - 468) <= 30) {
+          hitCatchBtn = true;
+        }
+      }
+      this.touchCatchHeld = touches.length >= 2 || hitCatchBtn;
+
+      if (touches.length === 0) {
+        this.touchCatchHeld = false;
+        this.state.isPointerDown = false;
+      }
     }, { passive: false });
   }
 
@@ -216,7 +267,14 @@ export class InputManager {
   }
 
   public isTetherHeld(): boolean {
+    if (this.state.isTouch) {
+      return this.touchCatchHeld || this.keysDown.has('Space') || this.keysDown.has('KeyZ');
+    }
     return !!this.state.isPointerDown || this.keysDown.has('Space') || this.keysDown.has('KeyZ');
+  }
+
+  public isTouchCatchHeld(): boolean {
+    return this.touchCatchHeld;
   }
 
   public consumeCrtToggle(): boolean {

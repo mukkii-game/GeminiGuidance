@@ -293,14 +293,23 @@ export class Game {
 
   public start(): void {
     let lastTime = performance.now();
+    let accumulator = 0;
+    const fixedDt = 1000 / 60; // 16.666 ms per tick (rock-solid 60 FPS physics regardless of 120Hz/60Hz/30Hz)
 
     const loop = (currentTime: number) => {
-      const dt = Math.min(50, currentTime - lastTime);
+      let dt = currentTime - lastTime;
       lastTime = currentTime;
+      if (dt > 100) dt = 100; // clamp max lag spike (e.g. background tab)
 
-      this.update(dt / 16.666);
+      accumulator += dt;
+      let updates = 0;
+      while (accumulator >= fixedDt && updates < 4) {
+        this.update(1.0);
+        accumulator -= fixedDt;
+        updates++;
+      }
+
       this.render();
-
       requestAnimationFrame(loop);
     };
 
