@@ -190,7 +190,7 @@ export class Game {
   public cycleTensionWithFeedback(): void {
     const val = this.geminiManager.cycleTension();
     this.audio.playGeminiBounce();
-    const desc = val <= 0.4 ? '極弱(超ゆったり)' : val <= 0.6 ? '弱(マイルド)' : val <= 0.8 ? '標準(快適)' : val <= 1.0 ? 'やや強' : val <= 1.3 ? '強' : '猛烈';
+    const desc = val <= 0.6 ? 'マイルド' : val <= 0.8 ? '軽快' : val <= 1.0 ? '標準(アーケード)' : val <= 1.5 ? '高速追従' : val <= 2.0 ? '強烈' : '神速';
     this.addFloatingText(
       this.player.state.x,
       this.player.state.y - 30,
@@ -231,7 +231,7 @@ export class Game {
   public cycleMaxSpeedWithFeedback(direction: number = 1): void {
     const val = this.geminiManager.cycleMaxSpeed(direction);
     this.audio.playGeminiBounce();
-    const desc = val <= 0.5 ? '極重・低速' : val <= 0.65 ? '落ち着いた速度' : val <= 0.8 ? '標準(快適)' : val <= 1.0 ? '快速' : val <= 1.2 ? '高速' : '超高速';
+    const desc = val <= 0.6 ? '中速' : val <= 0.8 ? '標準' : val <= 1.0 ? '快速(アーケード)' : val <= 1.5 ? '高速' : val <= 2.0 ? '超高速' : '爆速(ハレー彗星)';
     this.addFloatingText(
       this.player.state.x,
       this.player.state.y - 30,
@@ -1906,23 +1906,28 @@ export class Game {
       // Compact Tuning Bar in Normal HUD (y: height - 32 to height - 16)
       const tuneBarY = this.canvas.height - 32;
       if (y >= tuneBarY && y <= tuneBarY + 16) {
-        if (x >= 6 && x <= 76) {
+        // [J]加速度
+        if (x >= 6 && x <= 75) {
           this.cycleTensionWithFeedback();
           return true;
         }
-        if (x >= 77 && x <= 146) {
-          this.cycleTurnRateWithFeedback();
-          return true;
-        }
-        if (x >= 147 && x <= 220) {
-          this.cycleDampingWithFeedback();
-          return true;
-        }
-        if (x >= 221 && x <= 298) {
+        // [U]最高速 (球最高速)
+        if (x >= 76 && x <= 146) {
           this.cycleMaxSpeedWithFeedback();
           return true;
         }
-        if (x >= 299 && x <= 354) {
+        // [K]旋角
+        if (x >= 147 && x <= 218) {
+          this.cycleTurnRateWithFeedback();
+          return true;
+        }
+        // [Y]減衰
+        if (x >= 219 && x <= 292) {
+          this.cycleDampingWithFeedback();
+          return true;
+        }
+        // [R]初期
+        if (x >= 293 && x <= 354) {
           this.geminiManager.resetTuning();
           this.audio.playGeminiBounce();
           this.addFloatingText(this.player.state.x, this.player.state.y - 30, 'パラメータ初期化!', '#38bdf8');

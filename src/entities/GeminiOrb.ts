@@ -15,10 +15,10 @@ export const PHYSICS_PRESETS: Record<PhysicsPresetId, PhysicsPresetConfig> = {
     name: 'SNAP SLING',
     nameJa: '標準突き (ヨーヨー)',
     descJa: '前後に小気味よく突き刺すホーミング＆火の玉チャージ',
-    springK: 0.0008,
-    springNonlinear: 0.018,
+    springK: 0.0025,
+    springNonlinear: 0.045,
     damping: 0.993,
-    maxSpeed: 2.4,
+    maxSpeed: 8.5,
     apexThreshold: 0.45,
     orbitBaseSpeed: 0.035,
     orbitTransfer: 0.20,
@@ -28,10 +28,10 @@ export const PHYSICS_PRESETS: Record<PhysicsPresetId, PhysicsPresetConfig> = {
     name: 'HYPER BOOMERANG',
     nameJa: '大遠投ブーメラン',
     descJa: '低空気抵抗で遠くへ伸びる大弧線突き',
-    springK: 0.0005,
-    springNonlinear: 0.011,
+    springK: 0.0016,
+    springNonlinear: 0.030,
     damping: 0.997,
-    maxSpeed: 2.8,
+    maxSpeed: 10.0,
     apexThreshold: 0.40,
     orbitBaseSpeed: 0.028,
     orbitTransfer: 0.16,
@@ -41,10 +41,10 @@ export const PHYSICS_PRESETS: Record<PhysicsPresetId, PhysicsPresetConfig> = {
     name: 'GIGANTIC SPRING',
     nameJa: '超加速パチンコ (高反発)',
     descJa: '離すほど猛烈に火の玉化して突進する強力バネ',
-    springK: 0.0010,
-    springNonlinear: 0.032,
+    springK: 0.0035,
+    springNonlinear: 0.075,
     damping: 0.990,
-    maxSpeed: 3.1,
+    maxSpeed: 11.5,
     apexThreshold: 0.50,
     orbitBaseSpeed: 0.040,
     orbitTransfer: 0.24,
@@ -54,10 +54,10 @@ export const PHYSICS_PRESETS: Record<PhysicsPresetId, PhysicsPresetConfig> = {
     name: 'HEAVY WRECKER',
     nameJa: '重量分銅 (高質量)',
     descJa: '重い質量感。折り返しでの滞空時間が長く敵を押し戻す',
-    springK: 0.0006,
-    springNonlinear: 0.014,
+    springK: 0.0020,
+    springNonlinear: 0.035,
     damping: 0.995,
-    maxSpeed: 2.1,
+    maxSpeed: 7.5,
     apexThreshold: 0.55,
     orbitBaseSpeed: 0.024,
     orbitTransfer: 0.14,
@@ -67,10 +67,10 @@ export const PHYSICS_PRESETS: Record<PhysicsPresetId, PhysicsPresetConfig> = {
     name: 'RAPID ORBIT',
     nameJa: '高速公転バリア',
     descJa: 'タップ時の光のロープ拘束と追従性が最も高い防御型',
-    springK: 0.00085,
-    springNonlinear: 0.016,
+    springK: 0.0028,
+    springNonlinear: 0.040,
     damping: 0.992,
-    maxSpeed: 2.25,
+    maxSpeed: 8.0,
     apexThreshold: 0.45,
     orbitBaseSpeed: 0.048,
     orbitTransfer: 0.28,
@@ -138,10 +138,10 @@ export class GeminiOrbManager {
   public collisionMode: GeminiCollisionMode = 'PENETRATE';
   public screenEdgeBounce: boolean = false; // 画面端当たり判定: false = 通過, true = 跳ね返る
   public tuning: PhysicsTuningState = {
-    tensionMultiplier: 0.8,  // 加速度倍率: 0.4, 0.6, 0.8 (標準), 1.0, 1.3, 1.6
+    tensionMultiplier: 1.0,  // 加速度倍率: 0.6, 0.8, 1.0 (標準), 1.5, 2.0, 3.0
     maxTurnRate: 0.035,      // 1フレーム最大曲がり角度: 0.020, 0.027, 0.035 (標準約2.0°), 0.045, 0.060, 0.080
     damping: 0.993,          // 減衰率: 0.985 (強減衰), 0.990 (中), 0.993 (標準), 0.996 (弱), 0.998 (極弱)
-    maxSpeedMultiplier: 0.8, // 最高速度倍率: 0.5, 0.65, 0.8 (標準), 1.0, 1.2, 1.4
+    maxSpeedMultiplier: 1.0, // 最高速度倍率: 0.6, 0.8, 1.0 (標準), 1.5, 2.0, 3.0
     apexDwellMultiplier: 1.0,
     orbitRadius: 75,
     overshootRatio: 0.5,
@@ -158,7 +158,7 @@ export class GeminiOrbManager {
   }
 
   public cycleTension(): number {
-    const steps = [0.4, 0.6, 0.8, 1.0, 1.3, 1.6];
+    const steps = [0.6, 0.8, 1.0, 1.5, 2.0, 3.0];
     const curIdx = steps.findIndex(s => Math.abs(s - this.tuning.tensionMultiplier) < 0.06);
     const nextIdx = (curIdx + 1) % steps.length;
     this.tuning.tensionMultiplier = steps[nextIdx];
@@ -182,11 +182,11 @@ export class GeminiOrbManager {
   }
 
   public cycleMaxSpeed(direction: number = 1): number {
-    const steps = [0.5, 0.65, 0.8, 1.0, 1.2, 1.4];
+    const steps = [0.6, 0.8, 1.0, 1.5, 2.0, 3.0];
     const curIdx = steps.findIndex(s => Math.abs(s - this.tuning.maxSpeedMultiplier) < 0.06);
     let nextIdx: number;
     if (curIdx === -1) {
-      nextIdx = 2; // 0.8
+      nextIdx = 2; // 1.0
     } else {
       nextIdx = (curIdx + direction + steps.length) % steps.length;
     }
@@ -204,10 +204,10 @@ export class GeminiOrbManager {
 
   public resetTuning(): void {
     this.tuning = {
-      tensionMultiplier: 0.8,
+      tensionMultiplier: 1.0,
       maxTurnRate: 0.035,
       damping: 0.993,
-      maxSpeedMultiplier: 0.8,
+      maxSpeedMultiplier: 1.0,
       apexDwellMultiplier: 1.0,
       orbitRadius: 75,
       overshootRatio: 0.5,
@@ -671,9 +671,9 @@ export class GeminiOrbManager {
       orb.strokeDirX = dirX;
       orb.strokeDirY = dirY;
 
-      const linearF = distToAnchor * cfg.springK * this.tuning.tensionMultiplier * 0.85;
-      const slingshotBonus = D0 > 45 ? Math.pow((D0 - 45) / 55, 1.4) * 0.025 * this.tuning.tensionMultiplier : 0;
-      const accel = Math.min(0.35, linearF + slingshotBonus);
+      const linearF = distToAnchor * cfg.springK * this.tuning.tensionMultiplier * 1.8;
+      const slingshotBonus = D0 > 45 ? Math.pow((D0 - 45) / 55, 1.4) * 0.08 * this.tuning.tensionMultiplier : 0;
+      const accel = Math.min(1.5, linearF + slingshotBonus);
 
       orb.vx += dirX * accel;
       orb.vy += dirY * accel;
@@ -689,7 +689,7 @@ export class GeminiOrbManager {
       if (pSpeed > 0.4 && curSpd > 0.1) {
         const forwardP = playerVx * dirX + playerVy * dirY;
         if (forwardP > 0) {
-          const boost = Math.min(0.8, forwardP * 0.15);
+          const boost = Math.min(1.2, forwardP * 0.25);
           orb.vx += dirX * boost;
           orb.vy += dirY * boost;
         }
@@ -717,7 +717,7 @@ export class GeminiOrbManager {
       orb.vy = (orb.vy / updatedSpeed) * maxSpd;
     }
 
-    if (playerDist > 55 && updatedSpeed > 1.2) {
+    if (playerDist > 55 && updatedSpeed > 3.0) {
       orb.isCharged = true;
       orb.chargeRatio = Math.min(1.0, (playerDist - 40) / 80);
     } else {
@@ -756,21 +756,21 @@ export class GeminiOrbManager {
     // ケプラー引力 + バネ成分 (至近距離で発散しないソフトニング)
     const softening = 55;
     const effectiveDist = Math.max(softening, dist);
-    const gravity = (160 / (effectiveDist + 40)) * 0.065 * this.tuning.tensionMultiplier;
-    const springF = dist * 0.0006 * this.tuning.tensionMultiplier;
-    const totalPull = Math.min(0.28, gravity + springF);
+    const gravity = (450 / (effectiveDist + 35)) * 0.22 * this.tuning.tensionMultiplier;
+    const springF = dist * 0.0022 * this.tuning.tensionMultiplier;
+    const totalPull = Math.min(1.4, gravity + springF);
 
     orb.vx += dirX * totalPull;
     orb.vy += dirY * totalPull;
 
-    // 近日点スイングバイ効果: 自機至近距離(dist < 60)を通過する際、接線速度を維持・加速
-    if (dist < 60) {
+    // 近日点スイングバイ効果: 自機至近距離(dist < 70)を通過する際、接線速度を維持・加速
+    if (dist < 70) {
       const tangentX = -dirY;
       const tangentY = dirX;
       const dotTangent = orb.vx * tangentX + orb.vy * tangentY;
       if (Math.abs(dotTangent) > 0.2) {
         const sign = dotTangent >= 0 ? 1 : -1;
-        const swingBoost = Math.min(0.12, (60 - dist) * 0.003);
+        const swingBoost = Math.min(0.80, (70 - dist) * 0.02);
         orb.vx += tangentX * sign * swingBoost;
         orb.vy += tangentY * sign * swingBoost;
       }
@@ -788,9 +788,9 @@ export class GeminiOrbManager {
     }
 
     // 火の玉チャージ: 近日点通過時・適度な速度時
-    if (spd > 1.4 || (dist < 75 && spd > 0.9)) {
+    if (spd > 3.8 || (dist < 75 && spd > 2.5)) {
       orb.isCharged = true;
-      orb.chargeRatio = Math.min(1.0, spd / 2.2);
+      orb.chargeRatio = Math.min(1.0, spd / 5.5);
     } else {
       orb.isCharged = false;
       orb.chargeRatio = 0;
@@ -828,7 +828,7 @@ export class GeminiOrbManager {
 
     if (currentSpeed < 0.2) {
       currentAngle = targetAngle;
-      currentSpeed = 0.5;
+      currentSpeed = 1.0;
     }
 
     let angleDiff = targetAngle - currentAngle;
@@ -839,7 +839,7 @@ export class GeminiOrbManager {
     const clampedTurn = Math.max(-maxTurn, Math.min(maxTurn, angleDiff));
     const newAngle = currentAngle + clampedTurn;
 
-    const accel = 0.055 * this.tuning.tensionMultiplier;
+    const accel = 0.32 * this.tuning.tensionMultiplier;
     currentSpeed += accel;
     currentSpeed *= this.tuning.damping;
 
@@ -854,8 +854,8 @@ export class GeminiOrbManager {
     orb.x += orb.vx;
     orb.y += orb.vy;
 
-    orb.isCharged = currentSpeed > 1.3;
-    orb.chargeRatio = Math.min(1.0, currentSpeed / 2.2);
+    orb.isCharged = currentSpeed > 3.5;
+    orb.chargeRatio = Math.min(1.0, currentSpeed / 5.5);
     orb.orbitAngle = Math.atan2(orb.y - playerY, orb.x - playerX);
     orb.orbitRadius = dist;
   }
@@ -919,33 +919,33 @@ export class GeminiOrbManager {
 
     if (Math.abs(tangentialShipMotion) > 0.03) {
       // 自機の横移動・旋回で角加速度を加算（プレイヤーの操作でブンブン回す）
-      const torque = (tangentialShipMotion / chainLen) * 0.35 * this.tuning.tensionMultiplier;
+      const torque = (tangentialShipMotion / chainLen) * 1.25 * this.tuning.tensionMultiplier;
       orb.orbitAngularVel += torque;
     }
 
     // 2. 自機直進時の追従・引きずり（Trailing）
-    // 回転が穏やかな時（|ω| < 0.045）、自機が一定速度以上で直進していれば自機後方に自然と引きずられる
+    // 回転が穏やかな時（|ω| < 0.06）、自機が一定速度以上で直進していれば自機後方に自然と引きずられる
     const pSpeed = Math.hypot(playerVx, playerVy);
-    if (Math.abs(orb.orbitAngularVel) < 0.045 && pSpeed > 0.35) {
+    if (Math.abs(orb.orbitAngularVel) < 0.06 && pSpeed > 0.35) {
       const trailAngle = Math.atan2(-playerVy, -playerVx);
       let diff = trailAngle - orb.orbitAngle;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
-      orb.orbitAngle += diff * 0.045 * Math.min(1.0, pSpeed / 2.5);
+      orb.orbitAngle += diff * 0.055 * Math.min(1.0, pSpeed / 2.5);
     }
 
     // 3. 自然な角速度減衰（止まっている時は回転が自然に静止する：強制回転を廃止）
-    orb.orbitAngularVel *= 0.990;
+    orb.orbitAngularVel *= 0.992;
 
-    // 角速度クランプ（制御可能な最高スピン速度）
-    const maxOmega = 0.125 * this.tuning.maxSpeedMultiplier;
+    // 角速度クランプ（エグゼリカ式高速スピン: 最大約3.3回転/秒〜神速）
+    const maxOmega = 0.35 * this.tuning.maxSpeedMultiplier;
     if (Math.abs(orb.orbitAngularVel) > maxOmega) {
       orb.orbitAngularVel = Math.sign(orb.orbitAngularVel) * maxOmega;
     }
 
     // 4. 半径のゴム伸縮（自然長へスムーズに追従）
     const targetR = chainLen;
-    orb.orbitRadius += (targetR - orb.orbitRadius) * 0.10;
+    orb.orbitRadius += (targetR - orb.orbitRadius) * 0.12;
 
     // 5. 角度更新
     orb.orbitAngle += orb.orbitAngularVel;
@@ -958,18 +958,18 @@ export class GeminiOrbManager {
     orb.x = playerX + orb.orbitRadius * currentCos;
     orb.y = playerY + orb.orbitRadius * currentSin;
 
-    // 接線速度（離した時にそのまま射出ベクトルとなる）
+    // 接線速度（離した時にそのまま強烈な射出ベクトルとなる）
     const linearTangentialSpeed = orb.orbitAngularVel * orb.orbitRadius;
-    orb.vx = -currentSin * linearTangentialSpeed + playerVx * 0.35;
-    orb.vy = currentCos * linearTangentialSpeed + playerVy * 0.35;
+    orb.vx = -currentSin * linearTangentialSpeed + playerVx * 0.50;
+    orb.vy = currentCos * linearTangentialSpeed + playerVy * 0.50;
 
     // 7. スピンレベル判定（激しい回転で剛撃ジャイアントスイング）
     const absOmega = Math.abs(orb.orbitAngularVel);
-    if (absOmega > 0.08) {
-      orb.spinLevel = 2; // 🔥 GIGA SPIN (剛撃)
+    if (absOmega > 0.18) {
+      orb.spinLevel = 2; // 🔥 GIGA SPIN (室伏剛撃)
       orb.isCharged = true;
       orb.chargeRatio = 1.0;
-    } else if (absOmega > 0.04) {
+    } else if (absOmega > 0.08) {
       orb.spinLevel = 1; // ⚡ ACTIVE SPIN
       orb.isCharged = false;
       orb.chargeRatio = 0.5;
@@ -982,10 +982,10 @@ export class GeminiOrbManager {
 
   /**
    * 発射後の誘導ホーミング ＆ オーバーラン突き抜け物理
-   * 1. OUTWARD: 投擲の勢いで敵陣へ直線射出（約15〜18Fまたは一定距離飛翔）
-   * 2. INWARD: 自機への円弧誘導ホーミング（美しいカーブで落ち着いた速度で接近）
+   * 1. OUTWARD: 投擲の勢いで敵陣へ直線射出（深宇宙へ豪快に突進）
+   * 2. INWARD: 自機への円弧誘導ホーミング（美しいカーブで猛烈に接近）
    * 3. OVERSHOOT: 自機を通過した瞬間、そのまま前方深宇宙へ滑らかにオーバーラン突き抜け！
-   * 4. APEX: 最遠到達点でフワッと滞空、再び自機へのホーミングへ折り返し
+   * 4. APEX: 最遠到達点で滞空停止せず即座に自機へのホーミングへ折り返し
    */
   private updateHomingOverrun(
     orb: GeminiOrb,
@@ -1013,20 +1013,20 @@ export class GeminiOrbManager {
       const flyDist = Math.hypot(orb.x - (orb.launchStartX || orb.x), orb.y - (orb.launchStartY || orb.y));
 
       // 慣性保存（低い空気抵抗）
-      orb.vx *= 0.994;
-      orb.vy *= 0.994;
+      orb.vx *= 0.995;
+      orb.vy *= 0.995;
 
-      // 飛翔距離が一定（約75px）を超えるか、18フレーム経過、または減速でホーミングへ移行
-      if (flyDist > 75 || orb.strokeElapsed > 18 || curSpd < 1.2) {
+      // 画面奥深くまで豪快に飛翔（320pxまたは50フレーム）
+      if (flyDist > 320 || orb.strokeElapsed > 50 || curSpd < 2.0) {
         orb.strokePhase = 'INWARD';
-        orb.strokeDist = Math.max(45, distToPlayer);
+        orb.strokeDist = Math.max(50, distToPlayer);
       }
 
     } else if (orb.strokePhase === 'APEX') {
       // 滞空停止させず即座に自機ホーミングへ移行（敵衝突時のフリーズ・停止感を完全解消）
       orb.strokePhase = 'INWARD';
       orb.isHoveringApex = false;
-      orb.strokeDist = Math.max(45, distToPlayer);
+      orb.strokeDist = Math.max(50, distToPlayer);
 
     } else if (orb.strokePhase === 'OVERSHOOT') {
       // --- OVERSHOOTオーバーラン突き抜けフェーズ ---
@@ -1040,11 +1040,11 @@ export class GeminiOrbManager {
       const s = (orb.x - anchorX) * dirX + (orb.y - anchorY) * dirY;
       const forwardV = orb.vx * dirX + orb.vy * dirY;
 
-      // 目標オーバーラン距離 (約55〜90px)
-      const targetOvershoot = Math.max(55, (orb.peakSpeed || 2.0) * 26);
+      // 目標オーバーラン距離 (深宇宙へ伸びる突き抜け)
+      const targetOvershoot = Math.max(75, (orb.peakSpeed || 5.0) * 18);
 
       // 前進速度の自然なブレーキ
-      const peakV = Math.max(1.8, orb.peakSpeed || curSpd);
+      const peakV = Math.max(3.0, orb.peakSpeed || curSpd);
       const brakeAccel = (peakV * peakV) / (2 * targetOvershoot);
       orb.vx -= dirX * brakeAccel * 0.85;
       orb.vy -= dirY * brakeAccel * 0.85;
@@ -1056,10 +1056,10 @@ export class GeminiOrbManager {
       orb.vy = forwardV * dirY + perpVy * 0.88;
 
       // 目標距離到達または前進速度停止でスムーズに自機ホーミングへ移行（停止なし）
-      if (s >= targetOvershoot || forwardV <= 0.18) {
+      if (s >= targetOvershoot || forwardV <= 0.30) {
         orb.strokePhase = 'INWARD';
         orb.isHoveringApex = false;
-        orb.strokeDist = Math.max(45, distToPlayer);
+        orb.strokeDist = Math.max(50, distToPlayer);
       }
 
     } else {
@@ -1073,7 +1073,7 @@ export class GeminiOrbManager {
 
       if (speed < 0.2) {
         currentAngle = targetAngle;
-        speed = 0.5;
+        speed = 1.0;
       }
 
       let angleDiff = targetAngle - currentAngle;
@@ -1081,16 +1081,16 @@ export class GeminiOrbManager {
       while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
 
       // 1Fあたりの最大旋回角度制限 (美しい円弧を描く)
-      const maxTurn = (this.tuning.maxTurnRate || 0.035) * 1.1;
+      const maxTurn = (this.tuning.maxTurnRate || 0.035) * 1.15;
       const clampedTurn = Math.max(-maxTurn, Math.min(maxTurn, angleDiff));
       const newAngle = currentAngle + clampedTurn;
 
-      // 自機への推進加速 (落ち着いたマイルドな加速: 0.045〜0.08程度)
-      const accel = (0.045 + Math.min(0.040, distToPlayer * 0.0003)) * this.tuning.tensionMultiplier;
+      // 自機への推進加速 (機敏なアーケード加速)
+      const accel = (0.35 + Math.min(0.35, distToPlayer * 0.0018)) * this.tuning.tensionMultiplier;
       speed += accel;
       speed *= this.tuning.damping;
 
-      const maxSpd = (cfg.maxSpeed * 1.20) * this.tuning.maxSpeedMultiplier;
+      const maxSpd = (cfg.maxSpeed * 1.25) * this.tuning.maxSpeedMultiplier;
       if (speed > maxSpd) speed = maxSpd;
 
       orb.vx = Math.cos(newAngle) * speed;
@@ -1101,7 +1101,7 @@ export class GeminiOrbManager {
       const dirToPlayerY = dy / distToPlayer;
       const forwardToPlayer = orb.vx * dirToPlayerX + orb.vy * dirToPlayerY;
 
-      if (distToPlayer <= 30 || (distToPlayer < 55 && forwardToPlayer < 0)) {
+      if (distToPlayer <= 32 || (distToPlayer < 65 && forwardToPlayer < 0)) {
         orb.strokePhase = 'OVERSHOOT';
         orb.peakSpeed = Math.hypot(orb.vx, orb.vy);
         const pSpd = Math.max(0.01, orb.peakSpeed);
@@ -1112,7 +1112,7 @@ export class GeminiOrbManager {
       }
     }
 
-    // 最高速度クランプ (最高でも約2.8〜3.1 px/frame)
+    // 最高速度クランプ (最高速倍率に対応)
     const finalSpd = Math.hypot(orb.vx, orb.vy);
     const maxAllowed = (cfg.maxSpeed * 1.30) * this.tuning.maxSpeedMultiplier;
     if (finalSpd > maxAllowed) {
@@ -1121,7 +1121,7 @@ export class GeminiOrbManager {
     }
 
     // 火の玉チャージ判定
-    if (distToPlayer > 45 && finalSpd > 1.3) {
+    if (distToPlayer > 45 && finalSpd > 3.5) {
       orb.isCharged = true;
       orb.chargeRatio = Math.min(1.0, (distToPlayer - 35) / 60);
     } else {
@@ -1163,15 +1163,15 @@ export class GeminiOrbManager {
       const sinA = Math.sin(orb.orbitAngle);
       const cosA = Math.cos(orb.orbitAngle);
       const tangentSpeed = -orb.vx * sinA + orb.vy * cosA;
-      orb.orbitAngularVel = Math.max(-0.10, Math.min(0.10, tangentSpeed / orb.orbitRadius));
+      orb.orbitAngularVel = Math.max(-0.25, Math.min(0.25, tangentSpeed / orb.orbitRadius));
     } else if (!isTetherHeld && wasTethered) {
       // 投擲リリース！
       orb.isTethered = false;
       orb.mode = 'COMET';
       const spd = Math.hypot(orb.vx, orb.vy);
       if (spd > 0.3) {
-        orb.vx *= 1.08; // 遠心力射出初速 (マイルドな初速)
-        orb.vy *= 1.08;
+        orb.vx *= 1.35; // 遠心力カタパルト射出初速
+        orb.vy *= 1.35;
       }
       orb.strokePhase = 'OUTWARD';
       orb.launchStartX = orb.x;

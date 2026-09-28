@@ -1352,11 +1352,11 @@ export class ArcadeRenderer {
       tuneBarY + 11
     );
 
-    // Line 2: Physics Tuning Multipliers in bold 10px (Side-by-side [J]加速度 & [U]最高速)
+    // Line 2: Physics Tuning Multipliers in bold 10px (Side-by-side [J]加速度 & [U]球最高速)
     this.setFont(this.readableFont10);
     ctx.fillStyle = '#fde047';
     ctx.fillText(
-      `[J]加速度:x${(tng?.tensionMultiplier || 0.8).toFixed(1)}  [U]最高速:x${(tng?.maxSpeedMultiplier || 0.8).toFixed(1)}  [K]旋角:${turnD}°  [Y]減衰:${(tng?.damping || 0.993).toFixed(3)}  [R]初期`,
+      `[J]加速度:x${(tng?.tensionMultiplier || 1.0).toFixed(1)}  [U]球最高速:x${(tng?.maxSpeedMultiplier || 1.0).toFixed(1)}  [K]旋角:${turnD}°  [Y]減衰:${(tng?.damping || 0.993).toFixed(3)}  [R]初期`,
       w / 2,
       tuneBarY + 23
     );
@@ -1643,7 +1643,7 @@ export class ArcadeRenderer {
     }
 
     // Row 5: Real-time Physics Parameter Tuning (y: 71 to 86)
-    const tng = telemetry?.tuning || { tensionMultiplier: 0.8, maxTurnRate: 0.035, damping: 0.993, maxSpeedMultiplier: 0.8, orbitRadius: 75, overshootRatio: 0.5, apexDwellMultiplier: 1.0 };
+    const tng = telemetry?.tuning || { tensionMultiplier: 1.0, maxTurnRate: 0.035, damping: 0.993, maxSpeedMultiplier: 1.0, orbitRadius: 75, overshootRatio: 0.5, apexDwellMultiplier: 1.0 };
     const turnDeg = ((tng.maxTurnRate || 0.035) * 180 / Math.PI).toFixed(1);
     const tuningBtns = [
       { label: `[J]加速度:x${tng.tensionMultiplier.toFixed(1)}`, x: 4, w: 72 },
@@ -1680,7 +1680,7 @@ export class ArcadeRenderer {
     ctx.textAlign = 'center';
     ctx.fillText(isDirect ? '🖱️自機移動: マウス直結[M]' : `🚀自機移動: 速度制限[M]`, 8 + 85, ctrlBarY + 12);
 
-    // Right Button: [⚡自機最高速度: x3.0 (切替)[V]] (x: 182 to 352, w: 170)
+    // Right Button: [🚀自機移動速度: x3.0 (切替)[V]] (x: 182 to 352, w: 170)
     ctx.fillStyle = 'rgba(15, 23, 42, 0.90)';
     ctx.fillRect(182, ctrlBarY, 170, 18);
     ctx.strokeStyle = '#fde047';
@@ -1689,7 +1689,7 @@ export class ArcadeRenderer {
     ctx.fillStyle = '#fde047';
     this.setFont(this.readableFont10);
     ctx.textAlign = 'center';
-    ctx.fillText(`⚡自機最高速度: x${speedMult.toFixed(1)} (切替)[V]`, 182 + 85, ctrlBarY + 12);
+    ctx.fillText(`🚀自機移動速度: x${speedMult.toFixed(1)} [V]`, 182 + 85, ctrlBarY + 12);
 
     // 4. Real-time Telemetry Bar at Screen Bottom (y: height - 24 to height)
     const btmY = this.canvas.height - 24;
