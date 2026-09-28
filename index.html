@@ -56,17 +56,16 @@
       display: block;
       width: 100%;
       height: 100%;
-      image-rendering: pixelated;
-      image-rendering: crisp-edges;
+      image-rendering: auto;
       touch-action: none;
     }
     #arcade-footer {
       margin-top: 6px;
-      font-size: 10px;
-      color: #7d8b99;
+      font-size: 11px;
+      color: #94a3b8;
       text-align: center;
       line-height: 1.5;
-      font-family: 'DotGothic16', monospace;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Meiryo", "Noto Sans JP", sans-serif;
       display: flex;
       gap: 12px;
       align-items: center;
@@ -89,7 +88,7 @@
     }
     @media (max-height: 650px) {
       #arcade-footer {
-        font-size: 8px;
+        font-size: 9px;
         margin-top: 2px;
       }
       .btn-toggle {
@@ -106,7 +105,7 @@
     </div>
     <div id="arcade-footer">
       <span>📱 スマホ: ドラッグ(自機移動) / 右下「⚡捕獲」ボタンまたは2本指タッチでヒモ捕獲・離して投擲！</span>
-      <span>💻 PC: [Z/右クリ]ヨーヨー⇄分銅 | [M]直結/制限 | [V]自機速度 | [Y]減衰 | [K]旋回角 | [J]引力 | [U]球速 | [T]実験室</span>
+      <span>💻 PC: [Z/右クリック]捕獲⇄投擲 | [J]ジェミニ加速度 | [U]球最高速 | [K]旋回角 | [Y]減衰 | [V]自機最高速 | [M]直結/制限 | [T]実験室</span>
       <button id="btn-bgm" class="btn-toggle" title="BGM切替 (Bキー)">🎵 BGM: ON</button>
       <button id="btn-se" class="btn-toggle" title="効果音切替 (Nキー)">🔊 SE: ON</button>
       <button id="btn-all-audio" class="btn-toggle" title="全ミュート">🔇 全消音</button>

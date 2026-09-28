@@ -182,7 +182,7 @@ export class Game {
     this.addFloatingText(
       this.player.state.x,
       this.player.state.y - 30,
-      `自機最高速度: x${spd.toFixed(1)} [V]`,
+      `🚀自機最高速度: x${spd.toFixed(1)} [V]`,
       '#fde047'
     );
   }
@@ -194,7 +194,7 @@ export class Game {
     this.addFloatingText(
       this.player.state.x,
       this.player.state.y - 30,
-      `加速度倍率: x${val.toFixed(1)} (${desc}) [J]`,
+      `⚡ジェミニ加速度: x${val.toFixed(1)} (${desc}) [J]`,
       '#fde047'
     );
   }
@@ -235,7 +235,7 @@ export class Game {
     this.addFloatingText(
       this.player.state.x,
       this.player.state.y - 30,
-      `玉の最高速度: x${val.toFixed(1)} (${desc}) [U]`,
+      `⚡ジェミニ最高速度: x${val.toFixed(1)} (${desc}) [U]`,
       '#fde047'
     );
   }
@@ -1812,28 +1812,28 @@ export class Game {
 
       // 6. Row 5: Parameter Quick Tuning (y: 71 to 88)
       if (y >= 71 && y <= 88) {
-        // [加速: x..[J]] (x: 4 to 60)
-        if (x >= 4 && x <= 60) {
+        // [J]加速度: x.. (x: 4 to 76)
+        if (x >= 4 && x <= 76) {
           this.cycleTensionWithFeedback();
           return true;
         }
-        // [曲がり角: ..°[K]] (x: 61 to 125)
-        if (x >= 61 && x <= 125) {
-          this.cycleTurnRateWithFeedback();
-          return true;
-        }
-        // [減衰率: ..[Y]] (x: 126 to 195)
-        if (x >= 126 && x <= 195) {
-          this.cycleDampingWithFeedback();
-          return true;
-        }
-        // [最高速: x..[U]] (x: 196 to 260)
-        if (x >= 196 && x <= 260) {
+        // [U]球最高速: x.. (x: 77 to 150)
+        if (x >= 77 && x <= 150) {
           this.cycleMaxSpeedWithFeedback();
           return true;
         }
-        // [↺初期[R]] (x: 261 to 356)
-        if (x >= 261 && x <= 356) {
+        // [K]旋角: ..° (x: 151 to 218)
+        if (x >= 151 && x <= 218) {
+          this.cycleTurnRateWithFeedback();
+          return true;
+        }
+        // [Y]減衰: .. (x: 219 to 290)
+        if (x >= 219 && x <= 290) {
+          this.cycleDampingWithFeedback();
+          return true;
+        }
+        // [R]初期 (x: 291 to 356)
+        if (x >= 291 && x <= 356) {
           this.geminiManager.resetTuning();
           this.audio.playGeminiBounce();
           this.addFloatingText(this.player.state.x, this.player.state.y - 30, 'パラメータ初期化!', '#38bdf8');

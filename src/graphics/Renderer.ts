@@ -44,6 +44,16 @@ export class ArcadeRenderer {
     }
   }
 
+  private get readableFont10(): string {
+    return 'bold 10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Meiryo", "Noto Sans JP", sans-serif';
+  }
+  private get readableFont9(): string {
+    return 'bold 9px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Meiryo", "Noto Sans JP", sans-serif';
+  }
+  private get readableFont11(): string {
+    return 'bold 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Meiryo", "Noto Sans JP", sans-serif';
+  }
+
   constructor(canvas: HTMLCanvasElement, sprites: SpriteSheet, terrain: TerrainEngine) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
@@ -1260,7 +1270,7 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1;
     ctx.strokeRect(btnPresetX, 4, 82, 15);
     ctx.fillStyle = '#fde047';
-    this.setFont('7px "DotGothic16", monospace');
+    this.setFont(this.readableFont10);
     ctx.fillText(`[1-5:${telemetry?.patternInfo?.shortLabel || '①ヨーヨー'}]`, btnPresetX + 41, 14);
 
     // Row 2 Buttons: Attack Mode (ヒモ保持 ⇄ 投擲リリース) & Attribute (貫通 / 反射)
@@ -1273,7 +1283,7 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1.2;
     ctx.strokeRect(btnModeX, 23, btnModeW, 16);
     ctx.fillStyle = isTethered ? '#38bdf8' : '#fde047';
-    this.setFont('8px "DotGothic16", monospace');
+    this.setFont(this.readableFont10);
     ctx.textAlign = 'center';
     ctx.fillText(isTethered ? '⚡分銅ヒモ保持' : (telemetry?.patternInfo?.shortLabel || '☄️ハレー彗星'), btnModeX + btnModeW / 2, 34);
 
@@ -1287,7 +1297,7 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1.2;
     ctx.strokeRect(btnColX, 23, btnColW, 16);
     ctx.fillStyle = isPen ? '#22c55e' : '#f97316';
-    this.setFont('8px "DotGothic16", monospace');
+    this.setFont(this.readableFont10);
     ctx.textAlign = 'center';
     ctx.fillText(isPen ? '⚔️属性:貫通' : '🛡️属性:反射', btnColX + btnColW / 2, 34);
 
@@ -1320,34 +1330,35 @@ export class ArcadeRenderer {
     this.setFont('6px "Press Start 2P", monospace');
     ctx.fillText(`${player.hp}%`, gaugeX + barW + 5, shieldY + 5);
 
-    // Real-time Telemetry & Compact Tuning Bar in Normal Play (y: height - 38 to height - 16, h: 22)
-    const tuneBarY = this.canvas.height - 38;
-    const tuneBarH = 22;
-    ctx.fillStyle = 'rgba(2, 6, 23, 0.92)';
+    // Real-time Telemetry & Compact Tuning Bar in Normal Play (y: height - 43 to height - 15, h: 28)
+    const tuneBarY = this.canvas.height - 43;
+    const tuneBarH = 28;
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.94)';
     ctx.fillRect(6, tuneBarY, w - 12, tuneBarH);
     ctx.strokeStyle = '#38bdf8';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1.2;
     ctx.strokeRect(6, tuneBarY, w - 12, tuneBarH);
 
     const tng = telemetry?.tuning;
     const turnD = ((tng?.maxTurnRate || 0.035) * 180 / Math.PI).toFixed(1);
 
-    // Line 1: Live Measured Telemetry (SPD & ACC)
-    this.setFont('7px "DotGothic16", monospace');
+    // Line 1: Live Measured Telemetry (SPD & ACC) in bold 11px
+    this.setFont(this.readableFont11);
     ctx.fillStyle = '#38bdf8';
     ctx.textAlign = 'center';
     ctx.fillText(
-      `⚡現在速度: ${(telemetry?.speed || 0).toFixed(1)} px/f   ⚡現在加速度: ${(telemetry?.accel || 0).toFixed(2)} px/f²`,
+      `⚡速度(SPD): ${(telemetry?.speed || 0).toFixed(1)} px/f    ⚡加速度(ACC): ${(telemetry?.accel || 0).toFixed(2)} px/f²`,
       w / 2,
-      tuneBarY + 9
+      tuneBarY + 11
     );
 
-    // Line 2: Physics Tuning Multipliers
+    // Line 2: Physics Tuning Multipliers in bold 10px (Side-by-side [J]加速度 & [U]最高速)
+    this.setFont(this.readableFont10);
     ctx.fillStyle = '#fde047';
     ctx.fillText(
-      `[J]加速度:x${(tng?.tensionMultiplier || 0.8).toFixed(1)}  [K]旋角:${turnD}°  [Y]減衰:${(tng?.damping || 0.993).toFixed(3)}  [U]最高速:x${(tng?.maxSpeedMultiplier || 0.8).toFixed(1)}  [R]初期`,
+      `[J]加速度:x${(tng?.tensionMultiplier || 0.8).toFixed(1)}  [U]最高速:x${(tng?.maxSpeedMultiplier || 0.8).toFixed(1)}  [K]旋角:${turnD}°  [Y]減衰:${(tng?.damping || 0.993).toFixed(3)}  [R]初期`,
       w / 2,
-      tuneBarY + 19
+      tuneBarY + 23
     );
 
     // Bottom Bar: Lives, Stage Indicator, Gemini Power Level
@@ -1552,7 +1563,7 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1.5;
     ctx.strokeRect(8, 19, btnAtkW, 16);
     ctx.fillStyle = isTethered ? '#38bdf8' : '#fde047';
-    this.setFont('8px "DotGothic16", monospace');
+    this.setFont(this.readableFont10);
     ctx.textAlign = 'center';
     const modeLabel = isTethered ? '⚡分銅ヒモ保持[長押]' : '☄️ハレー彗星[デフォ]';
     ctx.fillText(modeLabel, 8 + btnAtkW / 2, 30);
@@ -1566,7 +1577,7 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1.5;
     ctx.strokeRect(124, 19, btnColW, 16);
     ctx.fillStyle = isPen ? '#22c55e' : '#f97316';
-    this.setFont('8px "DotGothic16", monospace');
+    this.setFont(this.readableFont10);
     ctx.textAlign = 'center';
     ctx.fillText(isPen ? '⚔️ジェミニ:貫通[X]' : '🛡️ジェミニ:反射[X]', 124 + btnColW / 2, 30);
 
@@ -1578,7 +1589,7 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1.2;
     ctx.strokeRect(240, 19, btnOrbW, 16);
     ctx.fillStyle = '#f472b6';
-    this.setFont('8px "DotGothic16", monospace');
+    this.setFont(this.readableFont10);
     ctx.textAlign = 'center';
     ctx.fillText(`ジェミニ:${orbCnt}機[O]`, 240 + btnOrbW / 2, 30);
 
@@ -1603,7 +1614,7 @@ export class ArcadeRenderer {
       ctx.lineWidth = isActive ? 2 : 1;
       ctx.strokeRect(tabX, tabY, tabW, tabH);
       ctx.fillStyle = isActive ? '#ffffff' : '#94a3b8';
-      this.setFont('7px "DotGothic16", monospace');
+      this.setFont(this.readableFont9);
       ctx.textAlign = 'center';
       ctx.fillText(`[${t.num}]${t.label}`, tabX + tabW / 2, tabY + 10);
     }
@@ -1626,7 +1637,7 @@ export class ArcadeRenderer {
       ctx.lineWidth = isAct ? 1.8 : 1;
       ctx.strokeRect(et.x, 53, et.w, 16);
       ctx.fillStyle = isAct ? '#ffffff' : '#94a3b8';
-      this.setFont('7px "DotGothic16", monospace');
+      this.setFont(this.readableFont9);
       ctx.textAlign = 'center';
       ctx.fillText(et.label, et.x + et.w / 2, 64);
     }
@@ -1635,11 +1646,11 @@ export class ArcadeRenderer {
     const tng = telemetry?.tuning || { tensionMultiplier: 0.8, maxTurnRate: 0.035, damping: 0.993, maxSpeedMultiplier: 0.8, orbitRadius: 75, overshootRatio: 0.5, apexDwellMultiplier: 1.0 };
     const turnDeg = ((tng.maxTurnRate || 0.035) * 180 / Math.PI).toFixed(1);
     const tuningBtns = [
-      { label: `加速度:x${tng.tensionMultiplier.toFixed(1)}[J]`, x: 4, w: 64 },
-      { label: `旋角:${turnDeg}°[K]`, x: 70, w: 66 },
-      { label: `減衰:${(tng.damping || 0.993).toFixed(3)}[Y]`, x: 138, w: 70 },
-      { label: `最高速:x${tng.maxSpeedMultiplier.toFixed(1)}[U]`, x: 210, w: 74 },
-      { label: '↺初期[R]', x: 286, w: 68 },
+      { label: `[J]加速度:x${tng.tensionMultiplier.toFixed(1)}`, x: 4, w: 72 },
+      { label: `[U]球最高速:x${tng.maxSpeedMultiplier.toFixed(1)}`, x: 78, w: 72 },
+      { label: `[K]旋角:${turnDeg}°`, x: 152, w: 66 },
+      { label: `[Y]減衰:${(tng.damping || 0.993).toFixed(3)}`, x: 220, w: 70 },
+      { label: '[R]初期', x: 292, w: 64 },
     ];
     for (const tb of tuningBtns) {
       ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
@@ -1648,7 +1659,7 @@ export class ArcadeRenderer {
       ctx.lineWidth = 1;
       ctx.strokeRect(tb.x, 71, tb.w, 15);
       ctx.fillStyle = '#fde047';
-      this.setFont('6px "DotGothic16", monospace');
+      this.setFont(this.readableFont9);
       ctx.textAlign = 'center';
       ctx.fillText(tb.label, tb.x + tb.w / 2, 82);
     }
@@ -1665,7 +1676,7 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1.5;
     ctx.strokeRect(8, ctrlBarY, 170, 18);
     ctx.fillStyle = isDirect ? '#38bdf8' : '#fde047';
-    this.setFont('8px "DotGothic16", monospace');
+    this.setFont(this.readableFont10);
     ctx.textAlign = 'center';
     ctx.fillText(isDirect ? '🖱️自機移動: マウス直結[M]' : `🚀自機移動: 速度制限[M]`, 8 + 85, ctrlBarY + 12);
 
@@ -1676,7 +1687,7 @@ export class ArcadeRenderer {
     ctx.lineWidth = 1.2;
     ctx.strokeRect(182, ctrlBarY, 170, 18);
     ctx.fillStyle = '#fde047';
-    this.setFont('8px "DotGothic16", monospace');
+    this.setFont(this.readableFont10);
     ctx.textAlign = 'center';
     ctx.fillText(`⚡自機最高速度: x${speedMult.toFixed(1)} (切替)[V]`, 182 + 85, ctrlBarY + 12);
 
@@ -1685,29 +1696,20 @@ export class ArcadeRenderer {
     ctx.fillStyle = 'rgba(2, 6, 23, 0.94)';
     ctx.fillRect(0, btmY, w, 24);
     ctx.strokeStyle = '#38bdf8';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1.2;
     ctx.strokeRect(0, btmY, w, 24);
 
-    this.setFont('6px "Press Start 2P", monospace');
+    this.setFont(this.readableFont10);
     ctx.fillStyle = '#38bdf8';
     ctx.textAlign = 'left';
-    ctx.fillText(`DIST:${telemetry?.dist || 0} SPD:${(telemetry?.speed || 0).toFixed(1)} ACC:${(telemetry?.accel || 0).toFixed(2)}`, 6, btmY + 15);
+    ctx.fillText(`⚡速度: ${(telemetry?.speed || 0).toFixed(1)}  ⚡加速度: ${(telemetry?.accel || 0).toFixed(2)}`, 8, btmY + 16);
 
-    const isTetheredBar = !!telemetry?.isTethered;
-    if (isTetheredBar) {
-      ctx.fillStyle = telemetry?.spinLevel === 2 ? '#ff3b00' : telemetry?.spinLevel === 1 ? '#fde047' : '#38bdf8';
-      ctx.fillText(telemetry?.spinLevel === 2 ? '🔥GIGA' : telemetry?.spinLevel === 1 ? '⚡HIGH' : '⚡FLAIL', 178, btmY + 15);
-    } else {
-      ctx.fillStyle = '#38bdf8';
-      ctx.fillText('☄️COMET', 178, btmY + 15);
-    }
-
-    ctx.fillStyle = isWallBounce ? '#38bdf8' : '#64748b';
-    ctx.fillText(`[壁:${isWallBounce ? 'ON' : 'OFF'}]`, 238, btmY + 15);
+    ctx.fillStyle = '#fde047';
+    ctx.fillText(`[距離:${telemetry?.dist || 0}px]`, 182, btmY + 16);
 
     ctx.fillStyle = '#22c55e';
     ctx.textAlign = 'right';
-    ctx.fillText(`DMG:${testBossDamage}`, w - 6, btmY + 15);
+    ctx.fillText(`DMG:${testBossDamage}`, w - 8, btmY + 16);
 
     // Boss HP Bar in Test Stage if boss active (y = 96)
     if (boss && boss.y > 0) {
