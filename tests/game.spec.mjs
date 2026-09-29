@@ -6,7 +6,7 @@ test.beforeEach(async ({ page }) => {
     localStorage.setItem('gemini_se_enabled', 'false');
   });
   // Instantiate the real game without RAF; advance fixed ticks deterministically.
-  await page.route('**/src/main.ts', route => route.fulfill({ contentType: 'text/javascript', body: '' }));
+  await page.route('**/src/main.ts*', route => route.fulfill({ contentType: 'text/javascript', body: '' }));
   await page.goto('/');
   await page.evaluate(async () => {
     const { Game } = await import('/src/core/Game.ts');
