@@ -758,7 +758,35 @@ export class ArcadeRenderer {
         ctx.arc(orb.x, orb.y, (25 - orb.fuseTimer) * 2.2 + orb.radius, 0, Math.PI * 2);
         ctx.stroke();
         ctx.restore();
-    this.cachedFont = '';
+        this.cachedFont = '';
+      }
+
+      // 5. Offscreen Edge Locator (画面外はみ出し時の位置インジケーター)
+      const w = this.canvas.width;
+      const h = this.canvas.height;
+      if (orb.x < 0 || orb.x > w || orb.y < 0 || orb.y > h) {
+        ctx.save();
+        const clampX = Math.max(16, Math.min(w - 16, orb.x));
+        const clampY = Math.max(26, Math.min(h - 26, orb.y));
+        const angleToOrb = Math.atan2(orb.y - clampY, orb.x - clampX);
+
+        ctx.fillStyle = orb.level === 3 ? '#ec4899' : orb.level === 2 ? '#a855f7' : '#38bdf8';
+        ctx.shadowColor = ctx.fillStyle;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(clampX, clampY, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Arrow pointer pointing toward orb
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(clampX, clampY);
+        ctx.lineTo(clampX + Math.cos(angleToOrb) * 10, clampY + Math.sin(angleToOrb) * 10);
+        ctx.stroke();
+
+        ctx.restore();
+        this.cachedFont = '';
       }
     }
   }

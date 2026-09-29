@@ -136,7 +136,7 @@ export class GeminiOrbManager {
   public currentPresetId: PhysicsPresetId = 'SNAP_SLING';
   public currentPatternId: PhysicsPatternId = 'HYBRID_COMET_FLAIL'; // デフォルトは統合ハイブリッド
   public collisionMode: GeminiCollisionMode = 'PENETRATE';
-  public screenEdgeBounce: boolean = true; // デフォルトで画面端反射ON (画面外消失・脱走を完全防止)
+  public screenEdgeBounce: boolean = false; // デフォルトは通過(false)。プレイヤーが意図して壁反射を使いたい時だけON(true)にする
   public tuning: PhysicsTuningState = {
     tensionMultiplier: 1.0,  // 加速度倍率: 0.6, 0.8, 1.0 (標準), 1.5, 2.0, 3.0
     maxTurnRate: 0.035,      // 1フレーム最大曲がり角度: 0.020, 0.027, 0.035 (標準約2.0°), 0.045, 0.060, 0.080
@@ -212,7 +212,7 @@ export class GeminiOrbManager {
       orbitRadius: 75,
       overshootRatio: 0.5,
     };
-    this.screenEdgeBounce = true;
+    this.screenEdgeBounce = false;
   }
 
   public setOrbCount(count: number, playerX: number, playerY: number): number {
@@ -654,7 +654,7 @@ export class GeminiOrbManager {
         orb.vy += ((playerY - orb.y) / playerDist) * tautF;
       }
 
-      if (s >= targetOvershoot || forwardV <= 0.15 || orb.x <= 18 || orb.x >= 342 || orb.y <= 26 || orb.y >= 514) {
+      if (s >= targetOvershoot || forwardV <= 0.15) {
         orb.strokePhase = 'APEX';
         orb.apexDwellTimer = Math.round(9 * this.tuning.apexDwellMultiplier);
         orb.isHoveringApex = true;
@@ -782,12 +782,6 @@ export class GeminiOrbManager {
         orb.vy += tangentY * sign * swingBoost;
       }
     }
-
-    // 画面端接近時の内向きソフトガイダンス（画面外への脱走を自然に防止）
-    if (orb.x < 36) orb.vx += (36 - orb.x) * 0.035 * this.tuning.tensionMultiplier;
-    if (orb.x > 324) orb.vx -= (orb.x - 324) * 0.035 * this.tuning.tensionMultiplier;
-    if (orb.y < 36) orb.vy += (36 - orb.y) * 0.035 * this.tuning.tensionMultiplier;
-    if (orb.y > 504) orb.vy -= (orb.y - 504) * 0.035 * this.tuning.tensionMultiplier;
 
     // 天体運動の極めて低い空気抵抗
     orb.vx *= Math.max(0.993, this.tuning.damping);
@@ -1029,16 +1023,9 @@ export class GeminiOrbManager {
       orb.vx *= 0.995;
       orb.vy *= 0.995;
 
-      // 飛翔距離が一定（約220px）を超えるか、画面端に達した場合はスムーズにホーミングへ移行
-      if (
-        flyDist > 220 ||
-        orb.strokeElapsed > 35 ||
-        curSpd < 2.0 ||
-        orb.x <= 20 ||
-        orb.x >= 340 ||
-        orb.y <= 28 ||
-        orb.y >= 512
-      ) {
+      // 飛翔距離が一定（約240px）を超えるか、速度減衰でホーミングへ移行（壁反射ON時は壁接触でも即移行）
+      const hitWall = this.screenEdgeBounce && (orb.x <= 16 || orb.x >= 344 || orb.y <= 24 || orb.y >= 516);
+      if (flyDist > 240 || orb.strokeElapsed > 40 || curSpd < 2.0 || hitWall) {
         orb.strokePhase = 'INWARD';
         orb.strokeDist = Math.max(50, distToPlayer);
       }
@@ -1061,8 +1048,8 @@ export class GeminiOrbManager {
       const s = (orb.x - anchorX) * dirX + (orb.y - anchorY) * dirY;
       const forwardV = orb.vx * dirX + orb.vy * dirY;
 
-      // 目標オーバーラン距離 (深宇宙へ伸びる突き抜けだが画面端を超えないよう制限)
-      const targetOvershoot = Math.min(150, Math.max(55, (orb.peakSpeed || 5.0) * 14));
+      // 目標オーバーラン距離 (深宇宙へ伸びる自然な突き抜け)
+      const targetOvershoot = Math.min(160, Math.max(60, (orb.peakSpeed || 5.0) * 15));
 
       // 前進速度の自然なブレーキ
       const peakV = Math.max(3.0, orb.peakSpeed || curSpd);
@@ -1076,15 +1063,9 @@ export class GeminiOrbManager {
       orb.vx = forwardV * dirX + perpVx * 0.88;
       orb.vy = forwardV * dirY + perpVy * 0.88;
 
-      // 目標距離到達または前進速度停止、または画面端到達でスムーズに自機ホーミングへ移行（停止なし）
-      if (
-        s >= targetOvershoot ||
-        forwardV <= 0.30 ||
-        orb.x <= 20 ||
-        orb.x >= 340 ||
-        orb.y <= 28 ||
-        orb.y >= 512
-      ) {
+      // 目標距離到達または前進速度停止でスムーズに自機ホーミングへ移行（壁反射ON時は壁接触でも即移行）
+      const hitWallOvershoot = this.screenEdgeBounce && (orb.x <= 16 || orb.x >= 344 || orb.y <= 24 || orb.y >= 516);
+      if (s >= targetOvershoot || forwardV <= 0.30 || hitWallOvershoot) {
         orb.strokePhase = 'INWARD';
         orb.isHoveringApex = false;
         orb.strokeDist = Math.max(50, distToPlayer);
@@ -1228,6 +1209,7 @@ export class GeminiOrbManager {
     const maxY = 516;
 
     if (this.screenEdgeBounce) {
+      // 🧱 壁反射モード (ON): 意図して壁当てトリック攻撃・裏回り反射を使いたい時だけ跳ね返る
       let bounced = false;
       if (orb.x < minX) { orb.x = minX; orb.vx = Math.abs(orb.vx) * 0.92; bounced = true; }
       if (orb.x > maxX) { orb.x = maxX; orb.vx = -Math.abs(orb.vx) * 0.92; bounced = true; }
@@ -1235,11 +1217,15 @@ export class GeminiOrbManager {
       if (orb.y > maxY) { orb.y = maxY; orb.vy = -Math.abs(orb.vy) * 0.92; bounced = true; }
       if (bounced && onWallHit) onWallHit(orb.x, orb.y);
     } else {
-      // 反射OFF時でも画面外への完全逸脱・消失を防止し、画面枠内に素早く収容
-      if (orb.x < minX) { orb.x = minX; orb.vx = Math.max(0.8, Math.abs(orb.vx) * 0.60); }
-      if (orb.x > maxX) { orb.x = maxX; orb.vx = Math.min(-0.8, -Math.abs(orb.vx) * 0.60); }
-      if (orb.y < minY) { orb.y = minY; orb.vy = Math.max(0.8, Math.abs(orb.vy) * 0.60); }
-      if (orb.y > maxY) { orb.y = maxY; orb.vy = Math.min(-0.8, -Math.abs(orb.vy) * 0.60); }
+      // 🚪 通過モード (OFF / デフォルト): 壁で勝手に跳ねない！
+      // 少しはみ出してもOK。プレイヤー自身の腕・自機の位置取り・引力でジェミニをコントロールする。
+      // 画面端を越えても跳ね返りや強制反転は一切せず、自然に飛行させる。
+      // 万が一極端に離れすぎた場合（約65px以上外側）のみ、緩やかに戻す。
+      const outerMargin = 65;
+      if (orb.x < -outerMargin) { orb.x = -outerMargin; orb.vx += 0.20; }
+      if (orb.x > 360 + outerMargin) { orb.x = 360 + outerMargin; orb.vx -= 0.20; }
+      if (orb.y < -outerMargin) { orb.y = -outerMargin; orb.vy += 0.20; }
+      if (orb.y > 540 + outerMargin) { orb.y = 540 + outerMargin; orb.vy -= 0.20; }
     }
   }
 
