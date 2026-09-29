@@ -7,7 +7,7 @@ export class BreakoutManager {
   public setupStage2Wall(canvasWidth: number): void {
     this.blocks = [];
     const cols = 8;
-    const rows = 4;
+    const rows = 3;
     const blockWidth = 38;
     const blockHeight = 13;
     const gapX = 4;
@@ -29,6 +29,8 @@ export class BreakoutManager {
       const y = startY + r * (blockHeight + gapY);
 
       for (let c = 0; c < cols; c++) {
+        // A central throwing lane makes reflection a choice, never a gate.
+        if (c === 3 || c === 4) continue;
         const x = startX + c * (blockWidth + gapX);
         this.blocks.push({
           id: `block_${++this.blockCounter}`,

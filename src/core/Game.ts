@@ -27,6 +27,11 @@ export class Game {
   public state: GameState = 'TITLE';
   public stage: number = 1;
   public stageTick: number = 0;
+  public paused: boolean = false;
+  private endingTick = 0;
+  private rewardedFormations = new Set<string>();
+  private escapedFormations = new Set<string>();
+  private bossContacts = new Set<string>();
 
   private canvas: HTMLCanvasElement;
   private input: InputManager;
@@ -71,12 +76,6 @@ export class Game {
   public testBossCollisionMode: 'PENETRATE' | 'REFLECT' = 'PENETRATE';
   private testSwarmRespawnCooldown: number = 0;
   private testBossTotalDamage: number = 0;
-  private savedNormalState: {
-    stage: number;
-    score: number;
-    lives: number;
-    shield: number;
-  } | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -96,6 +95,9 @@ export class Game {
     this.stageManager = new StageManager();
 
     this.setupAudioAndCrtControls();
+    window.addEventListener('blur', () => {
+      if (this.state === 'PLAYING' || this.state === 'TEST_STAGE') this.paused = true;
+    });
   }
 
   public toggleBgm(): boolean {
@@ -350,7 +352,19 @@ export class Game {
     this.stage = Math.max(1, Math.min(4, stageNum));
     this.stageTick = 0;
     this.state = 'PLAYING';
+    this.paused = false;
+    this.endingTick = 0;
+    this.playerRespawnTimer = 0;
+    this.rewardedFormations.clear();
+    this.bossContacts.clear();
+    this.escapedFormations.clear();
+    this.player.setControlMode('LIMITED');
+    this.player.setSpeedMultiplier(3);
     this.player.reset(this.canvas.width / 2, this.canvas.height - 90);
+    this.input.resetPosition(this.player.state.x, this.player.state.y);
+    this.geminiManager.setPattern('HYBRID_COMET_FLAIL');
+    this.geminiManager.resetTuning();
+    this.geminiManager.setCollisionMode('PENETRATE');
     this.player.state.score = 0;
     this.player.state.lives = 3;
 
@@ -390,6 +404,9 @@ export class Game {
     this.stage++;
     if (this.stage > 4) {
       this.state = 'GAME_CLEAR';
+      this.stage = 4;
+      this.endingTick = 0;
+      this.stageTick = 0;
       this.audio.stopBgm();
       return;
     }
@@ -397,6 +414,11 @@ export class Game {
     this.state = 'PLAYING';
     this.stageTick = 0;
     this.stageClearTimer = 0;
+    this.bossContacts.clear();
+    this.rewardedFormations.clear();
+    this.escapedFormations.clear();
+    this.player.reset(this.canvas.width / 2, this.canvas.height - 90);
+    this.input.resetPosition(this.player.state.x, this.player.state.y);
     this.enemyManager.clear();
     this.groundManager.clear();
     this.bossManager.clear();
@@ -438,21 +460,21 @@ export class Game {
       return;
     }
 
-    const presetChoice = this.input.consumePresetSelect();
+    const presetChoice = this.input.consumePatternSelect();
     if (presetChoice) {
-      if (presetChoice === 'SNAP_SLING') {
+      if (presetChoice === 'YOYO_STROKE') {
         this.startNewGame(1);
         return;
-      } else if (presetChoice === 'HYPER_BOOMERANG') {
+      } else if (presetChoice === 'COMET_GRAVITY') {
         this.startNewGame(2);
         return;
-      } else if (presetChoice === 'GIGANTIC_SPRING') {
+      } else if (presetChoice === 'ARC_HOMING') {
         this.startNewGame(3);
         return;
-      } else if (presetChoice === 'HEAVY_WRECKER') {
+      } else if (presetChoice === 'PURE_FLAIL') {
         this.startNewGame(4);
         return;
-      } else if (presetChoice === 'RAPID_ORBIT') {
+      } else if (presetChoice === 'HYBRID_COMET_FLAIL') {
         this.enterTestStage();
         return;
       }
@@ -501,10 +523,6 @@ export class Game {
           return;
         }
       }
-      if (y > 420 && y <= 436) {
-        this.toggleAllAudio();
-        return;
-      }
 
       // If clicked in start prompt area (y: 288 to 310)
       if (y >= 288 && y <= 310) {
@@ -515,6 +533,11 @@ export class Game {
   }
 
   public update(dtFactor: number = 1.0): void {
+    if (this.input.consumePause()) this.paused = !this.paused;
+    if (this.paused) {
+      if (this.input.consumeEnter() || this.input.consumeClick()) this.paused = false;
+      return;
+    }
     this.stageTick++;
 
     // Consume UI hotkeys
@@ -545,9 +568,11 @@ export class Game {
 
     // Handle Game Over & Game Clear Screen (Click or Enter returns to Title)
     if (this.state === 'GAME_OVER' || this.state === 'GAME_CLEAR') {
+      this.endingTick++;
+      this.terrain.update(dtFactor * 0.3);
       const click = this.input.consumeClick();
       const enter = this.input.consumeEnter();
-      if (click || enter) {
+      if (this.endingTick > 90 && (click || enter)) {
         this.state = 'TITLE';
         this.audio.stopBgm();
       }
@@ -564,89 +589,21 @@ export class Game {
       return;
     }
 
-    // Handle Orbit / Sling Mode toggle hotkey (Space / KeyZ / KeyO / Right-Click)
-    if (this.input.consumeOrbitToggle()) {
-      this.toggleOrbitWithFeedback();
+    // Laboratory mode controls are isolated from campaign balance.
+    if (this.state === 'TEST_STAGE') {
+      const click = this.input.consumeClick();
+      if (click) this.handlePointerClick(click.x, click.y);
+      if (this.state === 'TEST_STAGE') this.updateTestStage(dtFactor);
+      return;
     }
 
-    // Handle Collision Mode toggle hotkey (KeyX)
-    if (this.input.consumeCollisionToggle()) {
-      const colMode = this.geminiManager.toggleCollisionMode();
-      this.audio.playGeminiBounce();
-      this.addFloatingText(
-        this.player.state.x,
-        this.player.state.y - 30,
-        colMode === 'PENETRATE' ? '⚔️ 属性: 貫通 (すり抜け多段削り)' : '🛡️ 属性: 反射 (跳ね返りピンボール)',
-        colMode === 'PENETRATE' ? '#22c55e' : '#f97316'
-      );
-    }
-
-    // Handle Wall Bounce Toggle hotkey (KeyQ / KeyG)
-    if (this.input.consumeWallToggle()) {
-      this.toggleWallBounceWithFeedback();
-    }
-
-    // Handle Physics Pattern Selection (Digit1-5, KeyP)
-    const patternChoice = this.input.consumePatternSelect();
-    if (patternChoice) {
-      const info = this.geminiManager.setPattern(patternChoice);
-      this.addFloatingText(this.player.state.x, this.player.state.y - 30, `【${info.num}. ${info.nameJa}】`, '#fde047');
-      this.audio.playGeminiBounce();
-    }
-    if (this.input.consumePatternCycle()) {
-      const info = this.geminiManager.cyclePattern();
-      this.addFloatingText(this.player.state.x, this.player.state.y - 30, `【${info.num}. ${info.nameJa}】`, '#fde047');
-      this.audio.playGeminiBounce();
-    }
-
-    // Handle Level Up hotkey (KeyL)
-    if (this.input.consumeLevelUp()) {
-      for (const orb of this.geminiManager.orbs) {
-        this.geminiManager.levelUpOrb(orb);
-      }
-      this.audio.playGeminiLevelUp();
-      this.addFloatingText(this.player.state.x, this.player.state.y - 30, 'GEMINI LEVEL UP!', '#ec4899');
-    }
-
-    // Handle Player Control Mode hotkey (KeyM)
-    if (this.input.consumePlayerControlToggle()) {
-      this.togglePlayerControlModeWithFeedback();
-    }
-
-    // Handle Player Speed Cycle hotkey (KeyV)
-    if (this.input.consumePlayerSpeedCycle()) {
-      this.cyclePlayerSpeedWithFeedback();
-    }
-
-    // Handle Parameter Tuning hotkeys in playing
-    if (this.input.consumeTuningTension()) {
-      this.cycleTensionWithFeedback();
-    }
-    if (this.input.consumeTuningApex()) {
-      this.cycleTurnRateWithFeedback();
-    }
-    if (this.input.consumeTuningOvershoot()) {
-      this.cycleDampingWithFeedback();
-    }
-    if (this.input.consumeTuningSpeed()) {
-      this.cycleMaxSpeedWithFeedback();
-    }
-    if (this.input.consumeTuningReset()) {
-      this.geminiManager.resetTuning();
-      this.audio.playGeminiBounce();
-      this.addFloatingText(this.player.state.x, this.player.state.y - 30, 'パラメータ初期値にリセット', '#38bdf8');
-    }
+    if (this.input.consumeWallToggle()) this.toggleWallBounceWithFeedback();
 
     // Handle Click/Touch on HUD Buttons
     const click = this.input.consumeClick();
     if (click) {
       this.handlePointerClick(click.x, click.y);
-    }
-
-    // Test Stage Update Dispatch
-    if (this.state === 'TEST_STAGE') {
-      this.updateTestStage(dtFactor);
-      return;
+      if ((this.state as GameState) === 'TEST_STAGE') return;
     }
 
     if (this.state === 'STAGE_CLEAR') {
@@ -699,6 +656,7 @@ export class Game {
           }
         } else {
           this.state = 'GAME_OVER';
+          this.endingTick = 0;
           this.audio.stopBgm();
           return;
         }
@@ -735,6 +693,7 @@ export class Game {
     this.handleStageTimeline();
 
     // Update Enemies & Enemy Projectiles
+    const beforeEnemies = this.enemyManager.enemies.slice();
     this.enemyManager.update(
       this.canvas.width,
       this.canvas.height,
@@ -742,6 +701,11 @@ export class Game {
       this.player.state.y,
       (bx, by, bvx, bvy) => this.spawnBullet(bx, by, bvx, bvy)
     );
+    for (const enemy of beforeEnemies) {
+      if (enemy.formationId && !this.enemyManager.enemies.includes(enemy)) {
+        this.escapedFormations.add(enemy.formationId);
+      }
+    }
 
     // Update Boss
     if (this.bossManager.currentBoss) {
@@ -758,9 +722,8 @@ export class Game {
         () => {
           // Grok launches SpaceX Starship fleet from bottom!
           this.enemyManager.spawn('SPACEX_ROCKET', 70, this.canvas.height + 60, 'ROCKET_ASCENT');
-          this.enemyManager.spawn('SPACEX_ROCKET', 180, this.canvas.height + 90, 'ROCKET_ASCENT');
           this.enemyManager.spawn('SPACEX_ROCKET', 290, this.canvas.height + 60, 'ROCKET_ASCENT');
-          this.addFloatingText(this.canvas.width / 2, 240, 'SPACEX STARSHIPS LAUNCHED!', '#ef4444');
+          this.addFloatingText(this.canvas.width / 2, 450, '下方の左右からロケット！', '#ef4444');
         },
         (quote) => {
           this.voice.speak(quote);
@@ -869,6 +832,8 @@ export class Game {
       } else if (ev.type === 'BOSS' && ev.bossType) {
         this.bossManager.spawn(ev.bossType, this.canvas.width);
         this.voice.playBossVoice(this.stage);
+      } else if (ev.type === 'CUE' && ev.message) {
+        this.floatingTexts.push({ x: 180, y: 155, text: ev.message, color: '#a5f3fc', timer: 0, duration: 240 });
       }
     }
 
@@ -894,7 +859,7 @@ export class Game {
         const res = this.breakoutManager.checkGeminiCollision(orb);
         if (res.hit && res.block) {
           // Elastic reflection off Breakout Block!
-          if (orb.mode === 'SLING') {
+          if (!orb.isTethered) {
             const dot = orb.vx * res.normalX + orb.vy * res.normalY;
             if (dot < 0) {
               orb.vx -= 1.95 * dot * res.normalX;
@@ -955,14 +920,7 @@ export class Game {
           }
 
           // Determine reflection vs penetration:
-          let isReflect = false;
-          if (this.geminiManager.collisionMode === 'REFLECT') {
-            isReflect = true;
-          } else if (this.geminiManager.collisionMode === 'PENETRATE') {
-            isReflect = false;
-          } else {
-            isReflect = e.collisionType === 'REFLECT';
-          }
+          const isReflect = this.geminiManager.collisionMode === 'REFLECT' || e.collisionType === 'REFLECT';
 
           // Damage application (1回の通過で1回のみダメージ判定)
           e.hp -= effectiveDmg;
@@ -1073,7 +1031,9 @@ export class Game {
             // Check if formation is completely wiped out
             if (formationId) {
               const remainingInFormation = this.enemyManager.enemies.some(en => en.formationId === formationId);
-              if (!remainingInFormation) {
+              if (!remainingInFormation && !this.stageManager.hasPendingFormation(formationId)
+                && !this.rewardedFormations.has(formationId) && !this.escapedFormations.has(formationId)) {
+                this.rewardedFormations.add(formationId);
                 this.spawnGeminiDropItem(deadX, deadY);
                 this.player.repair(20);
                 this.addFloatingText(deadX, deadY - 24, 'FORMATION WIPE! +20 SHIELD', '#22c55e');
@@ -1087,6 +1047,9 @@ export class Game {
       // 3. Gemini Orbs vs Boss (貫通 vs 反射)
       if (this.bossManager.currentBoss) {
         const b = this.bossManager.currentBoss;
+        const touching = Math.hypot(orb.x - b.x, orb.y - b.y) < Math.max(b.width, b.height) * 0.48 + orbRadius;
+        if (!touching) this.bossContacts.delete(orb.id);
+        if (this.bossContacts.has(orb.id)) continue;
         if (!b.hitCooldown || b.hitCooldown <= 0) {
           const bdx = orb.x - b.x;
           const bdy = orb.y - b.y;
@@ -1100,6 +1063,7 @@ export class Game {
 
             const res = this.bossManager.hit(effectiveDmg, orb.x, orb.y);
             if (res.bossHit) {
+              this.bossContacts.add(orb.id);
               b.hitCooldown = isBossReflect ? 8 : 4;
               this.player.addScore(res.points);
 
@@ -1157,21 +1121,17 @@ export class Game {
             if (res.defeated) {
               // Boss Defeat Chain
               for (let k = 0; k < 12; k++) {
-                setTimeout(() => {
-                  const rx = this.bossManager.currentBoss ? this.bossManager.currentBoss.x + (Math.random() - 0.5) * 120 : 180;
-                  const ry = this.bossManager.currentBoss ? this.bossManager.currentBoss.y + (Math.random() - 0.5) * 80 : 120;
-                  this.addExplosion(rx, ry, 36, false);
-                  this.audio.playAirExplosion();
-                }, k * 120);
+                this.addExplosion(b.x + (Math.random() - .5) * 120, b.y + (Math.random() - .5) * 80, 36, false);
               }
               this.player.addScore(15000);
               this.addFloatingText(this.canvas.width / 2, 160, 'BOSS DESTROYED!', '#22c55e');
 
-              setTimeout(() => {
-                this.state = 'STAGE_CLEAR';
-                this.stageClearTimer = 0;
-                this.audio.playStageClear();
-              }, 1600);
+              this.state = 'STAGE_CLEAR';
+              this.stageClearTimer = 0;
+              this.enemyBullets = [];
+              this.enemyManager.clear();
+              this.audio.playStageClear();
+              return;
             }
           }
         }
@@ -1187,10 +1147,15 @@ export class Game {
 
         if (dist < 22 + it.size) {
           // Player collected item: SPAWN NEW GEMINI ORB & REPAIR SHIELD!
-          this.geminiManager.spawn(it.x, it.y);
+          if (this.geminiManager.orbs.length < 2) {
+            this.geminiManager.spawn(it.x, it.y);
+          } else {
+            const weakest = [...this.geminiManager.orbs].sort((a, b) => a.level - b.level)[0];
+            this.geminiManager.levelUpOrb(weakest);
+          }
           this.player.repair(15);
           this.audio.playItemCollect();
-          this.addFloatingText(it.x, it.y - 18, '+1 GEMINI! +15 SHIELD', '#38bdf8');
+          this.addFloatingText(it.x, it.y - 18, 'GEMINI UP! +15 SHIELD', '#38bdf8');
           this.player.addScore(2000);
           this.geminiItems.splice(i, 1);
         }
@@ -1289,6 +1254,18 @@ export class Game {
     }
 
     // NOTE: Player vs Gemini Orb is completely SAFE.
+    const boss = this.bossManager.currentBoss;
+    if (boss && !boss.defeated && boss.phase > 0 && this.state === 'PLAYING'
+      && Math.abs(this.player.state.x - boss.x) < boss.width * .32
+      && Math.abs(this.player.state.y - boss.y) < boss.height * .30) {
+      const result = this.player.takeDamage(30);
+      if (result.damaged) {
+        this.renderer.triggerShake(8, 4);
+        this.addExplosion(this.player.state.x, this.player.state.y, 22, false);
+        this.audio.playPlayerDamage();
+        if (result.destroyed) this.playerRespawnTimer = 0;
+      }
+    }
   }
 
   // --- Effects Management ---
@@ -1393,18 +1370,20 @@ export class Game {
       { x: this.input.state.x, y: this.input.state.y },
       { bgm: this.audio.isBgmEnabled(), se: this.audio.isSeEnabled() }
     );
+    if (this.paused) {
+      const ctx = this.canvas.getContext('2d')!;
+      ctx.fillStyle = 'rgba(3, 8, 20, .85)'; ctx.fillRect(0, 0, 360, 540);
+      ctx.textAlign = 'center'; ctx.fillStyle = '#a5f3fc'; ctx.font = 'bold 26px monospace';
+      ctx.fillText('PAUSED', 180, 250);
+      ctx.font = '12px monospace'; ctx.fillText('Esc / Enter / クリックで再開', 180, 283);
+    }
+
   }
 
   // --- Test Stage / Physics Sandbox System ---
   private enterTestStage(): void {
     if (this.state === 'TEST_STAGE') return;
 
-    this.savedNormalState = {
-      stage: this.stage,
-      score: this.player.state.score,
-      lives: this.player.state.lives,
-      shield: this.player.state.hp,
-    };
 
     this.state = 'TEST_STAGE';
     this.audio.resume();
@@ -1439,30 +1418,10 @@ export class Game {
   }
 
   private exitTestStage(): void {
-    if (this.state !== 'TEST_STAGE') return;
-
-    if (this.savedNormalState) {
-      this.stage = this.savedNormalState.stage;
-      this.player.state.score = this.savedNormalState.score;
-      this.player.state.lives = this.savedNormalState.lives;
-      this.player.repair(100);
-    } else {
-      this.stage = 1;
-    }
-
-    this.state = 'PLAYING';
-    this.enemyManager.clear();
-    this.groundManager.clear();
-    this.bossManager.clear();
-    this.breakoutManager.clear();
-    this.geminiItems = [];
-    this.enemyBullets = [];
-    this.testDummyRespawnQueue = [];
-
-    this.terrain.setStage(this.stage);
-    this.stageManager.loadStage(this.stage);
-    this.audio.playStageBgm(this.stage);
-    this.addFloatingText(this.canvas.width / 2, 140, 'RESUMING MISSION', '#22c55e');
+    this.state = 'TITLE';
+    this.paused = false;
+    this.input.releaseAll();
+    this.audio.stopBgm();
   }
 
   public applyTestEnemySetup(setup: TestEnemySetup): void {
@@ -1600,6 +1559,11 @@ export class Game {
     // Continuous full repair in test stage
     this.player.repair(100);
 
+    const pattern = this.input.consumePatternSelect();
+    if (pattern) this.geminiManager.setPattern(pattern);
+    if (this.input.consumePatternCycle()) this.geminiManager.cyclePattern();
+    if (this.input.consumeLevelUp()) this.geminiManager.orbs.forEach(orb => this.geminiManager.levelUpOrb(orb));
+    if (this.input.consumeCollisionToggle()) this.geminiManager.toggleCollisionMode();
     // Hotkey consumption
     if (this.input.consumeWallToggle()) {
       this.toggleWallBounceWithFeedback();
@@ -1875,84 +1839,11 @@ export class Game {
 
       return false;
     } else {
-      // Normal HUD buttons
-      // Row 1: [🎵BGM] button (x: 148 to 184, y: 3 to 20)
-      if (x >= 148 && x <= 184 && y >= 3 && y <= 20) {
-        this.toggleBgm();
-        return true;
+      if (y >= 4 && y <= 19) {
+        if (x >= 148 && x <= 184) { this.toggleBgm(); return true; }
+        if (x >= 186 && x <= 222) { this.toggleSe(); return true; }
+        if (x >= w - 44 && x <= w - 4) { this.enterTestStage(); return true; }
       }
-
-      // Row 1: [🔊SE] button (x: 186 to 222, y: 3 to 20)
-      if (x >= 186 && x <= 222 && y >= 3 && y <= 20) {
-        this.toggleSe();
-        return true;
-      }
-
-      // Row 1: [LAB(T)] button (x: w - 46 to w - 4, y: 3 to 20)
-      if (x >= w - 46 && x <= w - 4 && y >= 3 && y <= 20) {
-        this.enterTestStage();
-        return true;
-      }
-
-      // Row 1: [1-5: パターン切替] button (x: w - 134 to w - 48, y: 3 to 20)
-      if (x >= w - 134 && x <= w - 48 && y >= 3 && y <= 20) {
-        const info = this.geminiManager.cyclePattern();
-        this.addFloatingText(this.player.state.x, this.player.state.y - 30, `【${info.num}. ${info.nameJa}】`, '#fde047');
-        this.audio.playGeminiBounce();
-        return true;
-      }
-
-      // Row 2: [攻撃: ヨーヨー突撃 / 光ロープ分銅] button (x: w - 176 to w - 92, y: 22 to 40)
-      if (x >= w - 178 && x <= w - 90 && y >= 22 && y <= 40) {
-        this.toggleOrbitWithFeedback();
-        return true;
-      }
-
-      // Row 2: [属性: 貫通 / 反射] button (x: w - 88 to w - 6, y: 22 to 40)
-      if (x >= w - 90 && x <= w - 4 && y >= 22 && y <= 40) {
-        const col = this.geminiManager.toggleCollisionMode();
-        this.audio.playGeminiBounce();
-        this.addFloatingText(
-          this.player.state.x,
-          this.player.state.y - 30,
-          col === 'PENETRATE' ? '⚔️ 属性: 貫通 (すり抜け多段削り)' : '🛡️ 属性: 反射 (跳ね返りピンボール)',
-          col === 'PENETRATE' ? '#22c55e' : '#f97316'
-        );
-        return true;
-      }
-
-      // Compact Tuning Bar in Normal HUD (y: height - 32 to height - 16)
-      const tuneBarY = this.canvas.height - 32;
-      if (y >= tuneBarY && y <= tuneBarY + 16) {
-        // [J]加速度
-        if (x >= 6 && x <= 75) {
-          this.cycleTensionWithFeedback();
-          return true;
-        }
-        // [U]最高速 (球最高速)
-        if (x >= 76 && x <= 146) {
-          this.cycleMaxSpeedWithFeedback();
-          return true;
-        }
-        // [K]旋角
-        if (x >= 147 && x <= 218) {
-          this.cycleTurnRateWithFeedback();
-          return true;
-        }
-        // [Y]減衰
-        if (x >= 219 && x <= 292) {
-          this.cycleDampingWithFeedback();
-          return true;
-        }
-        // [R]初期
-        if (x >= 293 && x <= 354) {
-          this.geminiManager.resetTuning();
-          this.audio.playGeminiBounce();
-          this.addFloatingText(this.player.state.x, this.player.state.y - 30, 'パラメータ初期化!', '#38bdf8');
-          return true;
-        }
-      }
-
       return false;
     }
   }

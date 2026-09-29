@@ -16,15 +16,38 @@ export class InputManager {
   private canvas: HTMLCanvasElement;
   private lastTouchX: number = 0;
   private lastTouchY: number = 0;
+  private steerTouchId: number | null = null;
   private keysDown: Set<string> = new Set();
   private lastClick: { x: number; y: number } | null = null;
   private cyclePresetPressed: boolean = false;
   private touchCatchHeld: boolean = false;
+  private pausePressed = false;
+
+  public resetPosition(x: number, y: number): void {
+    this.state.x = x;
+    this.state.y = y;
+    this.lastClick = null;
+  }
+
+  public releaseAll(): void {
+    this.keysDown.clear();
+    this.state.isPointerDown = false;
+    this.touchCatchHeld = false;
+    this.steerTouchId = null;
+  }
+
+  public consumePause(): boolean {
+    const pressed = this.pausePressed;
+    this.pausePressed = false;
+    return pressed;
+  }
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.setupMouseAndTouch();
     this.setupKeyboard();
+    window.addEventListener('blur', () => this.releaseAll());
+    this.canvas.addEventListener('touchcancel', () => this.releaseAll());
   }
 
   private setupMouseAndTouch(): void {
@@ -40,7 +63,7 @@ export class InputManager {
     });
 
     this.canvas.addEventListener('mousedown', (e) => {
-      if (e.button === 0) {
+      if (e.button === 0 || e.button === 2) {
         this.state.active = true;
         this.state.isPointerDown = true;
         const rect = this.canvas.getBoundingClientRect();
@@ -60,7 +83,6 @@ export class InputManager {
     // Right-Click: Toggle Attack Mode (ヨーヨー ⇄ 公転)
     this.canvas.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      this.state.orbitTogglePressed = true;
     });
 
     // Touch Events: Relative Delta Dragging (Ergonomic 1-finger control)
@@ -92,11 +114,14 @@ export class InputManager {
         const tx = (t.clientX - rect.left) * scaleX;
         const ty = (t.clientY - rect.top) * scaleY;
         return Math.hypot(tx - 318, ty - 468) > 30;
-      }) || touches[0];
+      });
 
-      this.lastTouchX = (steerTouch.clientX - rect.left) * scaleX;
-      this.lastTouchY = (steerTouch.clientY - rect.top) * scaleY;
-      this.lastClick = { x: this.lastTouchX, y: this.lastTouchY };
+      if (steerTouch) {
+        this.steerTouchId = steerTouch.identifier;
+        this.lastTouchX = (steerTouch.clientX - rect.left) * scaleX;
+        this.lastTouchY = (steerTouch.clientY - rect.top) * scaleY;
+        this.lastClick = { x: this.lastTouchX, y: this.lastTouchY };
+      }
     }, { passive: false });
 
     this.canvas.addEventListener('touchmove', (e) => {
@@ -120,11 +145,16 @@ export class InputManager {
         const tx = (t.clientX - rect.left) * scaleX;
         const ty = (t.clientY - rect.top) * scaleY;
         return Math.hypot(tx - 318, ty - 468) > 30;
-      }) || touches[0];
+      });
 
       if (steerTouch) {
         const currentX = (steerTouch.clientX - rect.left) * scaleX;
         const currentY = (steerTouch.clientY - rect.top) * scaleY;
+        if (this.steerTouchId !== steerTouch.identifier) {
+          this.steerTouchId = steerTouch.identifier;
+          this.lastTouchX = currentX;
+          this.lastTouchY = currentY;
+        }
 
         const dx = currentX - this.lastTouchX;
         const dy = currentY - this.lastTouchY;
@@ -155,6 +185,7 @@ export class InputManager {
       this.touchCatchHeld = touches.length >= 2 || hitCatchBtn;
 
       if (touches.length === 0) {
+        this.steerTouchId = null;
         this.touchCatchHeld = false;
         this.state.isPointerDown = false;
       }
@@ -164,6 +195,9 @@ export class InputManager {
   private setupKeyboard(): void {
     window.addEventListener('keydown', (e) => {
       this.keysDown.add(e.code);
+      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+      if (e.repeat) return;
+      if (e.code === 'Escape') this.pausePressed = true;
       if (e.code === 'KeyC') {
         this.state.crtTogglePressed = true;
       }
@@ -190,7 +224,7 @@ export class InputManager {
         this.state.patternCyclePressed = true;
       }
       if (e.code === 'Space' || e.code === 'KeyZ') {
-        this.state.orbitTogglePressed = true;
+        // Capture is held, never a second mode toggle.
       }
       if (e.code === 'KeyO') {
         this.state.orbCountPressed = true;

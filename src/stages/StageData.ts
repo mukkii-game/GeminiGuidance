@@ -2,7 +2,7 @@ import { EnemyType, GroundType, BossType, MovementPattern } from '../types';
 
 export interface SpawnEvent {
   tick: number;
-  type: 'ENEMY' | 'GROUND' | 'BOSS' | 'ALERT' | 'INVADER_GRID' | 'UFO' | 'BREAKOUT_WALL';
+  type: 'ENEMY' | 'GROUND' | 'BOSS' | 'ALERT' | 'INVADER_GRID' | 'UFO' | 'BREAKOUT_WALL' | 'CUE';
   enemyType?: EnemyType;
   groundType?: GroundType;
   bossType?: BossType;
@@ -10,40 +10,25 @@ export interface SpawnEvent {
   x?: number;
   y?: number;
   pattern?: MovementPattern;
+  message?: string;
 }
 
+/** Fixed 60 Hz campaign: introduce, combine, then test each skill. */
 export class StageManager {
-  public currentStage: number = 1;
-  public stageTick: number = 0;
-  public bossActive: boolean = false;
-  public stageCleared: boolean = false;
-
+  public currentStage = 1;
+  public stageTick = 0;
+  public bossActive = false;
+  public stageCleared = false;
   private events: SpawnEvent[] = [];
 
-  constructor() {
-    this.loadStage(1);
-  }
+  constructor() { this.loadStage(1); }
 
   public getStageTitle(stage: number): string {
-    switch (stage) {
-      case 1: return 'チャイナ・シンドローム';
-      case 2: return 'イーロンズ・ゲート';
-      case 3: return 'ザ・ファブル';
-      case 4: return '魔法使いチャッピー';
-      default: return `STAGE ${stage}`;
-    }
+    return ['チャイナ・シンドローム', 'イーロンズ・ゲート', 'ザ・ファブル', '魔法使いチャッピー'][stage - 1] ?? `STAGE ${stage}`;
   }
-
   public getStageDisplayName(stage: number): string {
-    switch (stage) {
-      case 1: return 'STAGE 1: チャイナ・シンドローム';
-      case 2: return 'STAGE 2: イーロンズ・ゲート';
-      case 3: return 'STAGE 3: ザ・ファブル';
-      case 4: return 'STAGE 4: 魔法使いチャッピー';
-      default: return `STAGE ${stage}`;
-    }
+    return `STAGE ${stage}: ${this.getStageTitle(stage)}`;
   }
-
   public loadStage(stage: number): void {
     this.currentStage = stage;
     this.stageTick = 0;
@@ -51,118 +36,89 @@ export class StageManager {
     this.stageCleared = false;
     this.events = this.generateStageEvents(stage);
   }
-
+  public hasPendingFormation(id: string): boolean {
+    return this.events.some(event => event.formationId === id && event.tick > this.stageTick);
+  }
   public update(): SpawnEvent[] {
     this.stageTick++;
-    const ready = this.events.filter(e => e.tick === this.stageTick);
-    return ready;
+    return this.events.filter(event => event.tick === this.stageTick);
   }
 
   private generateStageEvents(stage: number): SpawnEvent[] {
     const events: SpawnEvent[] = [];
-    let waveCounter = 0;
-
-    const addGround = (tick: number, gtype: GroundType, x: number) => {
-      events.push({ tick, type: 'GROUND', groundType: gtype, x });
+    let wave = 0;
+    const cue = (second: number, message: string) => events.push({ tick: second * 60, type: 'CUE', message });
+    const group = (second: number, enemyType: EnemyType, pattern: MovementPattern, positions: number[], stagger = 24) => {
+      const formationId = `s${stage}_wave${++wave}`;
+      positions.forEach((x, index) => events.push({ tick: second * 60 + index * stagger, type: 'ENEMY', enemyType, pattern, formationId, x, y: -32 }));
     };
-
-    const addWave = (tick: number, etype: EnemyType, pattern: MovementPattern, positions: number[]) => {
-      const formationId = `wave_s${stage}_${++waveCounter}`;
-      positions.forEach((x, idx) => {
-        events.push({
-          tick: tick + idx * 30,
-          type: 'ENEMY',
-          enemyType: etype,
-          pattern,
-          formationId,
-          x,
-          y: -30,
-        });
-      });
-    };
-
-    if (stage === 1) {
-      // --- STAGE 1: インベーダークローン + ボス戦 ---
-      // Ground decor
-      addGround(20, 'NVIDIA_BASE', 80);
-      addGround(120, 'HUGGINGFACE_BASE', 280);
-      addGround(240, 'META_BASE', 180);
-      addGround(380, 'SOL_CITADEL', 120);
-
-      // 1. Spawn Space Invaders Grid at start! (Mistral "M" logos & Qwen)
-      events.push({ tick: 25, type: 'INVADER_GRID' });
-
-      // 2. DeepSeek Whale UFO Mystery Ships gliding across the top!
-      events.push({ tick: 140, type: 'UFO' });
-      events.push({ tick: 320, type: 'UFO' });
-      events.push({ tick: 500, type: 'UFO' });
-      events.push({ tick: 700, type: 'UFO' });
-      // NOTE: Boss ONLY spawns after all 15 invaders are destroyed!
-    } else if (stage === 2) {
-      // --- STAGE 2: ブロック崩し (Arkanoid Wall & Boss Behind Blocks) ---
-      // (Ticks 0-220: Stage intro with Polygon Elon Hologram Transmission)
-      addGround(240, 'META_BASE', 180);
-      addGround(340, 'SOL_CITADEL', 280);
-
-      // Deploy Breakout Block Wall & Boss directly behind it!
-      events.push({ tick: 220, type: 'BREAKOUT_WALL' });
-      events.push({ tick: 230, type: 'BOSS', bossType: 'STAGE2_GROK_CURSOR' });
-
-    } else if (stage === 3) {
-      // --- STAGE 3: ザ・ファブル ---
-      addGround(30, 'SOL_CITADEL', 180);
-      addGround(110, 'NVIDIA_BASE', 280);
-      addGround(190, 'META_BASE', 80);
-      addGround(290, 'SOL_CITADEL', 140);
-
-      // Wave 1: Claude Haiku agile Toroid swoops
-      addWave(40, 'CLAUDE_HAIKU', 'TOROID_SWOOP', [70, 290]);
-
-      // Wave 2: Perplexity Spinners Galaga loops
-      addWave(140, 'PERPLEXITY_SPINNER', 'GALAGA_LOOP', [100, 260]);
-
-      // Wave 3: Claude Sonnet reactive tracking dive
-      addWave(250, 'CLAUDE_SONNET', 'TORKAN_TRACK_DASH', [180]);
-
-      addGround(400, 'HUGGINGFACE_BASE', 220);
-      addGround(480, 'SOL_CITADEL', 290);
-
-      // Wave 4: Claude Opus heavy cruiser & Haiku escorts
-      addWave(460, 'CLAUDE_OPUS', 'SPAROID_CRUISE', [180]);
-      addWave(530, 'CLAUDE_HAIKU', 'ZOSHI_REACTIVE_SWOOP', [60, 300]);
-
-      // Boss Alert & Spawn: The Fable (プロだ！)
-      events.push({ tick: 650, type: 'ALERT' });
-      events.push({ tick: 690, type: 'BOSS', bossType: 'STAGE3_CLAUDE_FABLE' });
-
-    } else {
-      // --- STAGE 4: 魔法使いチャッピー (OpenAI GPT-6 Fleet) ---
-      addGround(30, 'NVIDIA_BASE', 180);
-      addGround(90, 'META_BASE', 90);
-      addGround(170, 'SOL_CITADEL', 270);
-      addGround(250, 'STABILITY_BASE', 120);
-
-      // Wave 1: GPT-6 Luna Toroid swoops
-      addWave(30, 'GPT6_LUNA', 'TOROID_SWOOP', [80, 280]);
-
-      // Wave 2: GPT-6 Luna Torkan track-dash
-      addWave(130, 'GPT6_LUNA', 'TORKAN_TRACK_DASH', [110, 250]);
-
-      // Wave 3: GPT-6 Terra heavy cruiser
-      addWave(240, 'GPT6_TERRA', 'SPAROID_CRUISE', [180]);
-
-      addGround(380, 'SOL_CITADEL', 180);
-      addGround(460, 'HUGGINGFACE_BASE', 280);
-
-      // Wave 4: GPT-6 Sol & Luna escorts
-      addWave(450, 'GPT6_SOL', 'TORKAN_TRACK_DASH', [180]);
-      addWave(520, 'GPT6_LUNA', 'ZOSHI_REACTIVE_SWOOP', [70, 290]);
-
-      // Final Boss Alert & Spawn: 魔法使いチャッピー (アブラマハリクマハリタカブラ！)
-      events.push({ tick: 650, type: 'ALERT' });
-      events.push({ tick: 690, type: 'BOSS', bossType: 'STAGE4_GPT6_ASTRA' });
+    const ground: GroundType[] = ['NVIDIA_BASE', 'META_BASE', 'HUGGINGFACE_BASE', 'SOL_CITADEL', 'STABILITY_BASE'];
+    for (let second = 3; second < 48 + stage * 4; second += 7) {
+      events.push({ tick: second * 60, type: 'GROUND', groundType: ground[(second + stage) % ground.length], x: 65 + ((second * 37) % 230) });
     }
 
-    return events;
+    if (stage === 1) {
+      cue(1, '離して誘導 → 自機を抜ける突きで狙え');
+      group(4, 'MISTRAL_FLAME', 'STRAIGHT_DOWN', [180, 180, 180], 38);
+      group(9, 'DEEPSEEK_FLASH', 'STRAIGHT_DOWN', [85, 275], 0);
+      cue(13, '赤い照準を引きつけて  横へかわす');
+      group(14, 'KIMI_MOON', 'RUSH_DIVE', [100, 260], 65);
+      group(20, 'MISTRAL_FLAME', 'GALAGA_LOOP', [85, 145, 215, 275]);
+      cue(25, '長押しで捕獲・回転 / 離して投げる');
+      group(26, 'DEEPSEEK_FLASH', 'STRAIGHT_DOWN', [90, 180, 270], 0);
+      group(31, 'KIMI_MOON', 'RUSH_DIVE', [70, 290], 75);
+      group(36, 'MISTRAL_FLAME', 'STRAIGHT_DOWN', [120, 120, 240, 240], 32);
+      events.push({ tick: 40 * 60, type: 'UFO' });
+      group(42, 'QWEN_CUBE', 'SPAROID_CRUISE', [180]);
+      group(45, 'DEEPSEEK_FLASH', 'RUSH_DIVE', [70, 290], 60);
+      cue(49, 'ボスの攻撃後がチャンス  突き・投擲を当てよう');
+    } else if (stage === 2) {
+      cue(1, '反射する装甲を使い  奥へジェミニを通せ');
+      group(4, 'COPILOT_GLIDER', 'STRAIGHT_DOWN', [80, 180, 280], 0);
+      group(9, 'CURSOR_PROBE', 'RUSH_DIVE', [90, 270], 60);
+      group(14, 'GROK_RAIDER', 'SPAROID_CRUISE', [100, 260], 0);
+      group(19, 'COPILOT_GLIDER', 'GALAGA_LOOP', [80, 140, 220, 280]);
+      cue(24, '壁反射は Q で任意ON / 中央の隙間も使える');
+      events.push({ tick: 25 * 60, type: 'BREAKOUT_WALL' });
+      group(28, 'CURSOR_PROBE', 'RUSH_DIVE', [70, 290], 70);
+      group(34, 'COPILOT_GLIDER', 'STRAIGHT_DOWN', [180, 180, 180], 32);
+      group(39, 'GROK_RAIDER', 'SPAROID_CRUISE', [95, 265], 0);
+      group(44, 'CURSOR_PROBE', 'RUSH_DIVE', [80, 180, 280], 50);
+      group(49, 'COPILOT_GLIDER', 'GALAGA_LOOP', [110, 250]);
+      cue(53, 'ゲートの内側へ投擲  反射は補助として使おう');
+    } else if (stage === 3) {
+      cue(1, '交差する敵列  引きつける位置を選べ');
+      group(4, 'CLAUDE_HAIKU', 'GALAGA_LOOP', [75, 135, 225, 285]);
+      group(10, 'CLAUDE_SONNET', 'RUSH_DIVE', [90, 270], 75);
+      group(16, 'PERPLEXITY_SPINNER', 'SNIPER_HOVER', [90, 270], 0);
+      group(22, 'CLAUDE_HAIKU', 'STRAIGHT_DOWN', [160, 200, 160, 200], 32);
+      cue(27, '回転は守り / 強い一撃は離して作る');
+      group(28, 'CLAUDE_OPUS', 'SPAROID_CRUISE', [180]);
+      group(29, 'CLAUDE_HAIKU', 'RUSH_DIVE', [65, 295], 75);
+      group(36, 'PERPLEXITY_SPINNER', 'GALAGA_LOOP', [75, 145, 215, 285]);
+      group(42, 'CLAUDE_SONNET', 'RUSH_DIVE', [90, 180, 270], 60);
+      group(48, 'CLAUDE_OPUS', 'SPAROID_CRUISE', [105, 255], 0);
+      group(52, 'CLAUDE_HAIKU', 'RUSH_DIVE', [70, 290], 60);
+      cue(57, '追撃をかわし  休止したコアを狙え');
+    } else {
+      cue(1, '最終防衛線  誘導・捕獲・投擲をつなげ');
+      group(4, 'GPT6_LUNA', 'STRAIGHT_DOWN', [90, 180, 270], 0);
+      group(9, 'GPT6_LUNA', 'RUSH_DIVE', [70, 180, 290], 60);
+      group(16, 'GPT6_TERRA', 'BARRAGE_DRIFT', [90, 270], 0);
+      group(23, 'GPT6_LUNA', 'GALAGA_LOOP', [75, 135, 225, 285]);
+      group(29, 'GPT6_SOL', 'SPAROID_CRUISE', [180]);
+      group(30, 'GPT6_LUNA', 'RUSH_DIVE', [70, 290], 65);
+      cue(36, '狙いを固定させてから移動  空いた道へ投げろ');
+      group(37, 'GPT6_TERRA', 'RUSH_DIVE', [85, 275], 80);
+      group(43, 'GPT6_LUNA', 'STRAIGHT_DOWN', [120, 120, 240, 240], 28);
+      group(48, 'GPT6_SOL', 'SPAROID_CRUISE', [105, 255], 0);
+      group(53, 'GPT6_LUNA', 'RUSH_DIVE', [70, 180, 290], 60);
+      cue(60, '最後の決闘  攻撃の合間に大きく突け');
+    }
+    const bossSecond = 50 + stage * 4;
+    const bosses: BossType[] = ['STAGE1_DEEPSEEK_KIMI', 'STAGE2_GROK_CURSOR', 'STAGE3_CLAUDE_FABLE', 'STAGE4_GPT6_ASTRA'];
+    events.push({ tick: (bossSecond - 2) * 60, type: 'ALERT' });
+    events.push({ tick: bossSecond * 60, type: 'BOSS', bossType: bosses[stage - 1] ?? bosses[3] });
+    return events.sort((a, b) => a.tick - b.tick);
   }
 }

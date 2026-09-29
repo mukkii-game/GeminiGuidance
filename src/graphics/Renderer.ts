@@ -116,6 +116,8 @@ export class ArcadeRenderer {
 
     // 1. Draw Scrolling Terrain
     this.terrain.render(ctx, stage);
+    ctx.fillStyle = 'rgba(3, 10, 20, .20)';
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
     // 2. Draw Ground Bases (Nvidia, Meta, HuggingFace, Stability AI octagons)
     this.renderGroundTargets(groundTargets);
@@ -170,7 +172,7 @@ export class ArcadeRenderer {
     // 13. Arcade HUD
     if (state === 'TEST_STAGE') {
       this.renderTestStageHUD(player, geminiOrbs, boss, presetConfig, telemetry, testBossDamage, testEnemySetup, testBossCollisionMode, audioSettings);
-    } else {
+    } else if (state === 'PLAYING' || state === 'STAGE_CLEAR') {
       this.renderHUD(player, stage, geminiOrbs, boss, presetConfig, telemetry, audioSettings);
     }
 
@@ -427,11 +429,11 @@ export class ArcadeRenderer {
       ctx.textAlign = 'center';
       if (mode === 'ORBIT') {
         ctx.fillStyle = '#38bdf8';
-        ctx.fillText('⚡分銅[室伏スピン/弾消し]', player.x, player.y - 18);
+        ctx.fillText('CAPTURE', player.x, player.y - 18);
       } else {
         ctx.fillStyle = '#fde047';
         const colLabel = colMode === 'REFLECT' ? '[反射]' : '[貫通]';
-        ctx.fillText(`🚀ヨーヨー槍${colLabel}`, player.x, player.y - 18);
+        ctx.fillText(`GUIDANCE ${colLabel}`, player.x, player.y - 18);
       }
       ctx.restore();
     this.cachedFont = '';
@@ -443,6 +445,16 @@ export class ArcadeRenderer {
     const ctx = this.ctx;
 
     for (const orb of orbs) {
+      // A clipped orb remains readable without bouncing it back for the player.
+      if (orb.x < 6 || orb.x > this.canvas.width - 6 || orb.y < 44 || orb.y > this.canvas.height - 28) {
+        const edgeX = Math.max(9, Math.min(this.canvas.width - 9, orb.x));
+        const edgeY = Math.max(49, Math.min(this.canvas.height - 33, orb.y));
+        const bearing = Math.atan2(orb.y - edgeY, orb.x - edgeX);
+        ctx.save(); ctx.translate(edgeX, edgeY); ctx.rotate(bearing);
+        ctx.fillStyle = '#67e8f9'; ctx.beginPath();
+        ctx.moveTo(6, 0); ctx.lineTo(-4, -4); ctx.lineTo(-4, 4); ctx.closePath(); ctx.fill();
+        ctx.restore(); this.cachedFont = '';
+      }
       const speed = Math.hypot(orb.vx, orb.vy);
       const isFast = speed > 1.25;
       const isCharged = !!orb.isCharged;
@@ -541,14 +553,14 @@ export class ArcadeRenderer {
 
         // 4. エグゼリカ式 投擲予測ベクトル（今離すと飛ぶ方向のガイド矢印）
         if (speed > 0.8) {
-          const arrowLen = Math.min(38, speed * 13);
+          const arrowLen = orb.radius + 28;
           const dirX = orb.vx / speed;
           const dirY = orb.vy / speed;
           ctx.strokeStyle = isGigaSpin ? '#ff3b00' : isHighSpin ? '#fde047' : 'rgba(56, 189, 248, 0.7)';
           ctx.lineWidth = 1.4;
           ctx.setLineDash([2, 3]);
           ctx.beginPath();
-          ctx.moveTo(orb.x, orb.y);
+          ctx.moveTo(orb.x + dirX * (orb.radius + 3), orb.y + dirY * (orb.radius + 3));
           ctx.lineTo(orb.x + dirX * arrowLen, orb.y + dirY * arrowLen);
           ctx.stroke();
           ctx.setLineDash([]);
@@ -795,6 +807,17 @@ export class ArcadeRenderer {
   private renderEnemies(enemies: EnemyEntity[]): void {
     const ctx = this.ctx;
     for (const e of enemies) {
+      const aiming = (e.pattern === 'RUSH_DIVE' && e.age >= 40 && e.age < 84)
+        || (e.pattern === 'TACKLE_DASH' && e.age < 36);
+      if (aiming && e.targetX !== undefined && e.targetY !== undefined) {
+        const targetX = e.pattern === 'TACKLE_DASH' ? e.x + e.targetX * 75 : e.targetX;
+        const targetY = e.pattern === 'TACKLE_DASH' ? e.y + e.targetY * 75 : e.targetY;
+        ctx.save(); ctx.strokeStyle = 'rgba(251,113,133,0.65)';
+        ctx.lineWidth = 1; ctx.setLineDash([4, 5]);
+        ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(targetX, targetY); ctx.stroke();
+        ctx.setLineDash([]); ctx.beginPath(); ctx.arc(targetX, targetY, 9, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore(); this.cachedFont = '';
+      }
       if (e.pattern === 'ROCKET_ASCENT' || e.type === 'SPACEX_ROCKET') {
         // SpaceX Starship Rocket (Ascending from bottom)
         ctx.save();
@@ -1169,12 +1192,16 @@ export class ArcadeRenderer {
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(0, 160, w, 44);
+    ctx.fillRect(0, 160, w, 64);
 
     this.setFont('13px "DotGothic16", monospace');
     ctx.fillStyle = '#38bdf8';
     ctx.textAlign = 'center';
-    ctx.fillText(title, w / 2, 188);
+    ctx.fillText(title, w / 2, 185);
+    this.setFont(this.readableFont11);
+    ctx.fillStyle = '#e2e8f0';
+    const lessons = ['', '誘って、かわす。ジェミニの突進で貫け。', '反射装甲の奥へ投げ込め。Qで壁トリック。', '捕獲で白弾を消し、離して要塞を砕け。', '誘導・捕獲・投擲。すべてをつなぐ最終戦。'];
+    ctx.fillText(lessons[stage] || '', w / 2, 207);
     ctx.restore();
     this.cachedFont = '';
   }
@@ -1238,237 +1265,65 @@ export class ArcadeRenderer {
   ): void {
     const ctx = this.ctx;
     const w = this.canvas.width;
-
+    const h = this.canvas.height;
+    const caught = !!telemetry?.isTethered;
+    ctx.fillStyle = 'rgba(3, 10, 20, 0.88)';
+    ctx.fillRect(0, 0, w, 43);
+    ctx.fillRect(0, h - 27, w, 27);
     this.setFont('8px "Press Start 2P", monospace');
     ctx.textAlign = 'left';
-
-    // Top Header: 1UP Score & HIGH Score
-    ctx.fillStyle = '#ef4444';
+    ctx.fillStyle = '#fda4af';
     ctx.fillText('1UP', 8, 15);
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(player.score.toString().padStart(6, '0'), 36, 15);
-
-    ctx.fillStyle = '#ef4444';
-    ctx.fillText('HI', 84, 15);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(player.highScore.toString().padStart(6, '0'), 102, 15);
-
-    // Audio Buttons (BGM & SE)
-    const isBgmOn = audioSettings?.bgm !== false;
-    const isSeOn = audioSettings?.se !== false;
-
-    // BGM Button (x: 148 to 184)
-    ctx.fillStyle = isBgmOn ? 'rgba(56, 189, 248, 0.30)' : 'rgba(239, 68, 68, 0.25)';
-    ctx.fillRect(148, 4, 36, 15);
-    ctx.strokeStyle = isBgmOn ? '#38bdf8' : '#ef4444';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(148, 4, 36, 15);
-    ctx.fillStyle = isBgmOn ? '#38bdf8' : '#f87171';
-    this.setFont('7px "DotGothic16", monospace');
-    ctx.textAlign = 'center';
-    ctx.fillText(isBgmOn ? '🎵ON' : '🎵OFF', 166, 14);
-
-    // SE Button (x: 186 to 222)
-    ctx.fillStyle = isSeOn ? 'rgba(253, 224, 71, 0.30)' : 'rgba(239, 68, 68, 0.25)';
-    ctx.fillRect(186, 4, 36, 15);
-    ctx.strokeStyle = isSeOn ? '#fde047' : '#ef4444';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(186, 4, 36, 15);
-    ctx.fillStyle = isSeOn ? '#fde047' : '#f87171';
-    this.setFont('7px "DotGothic16", monospace');
-    ctx.textAlign = 'center';
-    ctx.fillText(isSeOn ? '🔊ON' : '🔊OFF', 204, 14);
-
-    // Row 1 Buttons: Preset & LAB
-    const btnTestX = w - 44;
-    ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
-    ctx.fillRect(btnTestX, 4, 40, 15);
-    ctx.strokeStyle = '#38bdf8';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(btnTestX, 4, 40, 15);
-    ctx.fillStyle = '#38bdf8';
-    this.setFont('6px "Press Start 2P", monospace');
-    ctx.textAlign = 'center';
-    ctx.fillText('LAB(T)', btnTestX + 20, 14);
-
-    const btnPresetX = btnTestX - 86;
-    ctx.fillStyle = 'rgba(234, 179, 8, 0.25)';
-    ctx.fillRect(btnPresetX, 4, 82, 15);
-    ctx.strokeStyle = '#fde047';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(btnPresetX, 4, 82, 15);
-    ctx.fillStyle = '#fde047';
-    this.setFont(this.readableFont10);
-    ctx.fillText(`[1-5:${telemetry?.patternInfo?.shortLabel || '①ヨーヨー'}]`, btnPresetX + 41, 14);
-
-    // Row 2 Buttons: Attack Mode (ヒモ保持 ⇄ 投擲リリース) & Attribute (貫通 / 反射)
-    const isTethered = !!telemetry?.isTethered;
-    const btnModeX = w - 176;
-    const btnModeW = 84;
-    ctx.fillStyle = isTethered ? 'rgba(56, 189, 248, 0.45)' : 'rgba(234, 179, 8, 0.35)';
-    ctx.fillRect(btnModeX, 23, btnModeW, 16);
-    ctx.strokeStyle = isTethered ? '#38bdf8' : '#fde047';
-    ctx.lineWidth = 1.2;
-    ctx.strokeRect(btnModeX, 23, btnModeW, 16);
-    ctx.fillStyle = isTethered ? '#38bdf8' : '#fde047';
-    this.setFont(this.readableFont10);
-    ctx.textAlign = 'center';
-    ctx.fillText(isTethered ? '⚡分銅ヒモ保持' : (telemetry?.patternInfo?.shortLabel || '☄️ハレー彗星'), btnModeX + btnModeW / 2, 34);
-
-    const curCol = telemetry?.collisionMode || 'PENETRATE';
-    const isPen = curCol === 'PENETRATE';
-    const btnColX = w - 88;
-    const btnColW = 82;
-    ctx.fillStyle = isPen ? 'rgba(34, 197, 94, 0.40)' : 'rgba(249, 115, 22, 0.40)';
-    ctx.fillRect(btnColX, 23, btnColW, 16);
-    ctx.strokeStyle = isPen ? '#22c55e' : '#f97316';
-    ctx.lineWidth = 1.2;
-    ctx.strokeRect(btnColX, 23, btnColW, 16);
-    ctx.fillStyle = isPen ? '#22c55e' : '#f97316';
-    this.setFont(this.readableFont10);
-    ctx.textAlign = 'center';
-    ctx.fillText(isPen ? '⚔️属性:貫通' : '🛡️属性:反射', btnColX + btnColW / 2, 34);
-
-    // Player SHIELD / Armor Bar (Left side of Row 2)
-    const shieldX = 14;
-    const shieldY = 28;
-    const barW = 44;
-    const barH = 5;
-
-    this.setFont('6px "Press Start 2P", monospace');
-    ctx.fillStyle = '#94a3b8';
-    ctx.textAlign = 'left';
-    ctx.fillText('SHIELD', shieldX, shieldY + 5);
-
-    const gaugeX = shieldX + 44;
-    const hpRatio = Math.max(0, player.hp / player.maxHp);
-
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(gaugeX - 1, shieldY - 1, barW + 2, barH + 2);
-
-    const shieldColor = hpRatio > 0.5 ? '#22c55e' : hpRatio > 0.25 ? '#f59e0b' : '#ef4444';
-    ctx.fillStyle = shieldColor;
-    ctx.fillRect(gaugeX, shieldY, barW * hpRatio, barH);
-
-    ctx.strokeStyle = '#475569';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(gaugeX - 1, shieldY - 1, barW + 2, barH + 2);
-
-    ctx.fillStyle = '#ffffff';
-    this.setFont('6px "Press Start 2P", monospace');
-    ctx.fillText(`${player.hp}%`, gaugeX + barW + 5, shieldY + 5);
-
-    // Real-time Telemetry & Compact Tuning Bar in Normal Play (y: height - 43 to height - 15, h: 28)
-    const tuneBarY = this.canvas.height - 43;
-    const tuneBarH = 28;
-    ctx.fillStyle = 'rgba(2, 6, 23, 0.94)';
-    ctx.fillRect(6, tuneBarY, w - 12, tuneBarH);
-    ctx.strokeStyle = '#38bdf8';
-    ctx.lineWidth = 1.2;
-    ctx.strokeRect(6, tuneBarY, w - 12, tuneBarH);
-
-    const tng = telemetry?.tuning;
-    const turnD = ((tng?.maxTurnRate || 0.035) * 180 / Math.PI).toFixed(1);
-
-    // Line 1: Live Measured Telemetry (SPD & ACC) in bold 11px
-    this.setFont(this.readableFont11);
-    ctx.fillStyle = '#38bdf8';
-    ctx.textAlign = 'center';
-    ctx.fillText(
-      `⚡速度(SPD): ${(telemetry?.speed || 0).toFixed(1)} px/f    ⚡加速度(ACC): ${(telemetry?.accel || 0).toFixed(2)} px/f²`,
-      w / 2,
-      tuneBarY + 11
-    );
-
-    // Line 2: Physics Tuning Multipliers in bold 10px (Side-by-side [J]加速度 & [U]球最高速)
-    this.setFont(this.readableFont10);
-    ctx.fillStyle = '#fde047';
-    ctx.fillText(
-      `[J]加速度:x${(tng?.tensionMultiplier || 1.0).toFixed(1)}  [U]球最高速:x${(tng?.maxSpeedMultiplier || 1.0).toFixed(1)}  [K]旋角:${turnD}°  [Y]減衰:${(tng?.damping || 0.993).toFixed(3)}  [R]初期`,
-      w / 2,
-      tuneBarY + 23
-    );
-
-    // Bottom Bar: Lives, Stage Indicator, Gemini Power Level
-    const btmY = this.canvas.height - 4;
-
-    // Mini Lives Ships (Emergency Hull Restores)
-    const shipSprite = this.sprites.get('PLAYER_CENTER');
-    if (shipSprite) {
-      for (let i = 0; i < player.lives - 1; i++) {
-        ctx.drawImage(shipSprite, 16 + i * 16, btmY - 10, 10, 10);
-      }
+    ctx.fillText(player.score.toString().padStart(7, '0'), 39, 15);
+    this.setFont(this.readableFont9);
+    for (const button of [
+      { x: 148, w: 36, label: audioSettings?.bgm === false ? 'BGM −' : 'BGM +', on: audioSettings?.bgm !== false },
+      { x: 186, w: 36, label: audioSettings?.se === false ? 'SE −' : 'SE +', on: audioSettings?.se !== false },
+      { x: w - 44, w: 40, label: 'LAB [T]', on: true },
+    ]) {
+      ctx.fillStyle = '#102234'; ctx.fillRect(button.x, 4, button.w, 15);
+      ctx.strokeStyle = button.on ? '#326883' : '#334155'; ctx.lineWidth = 1;
+      ctx.strokeRect(button.x, 4, button.w, 15);
+      ctx.textAlign = 'center'; ctx.fillStyle = button.on ? '#bae6fd' : '#64748b';
+      ctx.fillText(button.label, button.x + button.w / 2, 15);
     }
-
-    // Player Control Mode indicator in HUD
-    this.setFont('6px "Press Start 2P", monospace');
-    ctx.fillStyle = player.controlMode === 'LIMITED' ? '#fde047' : '#38bdf8';
-    ctx.textAlign = 'left';
-    ctx.fillText(player.controlMode === 'LIMITED' ? `LIM(x${(player.speedMultiplier || 3).toFixed(1)})[M]` : 'DIR[M]', 68, btmY - 2);
-
-    // Stage Display
-    ctx.fillStyle = '#38bdf8';
-    ctx.textAlign = 'center';
-    this.setFont('8px "Press Start 2P", monospace');
-    ctx.fillText(`STAGE ${stage}`, w / 2, btmY - 2);
-
-    // Gemini Orb count & MAX Level indicator
-    ctx.textAlign = 'right';
-    if (geminiOrbs.length > 0) {
-      const maxLv = Math.max(...geminiOrbs.map(o => o.level));
-      ctx.fillStyle = maxLv === 3 ? '#ec4899' : maxLv === 2 ? '#a855f7' : '#38bdf8';
-      ctx.fillText(`GEMINI:Lv.${maxLv} [x${geminiOrbs.length}]`, w - 12, btmY - 2);
-    } else {
-      ctx.fillStyle = '#64748b';
-      ctx.fillText('GEMINI:0', w - 12, btmY - 2);
+    ctx.fillStyle = '#fef08a'; ctx.textAlign = 'center';
+    ctx.fillText(`STAGE ${stage} / 4`, 269, 15);
+    ctx.textAlign = 'left'; ctx.fillStyle = '#94a3b8';
+    ctx.fillText('HULL', 8, 34);
+    ctx.fillStyle = '#1e293b'; ctx.fillRect(38, 27, 58, 6);
+    ctx.fillStyle = player.hp > 30 ? '#5eead4' : '#fb7185';
+    ctx.fillRect(38, 27, 58 * Math.max(0, player.hp / player.maxHp), 6);
+    ctx.fillStyle = '#e2e8f0'; ctx.fillText(`×${player.lives}`, 101, 34);
+    ctx.fillStyle = caught ? '#67e8f9' : '#fde68a';
+    ctx.fillText(caught ? 'CAPTURE / 捕獲' : 'GUIDANCE / 誘導', 134, 34);
+    ctx.textAlign = 'right'; ctx.fillStyle = telemetry?.screenEdgeBounce ? '#fbbf24' : '#94a3b8';
+    ctx.fillText(telemetry?.screenEdgeBounce ? '[Q] 壁反射 ON' : '[Q] 壁反射 OFF', w - 8, 34);
+    if (telemetry?.screenEdgeBounce) {
+      ctx.strokeStyle = 'rgba(251,191,36,0.55)'; ctx.lineWidth = 2;
+      ctx.strokeRect(10, 20, w - 20, h - 46);
     }
-
-    // Mobile Virtual Catch / Throw Button (Right thumb area, x: 318, y: 466, r: 24)
-    const isCatching = !!telemetry?.isTethered;
-    ctx.save();
-    ctx.fillStyle = isCatching ? 'rgba(56, 189, 248, 0.38)' : 'rgba(15, 23, 42, 0.60)';
-    ctx.beginPath();
-    ctx.arc(318, 466, 24, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = isCatching ? '#fde047' : '#38bdf8';
-    ctx.lineWidth = isCatching ? 2.2 : 1.3;
-    ctx.beginPath();
-    ctx.arc(318, 466, 24, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.fillStyle = isCatching ? '#ffffff' : '#38bdf8';
-    this.setFont('8px "DotGothic16", monospace');
-    ctx.textAlign = 'center';
-    ctx.fillText(isCatching ? '⚡捕獲中' : '⚡捕獲', 318, 463);
-    this.setFont('6px "DotGothic16", monospace');
-    ctx.fillStyle = isCatching ? '#fde047' : '#94a3b8';
-    ctx.fillText(isCatching ? '離して投擲' : '長押/2本指', 318, 474);
-    ctx.restore();
-    this.cachedFont = '';
-
-    // Boss HP Bar
+    ctx.textAlign = 'left'; this.setFont(this.readableFont10);
+    ctx.fillStyle = caught ? '#67e8f9' : '#fde68a';
+    ctx.fillText(caught ? '離して投擲 → 接線方向へ強打' : '距離を取る → 誘う → 横へかわす', 8, h - 10);
+    ctx.textAlign = 'right'; ctx.fillStyle = '#c4b5fd';
+    ctx.fillText(`GEMINI ×${geminiOrbs.length}`, w - 8, h - 10);
+    ctx.beginPath(); ctx.arc(318, 466, 24, 0, Math.PI * 2);
+    ctx.fillStyle = caught ? 'rgba(8,145,178,0.45)' : 'rgba(7,20,34,0.7)'; ctx.fill();
+    ctx.strokeStyle = caught ? '#fde68a' : '#67e8f9'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.textAlign = 'center'; ctx.fillStyle = '#e0f2fe';
+    this.setFont(this.readableFont10); ctx.fillText(caught ? '捕獲中' : '捕獲', 318, 463);
+    this.setFont(this.readableFont9); ctx.fillText(caught ? '離す' : '長押し', 318, 476);
     if (boss && !boss.defeated && boss.y > 0) {
-      const bossBarW = 160;
-      const bossBarH = 6;
-      const bossBarX = (w - bossBarW) / 2;
-      const bossBarY = 38;
-
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-      ctx.fillRect(bossBarX - 2, bossBarY - 2, bossBarW + 4, bossBarH + 4);
-
-      const bossHpPercent = Math.max(0, boss.hp / boss.maxHp);
-      ctx.fillStyle = bossHpPercent > 0.3 ? '#ef4444' : '#fbbf24';
-      ctx.fillRect(bossBarX, bossBarY, bossBarW * bossHpPercent, bossBarH);
-
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(bossBarX, bossBarY, bossBarW, bossBarH);
-
-      ctx.fillStyle = '#ffffff';
-      this.setFont('7px "Press Start 2P", monospace');
-      ctx.textAlign = 'center';
-      ctx.fillText(boss.name, w / 2, bossBarY - 4);
+      ctx.fillStyle = 'rgba(3,10,20,0.88)'; ctx.fillRect(48, 44, w - 96, 22);
+      ctx.fillStyle = '#cbd5e1'; this.setFont(this.readableFont9);
+      const opening = boss.timer % 360 >= 260;
+      if (opening) ctx.fillStyle = '#5eead4';
+      ctx.fillText(opening ? 'CORE OPEN / 投擲のチャンス' : boss.name, w / 2, 53);
+      ctx.fillStyle = '#1e293b'; ctx.fillRect(58, 57, w - 116, 4);
+      ctx.fillStyle = boss.hp / boss.maxHp > 0.5 ? '#fb7185' : '#fbbf24';
+      ctx.fillRect(58, 57, (w - 116) * Math.max(0, boss.hp / boss.maxHp), 4);
     }
   }
 
@@ -1805,7 +1660,7 @@ export class ArcadeRenderer {
       ctx.fillText('【 ジェミニ誘導 - GEMINI GUIDANCE - 】', w / 2, 98);
       this.setFont('8px "Press Start 2P", monospace');
       ctx.fillStyle = '#94a3b8';
-      ctx.fillText('- 1983 NAMCO STYLE STG -', w / 2, 110);
+      ctx.fillText('- LURE / CAPTURE / RELEASE -', w / 2, 110);
 
       // 3. Stage Select Section Header
       this.setFont('8px "Press Start 2P", monospace');
@@ -1817,7 +1672,7 @@ export class ArcadeRenderer {
         {
           num: '1',
           name: '１面：チャイナ・シンドローム',
-          sub: 'インベーダー軍団＆クジラUFO',
+          sub: '誘導の基本：距離を取り、突き抜けさせる',
           y: 134,
           h: 26,
           color: '#38bdf8',
@@ -1826,7 +1681,7 @@ export class ArcadeRenderer {
         {
           num: '2',
           name: '２面：イーロンズ・ゲート',
-          sub: 'ブロック崩し＆帝王Grok',
+          sub: '反射ゲート：隙間へ投げ、奥を攻める',
           y: 164,
           h: 26,
           color: '#f97316',
@@ -1835,7 +1690,7 @@ export class ArcadeRenderer {
         {
           num: '3',
           name: '３面：ザ・ファブル',
-          sub: 'Claude Fable Apex 要塞決戦',
+          sub: '交差戦：捕獲で守り、離して反撃',
           y: 194,
           h: 26,
           color: '#fbbf24',
@@ -1844,7 +1699,7 @@ export class ArcadeRenderer {
         {
           num: '4',
           name: '４面：魔法使いチャッピー',
-          sub: 'GPT-6 Astra 最終決戦',
+          sub: '最終決戦：誘導・回転・投擲の総力戦',
           y: 224,
           h: 26,
           color: '#ef4444',
@@ -1890,13 +1745,13 @@ export class ArcadeRenderer {
         ctx.fillStyle = isHover ? '#ffffff' : '#f8fafc';
         this.setFont('10px "DotGothic16", monospace');
         const prefix = isHover ? '▶ ' : '';
-        ctx.fillText(`${prefix}${btn.name}`, btnX + 40, btn.y + (btn.isLab ? 14 : 17));
+        ctx.fillText(`${prefix}${btn.name}`, btnX + 40, btn.y + 11);
 
         // Subtext / description
         ctx.fillStyle = isHover ? '#fde047' : '#94a3b8';
         this.setFont('7px "DotGothic16", monospace');
         ctx.textAlign = 'right';
-        ctx.fillText(btn.sub, btnX + btnW - 8, btn.y + (btn.isLab ? 25 : 17));
+        ctx.fillText(btn.sub, btnX + btnW - 8, btn.y + 23);
       }
 
       // 5. Instruction prompt
@@ -1914,15 +1769,15 @@ export class ArcadeRenderer {
       // 6. Mechanics & Controls Guide
       this.setFont('8px "DotGothic16", monospace');
       ctx.fillStyle = '#22c55e';
-      ctx.fillText('★ 攻撃① ヨーヨー投擲: 引っ張り放ち＆折り返し滞空多段削り', w / 2, 316);
+      ctx.fillText('① 誘導：距離を取り、自機へ突っ込む球を横へかわす', w / 2, 316);
       ctx.fillStyle = '#38bdf8';
-      ctx.fillText('★ 攻撃② 旋回シールド: [Space / 右クリック]で紐ロック公転', w / 2, 332);
+      ctx.fillText('② 捕獲：クリック / Z 長押しで近くを回す・白弾を消す', w / 2, 332);
       ctx.fillStyle = '#fef08a';
-      ctx.fillText('★ [Xキー] 貫通モード(多段削り)と反射モード(ピンボール)切替', w / 2, 348);
+      ctx.fillText('③ 投擲：離した瞬間の進行方向へ。速い一撃ほど強い', w / 2, 348);
       ctx.fillStyle = '#ec4899';
-      ctx.fillText('★ 敵の白弾は相殺消滅！編隊全滅でジェミニ出現＆回復！', w / 2, 364);
+      ctx.fillText('球は自機に当たっても安全。止まると少しずつ戻ってくる', w / 2, 364);
       ctx.fillStyle = '#cbd5e1';
-      ctx.fillText('★ [1〜5キー] 物理挙動切替 / [Tキー] いつでも物理テストへ！', w / 2, 380);
+      ctx.fillText('[Q] 壁反射は任意でON / [T] 物理調整は実験室へ', w / 2, 380);
 
       // Separator Line
       ctx.strokeStyle = '#1e293b';
@@ -1961,7 +1816,7 @@ export class ArcadeRenderer {
       // Master Mute text
       this.setFont('7px "DotGothic16", monospace');
       ctx.fillStyle = '#64748b';
-      ctx.fillText('[Mキー] サウンド全消音 / 全解除', w / 2, 426);
+      ctx.fillText('まずは [1] から全４面のアーケードラン', w / 2, 426);
 
       // 7. Asset Attribution
       this.setFont('8px "DotGothic16", monospace');
@@ -2010,26 +1865,43 @@ export class ArcadeRenderer {
       }
 
     } else if (state === 'GAME_CLEAR') {
-      ctx.fillStyle = 'rgba(2, 6, 23, 0.85)';
+      ctx.fillStyle = 'rgba(2, 6, 23, 0.96)';
       ctx.fillRect(0, 0, w, h);
-
-      this.setFont('15px "Press Start 2P", monospace');
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#ec4899';
-      ctx.fillText('ALL STAGES CLEARED!', w / 2, h * 0.35);
-
-      ctx.fillStyle = '#38bdf8';
-      this.setFont('8px "Press Start 2P", monospace');
-      ctx.fillText('GPT-6 ASTRA DESTROYED!', w / 2, h * 0.45);
-      ctx.fillText('GEMINI ORBIT SUPREME!', w / 2, h * 0.52);
-
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(`VICTORY SCORE: ${score}`, w / 2, h * 0.62);
-
-      if (Math.floor(stageTick / 25) % 2 === 0) {
-        ctx.fillStyle = '#fef08a';
-        ctx.fillText('THANK YOU FOR PLAYING!', w / 2, h * 0.75);
+      // Quiet starfield and twin comet orbits close the arcade journey.
+      for (let i = 0; i < 55; i++) {
+        ctx.fillStyle = i % 3 ? '#334155' : '#7dd3fc';
+        ctx.fillRect((i * 97) % w, (i * 137 + stageTick * 0.12) % h, 1, 1);
       }
+      const centerY = 162;
+      ctx.strokeStyle = '#164e63'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(w / 2, centerY, 96, 39, -0.35, 0, Math.PI * 2); ctx.stroke();
+      for (let i = 0; i < 2; i++) {
+        const angle = stageTick * 0.018 + i * Math.PI;
+        for (let j = 16; j >= 0; j--) {
+          const a = angle - j * 0.06;
+          ctx.globalAlpha = 1 - j / 18;
+          ctx.fillStyle = i ? '#c4b5fd' : '#67e8f9';
+          ctx.beginPath(); ctx.arc(w / 2 + Math.cos(a) * 94, centerY + Math.sin(a) * 37, j ? 2 : 6, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      ctx.globalAlpha = 1;
+      const ship = this.sprites.get('PLAYER_CENTER');
+      if (ship) ctx.drawImage(ship, w / 2 - ship.width / 2, centerY - ship.height / 2);
+      ctx.textAlign = 'center'; this.setFont('13px "Press Start 2P", monospace');
+      ctx.fillStyle = '#fef08a'; ctx.fillText('ALL CLEAR', w / 2, 80);
+      this.setFont(this.readableFont11); ctx.fillStyle = '#e2e8f0';
+      ctx.fillText('最後の要塞は砕け、空に静けさが戻った。', w / 2, 249);
+      ctx.fillText('ふたつの光は、もう追跡者ではない。', w / 2, 273);
+      ctx.fillStyle = '#67e8f9'; ctx.fillText('あなたの軌道が、帰り道になる。', w / 2, 307);
+      this.setFont('9px "Press Start 2P", monospace');
+      ctx.fillStyle = '#ffffff'; ctx.fillText(`SCORE ${score.toString().padStart(8, '0')}`, w / 2, 354);
+      this.setFont(this.readableFont10); ctx.fillStyle = '#94a3b8';
+      ctx.fillText('GEMINI GUIDANCE / MUKKII ARCADE SYSTEM', w / 2, 401);
+      ctx.fillText('BGM: 魔王魂  /  効果音: 効果音ラボ', w / 2, 420);
+      ctx.fillStyle = '#fef08a';
+      ctx.fillText('THANK YOU FOR PLAYING', w / 2, 463);
+      ctx.fillStyle = Math.floor(stageTick / 30) % 2 ? '#94a3b8' : '#ffffff';
+      ctx.fillText('クリック / ENTER でタイトルへ', w / 2, 496);
     }
   }
 }

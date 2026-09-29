@@ -80,7 +80,7 @@ export class EnemyManager {
       points,
       color,
       angle: 0, // LOGOS NEVER ROTATE! Always stay upright.
-      shootCooldown: 320 + Math.floor(Math.random() * 200),
+      shootCooldown: 155 + Math.floor(Math.random() * 55),
       collisionType,
       mass,
       knockbackVx: 0,
@@ -88,7 +88,7 @@ export class EnemyManager {
       orbitCenterX: x,
       orbitCenterY: y,
       targetX: x,
-      targetY: y,
+      targetY: pattern === 'SNIPER_HOVER' ? 80 : pattern === 'BARRAGE_DRIFT' ? 115 : pattern === 'SHIELD_FORWARD' ? 155 : y,
     };
 
     this.enemies.push(enemy);
@@ -138,8 +138,10 @@ export class EnemyManager {
    */
   public spawnTackleMinion(type: EnemyType, x: number, y: number, vx: number, vy: number): EnemyEntity {
     const minion = this.spawn(type, x, y, 'TACKLE_DASH', 'minion_tackle', 1);
-    minion.vx = vx;
-    minion.vy = vy;
+    minion.vx = 0;
+    minion.vy = 0;
+    minion.targetX = vx;
+    minion.targetY = vy;
     return minion;
   }
 
@@ -204,6 +206,13 @@ export class EnemyManager {
             other.y -= ny * overlap * 0.5;
           }
         }
+      }
+
+      if (e.age > 510 && ['BARRAGE_DRIFT', 'SNIPER_HOVER', 'SHIELD_FORWARD'].includes(e.pattern)) {
+        e.vx = e.x < canvasWidth / 2 ? -1.8 : 1.8;
+        e.vy = -1.0;
+        e.x += e.vx;
+        e.y += e.vy;
       }
 
       // Specialized bullet firing
@@ -345,12 +354,14 @@ export class EnemyManager {
       }
 
       case 'UFO_FLYBY': {
-        e.vx = 1.6;
+        // Preserve the direction assigned at spawn.
         break;
       }
 
       case 'TACKLE_DASH': {
-        // Linear high-speed body tackle
+        // Pause visibly before committing to the previously aimed vector.
+        e.vx = t < 36 ? 0 : (e.targetX ?? 0);
+        e.vy = t < 36 ? 0 : (e.targetY ?? 2.6);
         break;
       }
 
@@ -393,28 +404,22 @@ export class EnemyManager {
       }
 
       case 'RUSH_DIVE': {
-        // Phase 1 (t < 30): Hover at spawn, lock onto player vector
-        // Phase 2 (t >= 30): Accelerate in straight line towards target
-        if (t < 30) {
+        // Enter the visible arena, aim, freeze aim, then commit without homing.
+        if (t < 40) {
           e.vx = 0;
-          e.vy = 0.4;
+          e.vy = 2.6;
           e.targetX = playerX;
           e.targetY = _playerY;
-        } else if (t === 30) {
-          const dx = (e.targetX ?? playerX) - e.x;
-          const dy = (e.targetY ?? _playerY) - e.y;
-          const dist = Math.hypot(dx, dy) || 1;
-          const rushSpeed = 2.4;
-          e.vx = (dx / dist) * rushSpeed;
-          e.vy = (dy / dist) * rushSpeed;
-        }
-        // If dives offscreen, loops back from top
-        if (e.y > 540 + 40) {
-          e.y = -30;
-          e.x = Math.random() * (canvasWidth - 80) + 40;
-          e.age = 0;
+        } else if (t < 84) {
           e.vx = 0;
           e.vy = 0;
+          if (t < 60) { e.targetX = playerX; e.targetY = _playerY; }
+        } else if (t === 84) {
+          const dx = (e.targetX ?? playerX) - e.x;
+          const dy = (e.targetY ?? _playerY) - e.y;
+          const distance = Math.hypot(dx, dy) || 1;
+          e.vx = dx / distance * 3.4;
+          e.vy = dy / distance * 3.4;
         }
         break;
       }
@@ -423,7 +428,7 @@ export class EnemyManager {
         // Orbits around (orbitCenterX, orbitCenterY) with radius 48px
         const cx = e.orbitCenterX ?? (canvasWidth / 2);
         const cy = e.orbitCenterY ?? 130;
-        const ang = (e.angle || 0) + 0.04;
+        const ang = t * 0.04;
         e.angle = ang;
         const r = 48;
         e.x = cx + Math.cos(ang) * r;

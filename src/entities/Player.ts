@@ -3,7 +3,7 @@ import { PlayerControlMode, PlayerState } from '../types';
 export const PLAYER_SPEED_PRESETS = [1.0, 2.0, 3.0, 5.0, 8.0, 10.0];
 
 export class Player {
-  public controlMode: PlayerControlMode = 'DIRECT'; // Default: DIRECT (instant mouse sync / proportional)
+  public controlMode: PlayerControlMode = 'LIMITED'; // Responsive movement with bounded physical velocity.
   public speedMultiplier: number = 3.0;             // Default: 3.0x speed!
   public readonly baseMaxSpeed: number = 8.4;       // 2.8 * 3.0 = 8.4 px/frame (~504 px/sec)
 
@@ -24,6 +24,10 @@ export class Player {
 
   constructor(startX: number = 180, startY: number = 440) {
     this.reset(startX, startY);
+    try {
+      const saved = Number(localStorage.getItem('gemini_high_score'));
+      if (Number.isFinite(saved)) this.state.highScore = Math.max(10000, saved);
+    } catch { /* Storage may be unavailable in embedded/private browsers. */ }
   }
 
   public reset(startX: number = 180, startY: number = 440): void {
@@ -109,6 +113,7 @@ export class Player {
     this.state.score += points;
     if (this.state.score > this.state.highScore) {
       this.state.highScore = this.state.score;
+      try { localStorage.setItem('gemini_high_score', String(this.state.highScore)); } catch { /* Optional persistence. */ }
     }
   }
 

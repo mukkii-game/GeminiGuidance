@@ -5,10 +5,13 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node tests/physics.mjs && node tests/campaign.mjs",
+    "test:browser": "playwright test"
   },
   "devDependencies": {
     "@lobehub/icons-static-svg": "^1.95.1",
+    "@playwright/test": "^1.63.0",
     "@rollup/wasm-node": "^4.63.5",
     "typescript": "^5.8.2",
     "vite": "^6.2.0"
