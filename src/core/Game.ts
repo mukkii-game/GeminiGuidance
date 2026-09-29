@@ -264,6 +264,26 @@ export class Game {
       btnAll.style.borderColor = anyOn ? '#2b4058' : '#22c55e';
       btnAll.style.color = anyOn ? '#9cb3cc' : '#22c55e';
     }
+    const btnWall = document.getElementById('btn-wall');
+    if (btnWall) {
+      const wallOn = this.geminiManager.screenEdgeBounce;
+      btnWall.textContent = wallOn ? '🧱 壁: 反射ON [Q]' : '🚪 壁: 通過OFF [Q]';
+      btnWall.style.borderColor = wallOn ? '#38bdf8' : '#64748b';
+      btnWall.style.color = wallOn ? '#38bdf8' : '#94a3b8';
+    }
+  }
+
+  public toggleWallBounceWithFeedback(): boolean {
+    const bounce = this.geminiManager.toggleScreenEdgeBounce();
+    this.audio.playGeminiBounce();
+    this.addFloatingText(
+      this.player.state.x,
+      this.player.state.y - 30,
+      bounce ? '🧱 画面端の壁: 反射 [ON]' : '🚪 画面端の壁: 通過 [OFF]',
+      bounce ? '#38bdf8' : '#94a3b8'
+    );
+    this.updateAudioButtonsUi();
+    return bounce;
   }
 
   private setupAudioAndCrtControls(): void {
@@ -285,6 +305,13 @@ export class Game {
     if (btnAll) {
       btnAll.addEventListener('click', () => {
         this.toggleAllAudio();
+      });
+    }
+
+    const btnWall = document.getElementById('btn-wall');
+    if (btnWall) {
+      btnWall.addEventListener('click', () => {
+        this.toggleWallBounceWithFeedback();
       });
     }
 
@@ -552,6 +579,11 @@ export class Game {
         colMode === 'PENETRATE' ? '⚔️ 属性: 貫通 (すり抜け多段削り)' : '🛡️ 属性: 反射 (跳ね返りピンボール)',
         colMode === 'PENETRATE' ? '#22c55e' : '#f97316'
       );
+    }
+
+    // Handle Wall Bounce Toggle hotkey (KeyQ / KeyG)
+    if (this.input.consumeWallToggle()) {
+      this.toggleWallBounceWithFeedback();
     }
 
     // Handle Physics Pattern Selection (Digit1-5, KeyP)
@@ -1570,14 +1602,7 @@ export class Game {
 
     // Hotkey consumption
     if (this.input.consumeWallToggle()) {
-      const bounce = this.geminiManager.toggleScreenEdgeBounce();
-      this.audio.playGeminiBounce();
-      this.addFloatingText(
-        this.player.state.x,
-        this.player.state.y - 30,
-        bounce ? '画面端: 跳ね返り [ON]' : '画面端: 当たり判定なし [OFF]',
-        bounce ? '#38bdf8' : '#94a3b8'
-      );
+      this.toggleWallBounceWithFeedback();
     }
     if (this.input.consumeEnemySetupCycle()) {
       const setups: TestEnemySetup[] = ['NONE', 'SWARM_PENETRATE', 'SHIELD_SNIPER', 'BARRAGE_RUSH', 'WAVE_TACKLE', 'ORBIT_CORE', 'BOSS_PENETRATE'];
@@ -1707,14 +1732,7 @@ export class Game {
     if (this.state === 'TEST_STAGE') {
       // 0. Row 1: [壁: 反射 / 通過] button (x: 88 to 174, y: 2 to 18)
       if (x >= 88 && x <= 174 && y >= 2 && y <= 18) {
-        const bounce = this.geminiManager.toggleScreenEdgeBounce();
-        this.audio.playGeminiBounce();
-        this.addFloatingText(
-          this.player.state.x,
-          this.player.state.y - 30,
-          bounce ? '画面端: 跳ね返り [ON]' : '画面端: 当たり判定なし [OFF]',
-          bounce ? '#38bdf8' : '#94a3b8'
-        );
+        this.toggleWallBounceWithFeedback();
         return true;
       }
 
