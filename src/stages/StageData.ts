@@ -11,6 +11,7 @@ export interface SpawnEvent {
   y?: number;
   pattern?: MovementPattern;
   message?: string;
+  wave?: number;
 }
 
 /** Fixed 60 Hz campaign: introduce, combine, then test each skill. */
@@ -46,87 +47,64 @@ export class StageManager {
 
   private generateStageEvents(stage: number): SpawnEvent[] {
     const events: SpawnEvent[] = [];
-    let wave = 0;
+    let formation = 0;
     const cue = (second: number, message: string) => events.push({ tick: second * 60, type: 'CUE', message });
-    const group = (second: number, enemyType: EnemyType, pattern: MovementPattern, positions: number[], stagger = 24) => {
-      const formationId = `s${stage}_wave${++wave}`;
-      positions.forEach((x, index) => events.push({ tick: second * 60 + index * stagger, type: 'ENEMY', enemyType, pattern, formationId, x, y: -32 }));
+    const group = (second: number, enemyType: EnemyType, pattern: MovementPattern, positions: number[], stagger = 24, sharedFormation?: string) => {
+      const wave = Math.floor((second - 3) / 10) + 1;
+      const formationId = sharedFormation ?? `s${stage}_wave${wave}_group${++formation}`;
+      positions.forEach((x, index) => events.push({ tick: second * 60 + index * stagger, type: 'ENEMY', enemyType, pattern, formationId, wave, x, y: -32 }));
     };
     const ground: GroundType[] = ['NVIDIA_BASE', 'META_BASE', 'HUGGINGFACE_BASE', 'SOL_CITADEL', 'STABILITY_BASE'];
     for (let second = 3; second < 48 + stage * 4; second += 7) {
       events.push({ tick: second * 60, type: 'GROUND', groundType: ground[(second + stage) % ground.length], x: 65 + ((second * 37) % 230) });
     }
 
+    const light: EnemyType[] = ['MISTRAL_FLAME', 'COPILOT_GLIDER', 'CLAUDE_HAIKU', 'GPT6_LUNA'];
+    const heavy: EnemyType[] = ['QWEN_CUBE', 'GROK_RAIDER', 'CLAUDE_OPUS', 'GPT6_SOL'];
+    const sniper: EnemyType[] = ['KIMI_MOON', 'CURSOR_PROBE', 'PERPLEXITY_SPINNER', 'GPT6_TERRA'];
+    const rank = Math.max(0, Math.min(3, stage - 1));
+    const rows = (second: number, pattern: MovementPattern) => {
+      const formationId = `s${stage}_wave${Math.floor((second - 3) / 10) + 1}`;
+      group(second, light[rank], pattern, [60, 120, 180, 240, 300], 0, formationId);
+      group(second + 1, light[rank], pattern, [60, 120, 180, 240, 300], 0, formationId);
+    };
+    cue(1, 'WAVE 1 / 柔らかい編隊を大きな誘導でまとめて貫け');
+    rows(3, 'STRAIGHT_DOWN');
     if (stage === 1) {
-      cue(1, '離して誘導 → 自機を抜ける突きで狙え');
-      group(4, 'MISTRAL_FLAME', 'STRAIGHT_DOWN', [180, 180, 180], 38);
-      group(9, 'DEEPSEEK_FLASH', 'STRAIGHT_DOWN', [85, 275], 0);
-      cue(13, '赤い照準を引きつけて  横へかわす');
-      group(14, 'KIMI_MOON', 'RUSH_DIVE', [100, 260], 65);
-      group(20, 'MISTRAL_FLAME', 'GALAGA_LOOP', [85, 145, 215, 275]);
-      cue(25, '長押しで捕獲・回転 / 離して投げる');
-      group(26, 'DEEPSEEK_FLASH', 'STRAIGHT_DOWN', [90, 180, 270], 0);
-      group(31, 'KIMI_MOON', 'RUSH_DIVE', [70, 290], 75);
-      group(36, 'MISTRAL_FLAME', 'STRAIGHT_DOWN', [120, 120, 240, 240], 32);
-      events.push({ tick: 40 * 60, type: 'UFO' });
-      group(42, 'QWEN_CUBE', 'SPAROID_CRUISE', [180]);
-      group(45, 'DEEPSEEK_FLASH', 'RUSH_DIVE', [70, 290], 60);
-      cue(49, '左右部位を壊せば追撃停止 / CORE OPENで大ダメージ');
-    } else if (stage === 2) {
-      cue(1, '反射する装甲を使い  奥へジェミニを通せ');
-      group(4, 'COPILOT_GLIDER', 'STRAIGHT_DOWN', [80, 180, 280], 0);
-      group(9, 'CURSOR_PROBE', 'RUSH_DIVE', [90, 270], 60);
-      group(14, 'GROK_RAIDER', 'SPAROID_CRUISE', [100, 260], 0);
-      group(19, 'COPILOT_GLIDER', 'GALAGA_LOOP', [80, 140, 220, 280]);
-      cue(24, '左右から奥へ入れる / ブロック裏面はダメージ3倍');
-      events.push({ tick: 25 * 60, type: 'BREAKOUT_WALL' });
-      group(28, 'CURSOR_PROBE', 'RUSH_DIVE', [70, 290], 70);
-      group(34, 'COPILOT_GLIDER', 'STRAIGHT_DOWN', [180, 180, 180], 32);
-      group(39, 'GROK_RAIDER', 'SPAROID_CRUISE', [95, 265], 0);
-      group(44, 'CURSOR_PROBE', 'RUSH_DIVE', [80, 180, 280], 50);
-      group(49, 'COPILOT_GLIDER', 'GALAGA_LOOP', [110, 250]);
-      cue(53, '左右から奥へ投擲 / 天井反射で裏面を崩せ');
-    } else if (stage === 3) {
-      cue(1, '交差する敵列  引きつける位置を選べ');
-      group(4, 'CLAUDE_HAIKU', 'GALAGA_LOOP', [75, 135, 225, 285]);
-      group(10, 'CLAUDE_SONNET', 'RUSH_DIVE', [90, 270], 75);
-      group(16, 'PERPLEXITY_SPINNER', 'SNIPER_HOVER', [90, 270], 0);
-      group(22, 'CLAUDE_HAIKU', 'STRAIGHT_DOWN', [160, 200, 160, 200], 32);
-      cue(27, '回転は守り / 強い一撃は離して作る');
-      group(28, 'CLAUDE_OPUS', 'SPAROID_CRUISE', [180]);
-      group(29, 'CLAUDE_HAIKU', 'RUSH_DIVE', [65, 295], 75);
-      group(36, 'PERPLEXITY_SPINNER', 'GALAGA_LOOP', [75, 145, 215, 285]);
-      group(42, 'CLAUDE_SONNET', 'RUSH_DIVE', [90, 180, 270], 60);
-      group(48, 'CLAUDE_OPUS', 'SPAROID_CRUISE', [105, 255], 0);
-      group(52, 'CLAUDE_HAIKU', 'RUSH_DIVE', [70, 290], 60);
-      cue(57, '追撃をかわし  休止したコアを狙え');
+      cue(11, 'WAVE 2 / INVADER WALL — 列の奥まで貫け');
+      events.push({tick:13*60,type:'INVADER_GRID',wave:2});
     } else {
-      cue(1, '最終防衛線  誘導・捕獲・投擲をつなげ');
-      group(4, 'GPT6_LUNA', 'STRAIGHT_DOWN', [90, 180, 270], 0);
-      group(9, 'GPT6_LUNA', 'RUSH_DIVE', [70, 180, 290], 60);
-      group(16, 'GPT6_TERRA', 'BARRAGE_DRIFT', [90, 270], 0);
-      group(23, 'GPT6_LUNA', 'GALAGA_LOOP', [75, 135, 225, 285]);
-      group(29, 'GPT6_SOL', 'SPAROID_CRUISE', [180]);
-      group(30, 'GPT6_LUNA', 'RUSH_DIVE', [70, 290], 65);
-      cue(36, '狙いを固定させてから移動  空いた道へ投げろ');
-      group(37, 'GPT6_TERRA', 'RUSH_DIVE', [85, 275], 80);
-      group(43, 'GPT6_LUNA', 'STRAIGHT_DOWN', [120, 120, 240, 240], 28);
-      group(48, 'GPT6_SOL', 'SPAROID_CRUISE', [105, 255], 0);
-      group(53, 'GPT6_LUNA', 'RUSH_DIVE', [70, 180, 290], 60);
-      cue(60, '最後の決闘  攻撃の合間に大きく突け');
+      cue(11, 'WAVE 2 / 重装甲は直進  射撃の間に奥へ通せ');
+      group(13, heavy[rank], 'SPAROID_CRUISE', [95, 265], 0);
+      group(13, light[rank], 'GALAGA_LOOP', [55, 180, 305], 24);
     }
-    // Slow, spaced columns are attack opportunities, not extra bullet curtains.
-    // Same-x spacing rewards crossing the whole train with a long free thrust.
-    const columnTypes: EnemyType[] = ['MISTRAL_FLAME', 'COPILOT_GLIDER', 'CLAUDE_HAIKU', 'GPT6_LUNA'];
-    const columnType = columnTypes[stage - 1] ?? 'GPT6_LUNA';
-    for (const [second, x] of [[7, 75], [17, 285], [28, 180], [39, 75], [47, 285]]) {
-      group(second, columnType, 'STRAIGHT_DOWN', [x, x, x, x], 64);
+    cue(21, 'WAVE 3 / 停止した砲台は狙い撃ち  弾は捕獲で防げ');
+    group(23, sniper[rank], 'SNIPER_HOVER', [75, 285], 0);
+    rows(24, 'GALAGA_LOOP');
+    group(23, sniper[rank], 'BARRAGE_DRIFT', [180]);
+    cue(25, '弾幕波 / 長押しで防御 → 止んだら投擲');
+    if (stage === 2) {
+      events.push({ tick: 25 * 60, type: 'BREAKOUT_WALL' });
+      cue(26, '左右から奥へ / 裏面3倍・天井で連続反射');
     }
-    cue(6, '長い誘導で縦列を貫通 / 近くで待つだけでは崩せない');
+    cue(31, 'WAVE 4 / 左右から下へ回り込む  中央で迎え撃て');
+    group(33, light[rank], 'TOROID_SWOOP', [38, 322, 38, 322, 38, 322], 25);
+    group(34, light[rank], 'RUSH_DIVE', [115, 245], 45);
+    cue(41, 'WAVE 5 / 照準を引きつけ 横へかわして突き返せ');
+    rows(43, 'RUSH_DIVE');
+    if (stage >= 3) {
+      cue(51, 'FINAL WAVE / 重巡の射線を抜けて背面を狙え');
+      group(53, heavy[rank], 'SPAROID_CRUISE', [95, 265], 0);
+      group(53, light[rank], 'ZOSHI_REACTIVE_SWOOP', [40, 320, 40, 320], 25);
+    }
+    for (const second of [8, 18, 28, 38, 48, ...(stage >= 3 ? [58] : [])]) {
+      cue(second, 'RELOAD / 残敵をかわし 次の編隊に備えろ');
+    }
     const bossSecond = 50 + stage * 4;
     const bosses: BossType[] = ['STAGE1_DEEPSEEK_KIMI', 'STAGE2_GROK_CURSOR', 'STAGE3_CLAUDE_FABLE', 'STAGE4_GPT6_ASTRA'];
     events.push({ tick: (bossSecond - 2) * 60, type: 'ALERT' });
     events.push({ tick: bossSecond * 60, type: 'BOSS', bossType: bosses[stage - 1] ?? bosses[3] });
+    if (stage === 1) for (const event of events) if (event.tick >= 18 * 60) event.tick += 10 * 60;
     return events.sort((a, b) => a.tick - b.tick);
   }
 }

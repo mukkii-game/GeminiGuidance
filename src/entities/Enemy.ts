@@ -63,7 +63,7 @@ export class EnemyManager {
     // Light hulls survive idle contact, but a fast level-one thrust still clears a column.
     width = Math.round(width * 1.2);
     height = Math.round(height * 1.2);
-    hp += hp >= 6 ? 2 : 1;
+    hp = mass <= 2 && collisionType === 'PENETRATE' ? 1 : hp + (hp >= 6 ? 4 : 2);
 
     if (customHp !== undefined) {
       hp = customHp;
@@ -86,7 +86,7 @@ export class EnemyManager {
       points,
       color,
       angle: 0, // LOGOS NEVER ROTATE! Always stay upright.
-      shootCooldown: 155 + Math.floor(Math.random() * 55),
+      shootCooldown: 100 + Math.floor(Math.random() * 35),
       collisionType,
       mass,
       knockbackVx: 0,
@@ -106,12 +106,12 @@ export class EnemyManager {
    * Featuring Mistral "M" pixel logo invaders and Qwen crystal invaders!
    */
   public spawnInvaderGrid(canvasWidth: number): void {
-    const cols = 5;
+    const cols = 6;
     const rows = 3;
-    const stepX = 52;
-    const stepY = 46;
+    const stepX = 48;
+    const stepY = 44;
     const startX = (canvasWidth - (cols - 1) * stepX) / 2;
-    const startY = 70;
+    const startY = -104;
 
     this.invaderMarchDir = 1;
     this.invaderStepTimer = 0;
@@ -123,7 +123,8 @@ export class EnemyManager {
       for (let c = 0; c < cols; c++) {
         const x = startX + c * stepX;
         const y = startY + r * stepY;
-        this.spawn(type, x, y, 'INVADER', 'invaders_wave', rowHp);
+        const invader = this.spawn(type, x, y, 'INVADER', 'invaders_wave', rowHp);
+        invader.width = 40; invader.height = 36; invader.collisionType = 'PENETRATE';
       }
     }
   }
@@ -176,6 +177,15 @@ export class EnemyManager {
       // Update movement pattern (non-invaders)
       if (e.pattern !== 'INVADER') {
         this.applyPattern(e, canvasWidth, playerX, playerY);
+        // Four seconds of attack, then a smooth lateral withdrawal. Unkilled
+        // ships leave under their own motion instead of clogging the next wave.
+        if (e.age > 240 && !['DUMMY', 'ORBIT_BIT', 'UFO_FLYBY', 'ROCKET_ASCENT', 'TACKLE_DASH'].includes(e.pattern)) {
+          const exitSide = (e.orbitCenterX ?? e.x) < canvasWidth / 2 ? -1 : 1;
+          // Integrate withdrawal independently of each pattern's reset velocity.
+          const blend = Math.min(1, (e.age - 240) / 24);
+          e.vx = e.vx * (1 - blend) + exitSide * 3.8 * blend;
+          e.vy = e.vy * (1 - blend) + 1.6 * blend;
+        }
         e.x += e.vx;
         e.y += e.vy;
       }
@@ -215,25 +225,16 @@ export class EnemyManager {
         }
       }
 
-      if (e.age > 510 && ['BARRAGE_DRIFT', 'SNIPER_HOVER', 'SHIELD_FORWARD'].includes(e.pattern)) {
-        e.vx = e.x < canvasWidth / 2 ? -1.8 : 1.8;
-        e.vy = -1.0;
-        e.x += e.vx;
-        e.y += e.vy;
-      }
-
       // Specialized bullet firing
-      if (onSpawnBullet) {
+      if (onSpawnBullet && e.age <= 240) {
         if (e.pattern === 'BARRAGE_DRIFT') {
-          e.shootCooldown--;
-          if (e.shootCooldown <= 0 && e.y > 40 && e.y < canvasHeight - 120) {
-            e.shootCooldown = 150 + Math.floor(Math.random() * 50);
-            const baseAngle = Math.atan2(playerY - e.y, playerX - e.x);
-            // 3-way fan spread
-            for (const offset of [-0.35, 0, 0.35]) {
-              const ang = baseAngle + offset;
-              const spd = 1.5;
-              onSpawnBullet(e.x, e.y + 12, Math.cos(ang) * spd, Math.sin(ang) * spd);
+          // One short dense burst, preceded by the stage's capture cue.
+          // Low speed gives the rotating defender time to erase the curtain.
+          if (e.age >= 150 && e.age <= 186 && e.age % 9 === 6) {
+            const aim = Math.atan2(playerY - e.y, playerX - e.x);
+            for (let ray = -5; ray <= 5; ray++) {
+              const angle = aim + ray * .14;
+              onSpawnBullet(e.x, e.y + 15, Math.cos(angle) * 1.35, Math.sin(angle) * 1.35);
             }
           }
         } else if (e.pattern === 'SNIPER_HOVER') {
@@ -243,7 +244,7 @@ export class EnemyManager {
             const bdx = playerX - e.x;
             const bdy = playerY - e.y;
             const bdist = Math.hypot(bdx, bdy) || 1;
-            const spd = 2.0; // sniper aimed shot
+            const spd = 2.5; // sniper aimed shot
             onSpawnBullet(e.x, e.y + 16, (bdx / bdist) * spd, (bdy / bdist) * spd);
           }
         } else {
@@ -251,11 +252,11 @@ export class EnemyManager {
           if (canShoot) {
             e.shootCooldown--;
             if (e.shootCooldown <= 0 && e.y > 60 && e.y < canvasHeight - 160) {
-              e.shootCooldown = 400 + Math.floor(Math.random() * 240);
+              e.shootCooldown = 105 + Math.floor(Math.random() * 35);
               const bdx = playerX - e.x;
               const bdy = playerY - e.y;
               const bdist = Math.hypot(bdx, bdy) || 1;
-              const bspeed = 1.5;
+              const bspeed = 2.1;
               onSpawnBullet(e.x, e.y, (bdx / bdist) * bspeed, (bdy / bdist) * bspeed);
             }
           }
@@ -298,8 +299,14 @@ export class EnemyManager {
     const invaders = this.enemies.filter(e => e.pattern === 'INVADER');
     if (invaders.length === 0) return;
 
+    if (invaders[0].age < 90) { for (const inv of invaders) inv.y += 2; return; }
+    if (invaders[0].age > 720) {
+      for (const inv of invaders) inv.y -= 3;
+      this.enemies = this.enemies.filter(e => e.pattern !== 'INVADER' || e.y > -80);
+      return;
+    }
     // Classic Invaders acceleration: fewer enemies -> faster tempo!
-    const stepInterval = Math.max(16, Math.floor((invaders.length / this.invaderTotal) * 60));
+    const stepInterval = Math.max(8, Math.floor((invaders.length / this.invaderTotal) * 24));
     this.invaderStepTimer++;
 
     if (this.invaderStepTimer >= stepInterval) {
@@ -325,12 +332,13 @@ export class EnemyManager {
       if (shouldDrop) {
         // Drop down a row!
         for (const inv of invaders) {
-          inv.y += 10;
+          inv.y += 16;
         }
       } else {
         // Step horizontally!
         for (const inv of invaders) {
-          inv.x += this.invaderMarchDir * 2;
+          inv.x += this.invaderMarchDir * 8;
+          inv.y += 2;
         }
       }
     }
@@ -341,7 +349,7 @@ export class EnemyManager {
       this.invaderShootCooldown = 110 + Math.floor(Math.random() * 80);
       const randomInv = invaders[Math.floor(Math.random() * invaders.length)];
       if (randomInv) {
-        onSpawnBullet(randomInv.x, randomInv.y + 16, 0, 0.45); // straight down white bullet
+        onSpawnBullet(randomInv.x, randomInv.y + 16, 0, 1.1); // straight down white bullet
       }
     }
   }
@@ -446,19 +454,14 @@ export class EnemyManager {
       }
 
       case 'TOROID_SWOOP': {
-        if (t < 45) {
-          e.vy = 1.2;
-          e.vx = 0;
-        } else if (t < 95) {
-          const progress = (t - 45) / 50;
-          const angle = progress * Math.PI;
-          const dir = e.x < canvasWidth / 2 ? -1 : 1;
-          e.vx = Math.sin(angle) * dir * 1.8;
-          e.vy = Math.cos(angle) * 1.4;
-        } else {
-          e.vy = -1.5;
-          e.vx = e.x < canvasWidth / 2 ? -0.8 : 0.8;
-        }
+        // Side wings descend below the fleet, then curl inward and back up.
+        const inward = (e.orbitCenterX ?? e.x) < canvasWidth / 2 ? 1 : -1;
+        if (t < 120) { e.vx = inward * 0.12; e.vy = 3.0; }
+        else if (t < 185) {
+          const angle = (t - 120) / 65 * Math.PI;
+          e.vx = inward * Math.sin(angle) * 2.8;
+          e.vy = Math.cos(angle) * 2.4;
+        } else { e.vx = inward * 0.7; e.vy = -2.8; }
         break;
       }
 
@@ -505,8 +508,8 @@ export class EnemyManager {
       }
 
       case 'SPAROID_CRUISE': {
-        e.vy = 1.05;
-        e.vx = Math.sin(t * 0.04) * 1.05;
+        e.vy = 1.8;
+        e.vx = 0;
         break;
       }
 
@@ -517,7 +520,7 @@ export class EnemyManager {
       }
 
       default: {
-        e.vy = 1.05;
+        e.vy = 1.8;
         break;
       }
     }

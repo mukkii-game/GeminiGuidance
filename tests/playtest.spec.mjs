@@ -39,4 +39,49 @@ test('large boss, thick blocks and resting orb render on mobile',async({page})=>
  await page.locator('canvas').screenshot({path:'test-results/playtest-pocket-mobile.png'});
  await page.evaluate(()=>{game.breakoutManager.clear();const b=game.bossManager.spawn('STAGE4_GPT6_ASTRA',360);b.y=110;b.phase=1;b.timer=280;game.render();});
  await page.locator('canvas').screenshot({path:'test-results/playtest-boss-mobile.png'});
+ await page.evaluate(()=>{game.bossManager.currentBoss.phase=0;game.bossManager.currentBoss.timer=40;game.render();});
+ await page.locator('canvas').screenshot({path:'test-results/boss-intro-mobile.png'});
+ await page.evaluate(()=>{
+  game.bossManager.clear();game.enemyManager.clear();game.enemyManager.spawnInvaderGrid(360);
+  for(let i=0;i<130;i++)game.enemyManager.update(360,540,180,450);
+  game.encounter={kind:'wave',title:'MISTRAL / KIMI / QWEN',wave:2,subtitle:'INVADER WALL',timer:130,duration:180};game.render();
+ });
+ await page.locator('canvas').screenshot({path:'test-results/invader-mobile.png'});
+ await page.evaluate(()=>{
+  game.enemyManager.clear();game.encounter=undefined;game.player.state.x=180;game.player.state.y=430;
+  const orb=game.geminiManager.orbs[0];Object.assign(orb,{x:230,y:430,isTethered:true,mode:'ORBIT',restRatio:0});
+  for(let row=0;row<5;row++)for(let col=0;col<11;col++)game.spawnBullet(30+col*30,260+row*23,0,1.35);
+  game.render();
+ });
+ await page.locator('canvas').screenshot({path:'test-results/guard-curtain-mobile.png'});
+});
+test('capture is zero damage, repels enemies and bosses, and protects against curtains',async({page})=>{
+ const r=await page.evaluate(()=>{
+  game.enemyManager.clear();game.player.state.x=180;game.player.state.y=400;
+  const orb=game.geminiManager.orbs[0];Object.assign(orb,{x:180,y:350,vx:6,vy:0,mode:'ORBIT',isTethered:true});
+  const e=game.enemyManager.spawn('MISTRAL_FLAME',180,330,'DUMMY');const enemyHp=e.hp;
+  for(let n=0;n<40;n++) {e.hitCooldown=0;game.handleCollisions();}
+  const enemy={hp:e.hp,initial:enemyHp,push:e.knockbackVy};
+  game.enemyManager.clear();const boss=game.bossManager.spawn('STAGE1_DEEPSEEK_KIMI',360);boss.phase=1;boss.x=180;boss.y=310;
+  const bossHp=boss.hp;game.handleCollisions();const beforeY=boss.y;
+  game.bossManager.update(360,180,400);const bossPush=beforeY-boss.y;
+  game.bossManager.clear();
+  for(let i=0;i<48;i++){const angle=i*Math.PI/24;game.spawnBullet(180+Math.cos(angle)*53,400+Math.sin(angle)*53,-Math.cos(angle),-Math.sin(angle));}
+  game.handleCollisions();
+  return {enemy,bossHp,bossAfter:boss.hp,bossPush,bullets:game.enemyBullets.length};
+ });
+ expect(r.enemy.hp).toBe(r.enemy.initial);expect(r.enemy.push).toBeLessThan(0);
+ expect(r.bossAfter).toBe(r.bossHp);expect(r.bossPush).toBeGreaterThan(10);expect(r.bullets).toBe(0);
+});
+test('a free thrust rattles across boss armor points, while camping cannot drill',async({page})=>{
+ const r=await page.evaluate(()=>{
+  game.enemyManager.clear();const boss=game.bossManager.spawn('STAGE4_GPT6_ASTRA',360);boss.phase=1;boss.x=180;boss.y=150;
+  const orb=game.geminiManager.orbs[0];Object.assign(orb,{x:30,y:150,vx:10,vy:0,restRatio:0});
+  let sounds=0;game.audio.playBossHit=()=>sounds++;
+  for(let x=45;x<=315;x+=9){orb.x=x;game.stageTick++;game.handleCollisions();}
+  const hp=boss.hp,hits=sounds;
+  for(let i=0;i<60;i++){game.stageTick++;game.handleCollisions();}
+  return {hits,hp,after:boss.hp};
+ });
+ expect(r.hits).toBeGreaterThanOrEqual(4);expect(r.hits).toBeLessThanOrEqual(5);expect(r.after).toBe(r.hp);
 });

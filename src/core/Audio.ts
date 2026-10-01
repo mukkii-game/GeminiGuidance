@@ -15,6 +15,7 @@ export class SoundEngine {
   private sfxGain: GainNode | null = null;
   private buffers: Map<string, AudioBuffer> = new Map();
   private loaded: boolean = false;
+  private paused = false;
   private bgmEnabled: boolean = true;
   private seEnabled: boolean = true;
 
@@ -73,7 +74,20 @@ export class SoundEngine {
     }
   }
 
+  public setPaused(paused: boolean): void {
+    if (this.paused === paused) return;
+    this.paused = paused;
+    if (paused) {
+      this.currentBgmAudio?.pause();
+      if (this.ctx?.state === 'running') this.ctx.suspend().catch(() => {});
+    } else {
+      this.resume();
+      if (this.bgmEnabled) this.currentBgmAudio?.play().catch(() => {});
+    }
+  }
+
   public resume(): void {
+    if (this.paused) return;
     if (!this.ctx) {
       this.init();
     }
@@ -90,7 +104,7 @@ export class SoundEngine {
       localStorage.setItem('gemini_bgm_enabled', String(this.bgmEnabled));
     } catch (_) {}
 
-    if (this.bgmEnabled) {
+    if (this.bgmEnabled && !this.paused) {
       if (this.currentBgmAudio) {
         this.currentBgmAudio.play().catch(() => {});
       } else if (this.currentBgmUrl) {
@@ -136,7 +150,7 @@ export class SoundEngine {
       this.sfxGain.gain.setValueAtTime(this.seEnabled ? 0.35 : 0.0, this.ctx.currentTime);
     }
     if (this.currentBgmAudio) {
-      if (this.bgmEnabled) {
+      if (this.bgmEnabled && !this.paused) {
         this.currentBgmAudio.play().catch(() => {});
       } else {
         this.currentBgmAudio.pause();
@@ -186,7 +200,7 @@ export class SoundEngine {
 
     if (sameTrack && this.currentBgmAudio) {
       this.currentBgmAudio.volume = volume;
-      if (this.bgmEnabled && this.currentBgmAudio.paused) {
+      if (this.bgmEnabled && !this.paused && this.currentBgmAudio.paused) {
         this.currentBgmAudio.play().catch(() => {});
       }
       return;
@@ -202,7 +216,7 @@ export class SoundEngine {
       this.currentBgmAudio = new Audio(url);
       this.currentBgmAudio.loop = true;
       this.currentBgmAudio.volume = volume;
-      if (this.bgmEnabled) {
+      if (this.bgmEnabled && !this.paused) {
         this.currentBgmAudio.play().catch(() => {});
       }
     } catch (err) {
@@ -256,7 +270,7 @@ export class SoundEngine {
   }
 
   private playBuffer(name: string, volume: number = 1.0, rate: number = 1.0, debounceMs: number = 40, debounceKey: string = name): boolean {
-    if (!this.seEnabled || !this.ctx || !this.sfxGain) return false;
+    if (this.paused || !this.seEnabled || !this.ctx || !this.sfxGain) return false;
     const now = performance.now();
     const last = this.lastPlayedTime.get(debounceKey) ?? -Infinity;
     if (now - last < debounceMs) {

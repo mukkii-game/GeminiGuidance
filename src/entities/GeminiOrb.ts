@@ -151,7 +151,7 @@ export class GeminiOrbManager {
     damping: 0.993,          // 減衰率: 0.985 (強減衰), 0.990 (中), 0.993 (標準), 0.996 (弱), 0.998 (極弱)
     maxSpeedMultiplier: 1.0, // 最高速度倍率: 0.6, 0.8, 1.0 (標準), 1.5, 2.0, 3.0
     apexDwellMultiplier: 1.0,
-    orbitRadius: 75,
+    orbitRadius: 50,
     overshootRatio: 0.5,
   };
   private orbCounter: number = 0;
@@ -218,7 +218,7 @@ export class GeminiOrbManager {
       damping: 0.993,
       maxSpeedMultiplier: 1.0,
       apexDwellMultiplier: 1.0,
-      orbitRadius: 75,
+      orbitRadius: 50,
       overshootRatio: 0.5,
     };
     this.screenEdgeBounce = false;
@@ -371,7 +371,8 @@ export class GeminiOrbManager {
 
   public getEffectiveDamage(orb: GeminiOrb): number {
     const baseDamage = orb.level === 1 ? 1 : orb.level === 2 ? 2 : 4;
-    if (this.isPassiveOrb(orb)) return Math.max(1, baseDamage / 2);
+    if (orb.isTethered || orb.mode === 'ORBIT') return 0;
+    if (this.isPassiveOrb(orb)) return 1;
     const speed = Math.hypot(orb.vx, orb.vy);
     return baseDamage + (speed > 9 ? 3 : speed > 5 ? 2 : speed > 2.5 ? 1 : 0);
   }
@@ -380,21 +381,25 @@ export class GeminiOrbManager {
     return getOrbEffectiveRadius(orb);
   }
 
-  /** Fade only low-speed, close-range motion. A fast pass by the ship stays lethal. */
+  /** Nearby residence, not velocity, distinguishes an idle loop from a committed spear. */
   private updateRestState(orb: GeminiOrb, playerX: number, playerY: number): void {
     if (orb.isTethered || orb.mode === 'ORBIT') {
       orb.restRatio = 0;
+      orb.nearPlayerFrames = 0;
       return;
     }
-    const speed = Math.hypot(orb.vx, orb.vy);
     const distance = Math.hypot(orb.x - playerX, orb.y - playerY);
-    if (speed > 3.2 || distance > 100) {
-      // Moving away winds up the next spear immediately, with no stale passive damage.
+    if (distance >= 130) {
+      // Creating a real gap winds up the next attack. Fast local circles do not.
       orb.restRatio = 0;
+      orb.nearPlayerFrames = 0;
+    } else if (distance <= 95) {
+      orb.nearPlayerFrames = Math.min(42, (orb.nearPlayerFrames ?? 0) + 1);
+      // An 18-frame grace period protects a spear crossing the player's position.
+      if (orb.nearPlayerFrames > 18) orb.restRatio = Math.max(orb.restRatio ?? 0, (orb.nearPlayerFrames - 18) / 24);
     } else {
-      const settled = speed < 2.2 && distance < 55;
-      const rest = orb.restRatio ?? 0;
-      orb.restRatio = settled ? Math.min(1, rest + 1 / 60) : Math.max(0, rest - 1 / 15);
+      // Small excursions don't reset accumulated inactivity or re-arm a resting orb.
+      orb.nearPlayerFrames = Math.max(0, (orb.nearPlayerFrames ?? 0) - 1);
     }
     if (this.isPassiveOrb(orb)) {
       orb.isCharged = false;
@@ -472,6 +477,7 @@ export class GeminiOrbManager {
       radius: 16,
       damage: 1,
       restRatio: 0,
+      nearPlayerFrames: 0,
       trail: [],
       fuseTimer: 20,
       mode: 'COMET',
@@ -559,9 +565,48 @@ export class GeminiOrbManager {
       this.updateRestState(orb, playerX, playerY);
     }
 
-    // Check for Gemini Fusion
+    this.separateFreeOrbs();
     // Twin orbs remain independent weapons, even when their paths cross.
     void onMerge;
+  }
+
+  /** Soft, local twin spacing. Never replace the shared player-directed trajectory. */
+  private separateFreeOrbs(): void {
+    for (let i = 0; i < this.orbs.length; i++) {
+      const a = this.orbs[i];
+      if (a.isTethered || a.mode === 'ORBIT') continue;
+      for (let j = i + 1; j < this.orbs.length; j++) {
+        const b = this.orbs[j];
+        if (b.isTethered || b.mode === 'ORBIT') continue;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const distance = Math.hypot(dx, dy);
+        const spacing = getOrbEffectiveRadius(a) + getOrbEffectiveRadius(b) + 3;
+        if (distance >= spacing) continue;
+        // Coincident twins split across their flight direction, rather than changing aim.
+        const meanVx = (a.vx + b.vx) * 0.5, meanVy = (a.vy + b.vy) * 0.5;
+        const meanSpeed = Math.hypot(meanVx, meanVy);
+        const nx = distance > 0.001 ? dx / distance : meanSpeed > 0.1 ? -meanVy / meanSpeed : 1;
+        const ny = distance > 0.001 ? dy / distance : meanSpeed > 0.1 ? meanVx / meanSpeed : 0;
+        const overlap = spacing - distance;
+        const correction = Math.min(0.75, overlap * 0.25);
+        const move = (orb: GeminiOrb, sign: number): void => {
+          let cx = sign * nx * correction, cy = sign * ny * correction;
+          if (this.screenEdgeBounce) {
+            // Clip only the small correction, never snap a constrained orb to a new spot.
+            if (cx < 0) cx = Math.max(cx, Math.min(0, 14 - orb.x));
+            else cx = Math.min(cx, Math.max(0, 346 - orb.x));
+            if (cy < 0) cy = Math.max(cy, Math.min(0, 24 - orb.y));
+            else cy = Math.min(cy, Math.max(0, 516 - orb.y));
+          }
+          orb.x += cx; orb.y += cy;
+        };
+        move(a, -1); move(b, 1);
+        const closing = Math.max(0, -((b.vx - a.vx) * nx + (b.vy - a.vy) * ny));
+        const impulse = Math.min(0.08, 0.035 * overlap / spacing + closing * 0.04);
+        a.vx -= nx * impulse; a.vy -= ny * impulse;
+        b.vx += nx * impulse; b.vy += ny * impulse;
+      }
+    }
   }
 
   /**
@@ -899,13 +944,13 @@ export class GeminiOrbManager {
     const distance = Math.hypot(dx, dy);
     const angle = Math.atan2(dy, dx);
     const direction = this.spinDirections.get(orb) ?? 1;
-    const baseOmega = 0.065;
+    const baseOmega = 0.11;
     const tangentMotion = -playerVx * Math.sin(angle) + playerVy * Math.cos(angle);
     // Only motion in the spin direction pumps energy; the baseline is always controllable.
     const pump = Math.max(0, tangentMotion * direction) * 0.0008;
-    const omega = Math.min(0.15, Math.abs(orb.orbitAngularVel || baseOmega) * 0.976 + baseOmega * 0.024 + pump);
+    const omega = Math.min(0.19, Math.abs(orb.orbitAngularVel || baseOmega) * 0.976 + baseOmega * 0.024 + pump);
     orb.orbitAngularVel = omega * direction;
-    const targetRadius = Math.max(48, Math.min(90, this.tuning.orbitRadius));
+    const targetRadius = Math.max(42, Math.min(60, this.tuning.orbitRadius));
     // Reel in at a bounded speed, so catching a distant orb never teleports it.
     const radius = distance + Math.max(-9, Math.min(9, (targetRadius - distance) * 0.10));
     const step = orb.orbitAngularVel * Math.min(1, targetRadius / Math.max(targetRadius, distance));
@@ -916,9 +961,9 @@ export class GeminiOrbManager {
     // Stored velocity is the release tangent, not the radial reeling velocity.
     orb.vx = -Math.sin(orb.orbitAngle) * omega * targetRadius * direction + playerVx * 0.3;
     orb.vy = Math.cos(orb.orbitAngle) * omega * targetRadius * direction + playerVy * 0.3;
-    orb.spinLevel = omega > 0.125 ? 2 : omega > 0.085 ? 1 : 0;
+    orb.spinLevel = omega > 0.17 ? 2 : omega > 0.135 ? 1 : 0;
     orb.isCharged = false;
-    orb.chargeRatio = Math.min(1, (omega - baseOmega) / 0.085);
+    orb.chargeRatio = Math.max(0, Math.min(1, (omega - baseOmega) / 0.08));
   }
 
   /** Free guidance: underdamped player-directed attraction, evaluated at fixed 60 Hz. */
@@ -983,7 +1028,7 @@ export class GeminiOrbManager {
       const cosA = Math.cos(orb.orbitAngle);
       const tangentSpeed = -orb.vx * sinA + orb.vy * cosA;
       const spinDirection = Math.abs(tangentSpeed) > 0.5 ? Math.sign(tangentSpeed) : Math.sign(orb.orbitAngularVel || 1);
-      orb.orbitAngularVel = (this.spinDirections.get(orb) ?? spinDirection) * Math.max(0.065, Math.min(0.15, Math.abs(tangentSpeed) / Math.max(1, orb.orbitRadius)));
+      orb.orbitAngularVel = (this.spinDirections.get(orb) ?? spinDirection) * Math.max(0.11, Math.min(0.19, Math.abs(tangentSpeed) / Math.max(1, orb.orbitRadius)));
     } else if (!isTetherHeld && wasTethered) {
       // 投擲リリース！
       orb.isTethered = false;
@@ -994,6 +1039,8 @@ export class GeminiOrbManager {
         orb.vx *= launchSpeed / spd;
         orb.vy *= launchSpeed / spd;
       }
+      orb.restRatio = 0;
+      orb.nearPlayerFrames = 0;
       orb.strokePhase = 'OUTWARD';
       orb.launchStartX = orb.x;
       orb.launchStartY = orb.y;
