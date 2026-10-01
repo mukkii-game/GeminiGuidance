@@ -39,6 +39,16 @@ test('large boss, thick blocks and resting orb render on mobile',async({page})=>
  await page.locator('canvas').screenshot({path:'test-results/playtest-pocket-mobile.png'});
  await page.evaluate(()=>{game.breakoutManager.clear();const b=game.bossManager.spawn('STAGE4_GPT6_ASTRA',360);b.y=110;b.phase=1;b.timer=280;game.render();});
  await page.locator('canvas').screenshot({path:'test-results/playtest-boss-mobile.png'});
+ await page.evaluate(()=>{
+  const boss=game.bossManager.currentBoss;boss.phase=1;boss.timer=0;boss.y=boss.targetY;
+  game.enemyBullets=[];
+  for(let i=0;i<150;i++){
+    game.bossManager.update(360,180,440,(x,y,vx,vy,r)=>game.spawnBullet(x,y,vx,vy,r));
+    game.updateEnemyBullets();
+  }
+  game.render();
+ });
+ await page.locator('canvas').screenshot({path:'test-results/boss-safe-lane-mobile.png'});
  await page.evaluate(()=>{game.bossManager.currentBoss.phase=0;game.bossManager.currentBoss.timer=40;game.render();});
  await page.locator('canvas').screenshot({path:'test-results/boss-intro-mobile.png'});
  await page.evaluate(()=>{
@@ -66,12 +76,18 @@ test('capture is zero damage, repels enemies and bosses, and protects against cu
   const bossHp=boss.hp;game.handleCollisions();const beforeY=boss.y;
   game.bossManager.update(360,180,400);const bossPush=beforeY-boss.y;
   game.bossManager.clear();
-  for(let i=0;i<48;i++){const angle=i*Math.PI/24;game.spawnBullet(180+Math.cos(angle)*53,400+Math.sin(angle)*53,-Math.cos(angle),-Math.sin(angle));}
-  game.handleCollisions();
-  return {enemy,bossHp,bossAfter:boss.hp,bossPush,bullets:game.enemyBullets.length};
+  // A bullet on Gemini disappears; another at the opposite side survives until the body sweeps there.
+  orb.x=230;orb.y=400;orb.orbitAngle=0;orb.orbitAngularVel=.22;
+  game.spawnBullet(230,400,0,0);game.spawnBullet(130,400,0,0);
+  game.handleCollisions();const afterContact=game.enemyBullets.length;
+  for(let tick=0;tick<18;tick++){
+    game.geminiManager.update(180,400,0,0,undefined,undefined,true);
+    game.handleCollisions();
+  }
+  return {enemy,bossHp,bossAfter:boss.hp,bossPush,afterContact,bullets:game.enemyBullets.length};
  });
  expect(r.enemy.hp).toBe(r.enemy.initial);expect(r.enemy.push).toBeLessThan(0);
- expect(r.bossAfter).toBe(r.bossHp);expect(r.bossPush).toBeGreaterThan(10);expect(r.bullets).toBe(0);
+ expect(r.bossAfter).toBe(r.bossHp);expect(r.bossPush).toBeGreaterThan(10);expect(r.afterContact).toBe(1);expect(r.bullets).toBe(0);
 });
 test('a free thrust rattles across boss armor points, while camping cannot drill',async({page})=>{
  const r=await page.evaluate(()=>{

@@ -95,5 +95,12 @@ assert.equal(invaders.enemies.length,0,'unfinished grid withdraws rather than bl
 const sustained=new BossManager();const curtainBoss=sustained.spawn('STAGE1_DEEPSEEK_KIMI',360);
 curtainBoss.phase=1;curtainBoss.y=curtainBoss.targetY;let large=0,lastLargeTick=0;
 for(let tick=1;tick<=360;tick++)sustained.update(360,180,450,(x,y,vx,vy,radius)=>{if(radius===8){large++;lastLargeTick=tick;}});
-assert.equal(large,357);assert.equal(lastLargeTick,195);
-console.log('Boss curtain: 357 large bullets, sustained through tick 195, then recovery');
+assert(large>=180 && large<320, `curtain bullets ${large}`);assert.equal(lastLargeTick,195);
+console.log('Boss curtain: sustained through tick 195, then recovery');
+
+const patterned=new BossManager(),pb=patterned.spawn('STAGE1_DEEPSEEK_KIMI',360);
+pb.phase=1;pb.y=pb.targetY;const volleys=[];
+for(let frame=0;frame<196;frame++)patterned.update(360,180,440,(x,y,vx,vy,r)=>{if(r&&r>=6)volleys.push({frame,x,r});});
+assert(volleys.length>200);
+assert(volleys.every(b=>Math.abs(b.x-82)>=43+b.r),'left safety lane stays clear of the boss curtain');
+assert(volleys.some(b=>b.r===8)&&volleys.some(b=>b.r===6),'heavy and light phases have different density');

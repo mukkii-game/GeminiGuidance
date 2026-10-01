@@ -944,11 +944,11 @@ export class GeminiOrbManager {
     const distance = Math.hypot(dx, dy);
     const angle = Math.atan2(dy, dx);
     const direction = this.spinDirections.get(orb) ?? 1;
-    const baseOmega = 0.11;
+    const baseOmega = 0.22;
     const tangentMotion = -playerVx * Math.sin(angle) + playerVy * Math.cos(angle);
     // Only motion in the spin direction pumps energy; the baseline is always controllable.
     const pump = Math.max(0, tangentMotion * direction) * 0.0008;
-    const omega = Math.min(0.19, Math.abs(orb.orbitAngularVel || baseOmega) * 0.976 + baseOmega * 0.024 + pump);
+    const omega = Math.min(0.38, Math.abs(orb.orbitAngularVel || baseOmega) * 0.976 + baseOmega * 0.024 + pump);
     orb.orbitAngularVel = omega * direction;
     const targetRadius = Math.max(42, Math.min(60, this.tuning.orbitRadius));
     // Reel in at a bounded speed, so catching a distant orb never teleports it.
@@ -961,9 +961,9 @@ export class GeminiOrbManager {
     // Stored velocity is the release tangent, not the radial reeling velocity.
     orb.vx = -Math.sin(orb.orbitAngle) * omega * targetRadius * direction + playerVx * 0.3;
     orb.vy = Math.cos(orb.orbitAngle) * omega * targetRadius * direction + playerVy * 0.3;
-    orb.spinLevel = omega > 0.17 ? 2 : omega > 0.135 ? 1 : 0;
+    orb.spinLevel = omega > 0.34 ? 2 : omega > 0.27 ? 1 : 0;
     orb.isCharged = false;
-    orb.chargeRatio = Math.max(0, Math.min(1, (omega - baseOmega) / 0.08));
+    orb.chargeRatio = Math.max(0, Math.min(1, (omega - baseOmega) / 0.16));
   }
 
   /** Free guidance: underdamped player-directed attraction, evaluated at fixed 60 Hz. */
@@ -1028,7 +1028,7 @@ export class GeminiOrbManager {
       const cosA = Math.cos(orb.orbitAngle);
       const tangentSpeed = -orb.vx * sinA + orb.vy * cosA;
       const spinDirection = Math.abs(tangentSpeed) > 0.5 ? Math.sign(tangentSpeed) : Math.sign(orb.orbitAngularVel || 1);
-      orb.orbitAngularVel = (this.spinDirections.get(orb) ?? spinDirection) * Math.max(0.11, Math.min(0.19, Math.abs(tangentSpeed) / Math.max(1, orb.orbitRadius)));
+      orb.orbitAngularVel = (this.spinDirections.get(orb) ?? spinDirection) * Math.max(0.22, Math.min(0.38, Math.abs(tangentSpeed) / Math.max(1, orb.orbitRadius)));
     } else if (!isTetherHeld && wasTethered) {
       // 投擲リリース！
       orb.isTethered = false;
