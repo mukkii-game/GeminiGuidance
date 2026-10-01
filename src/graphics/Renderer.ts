@@ -18,6 +18,7 @@ import {
   GeminiTelemetry,
   PhysicsPatternId,
 } from '../types';
+import { getOrbEffectiveRadius } from '../entities/GeminiOrb';
 import { SpriteSheet } from './Sprites';
 import { TerrainEngine } from './Terrain';
 
@@ -208,6 +209,12 @@ export class ArcadeRenderer {
   // --- Stage 2 Breakout Blocks (Arkanoid Wall) ---
   private renderBreakoutBlocks(blocks: BreakoutBlock[]): void {
     const ctx = this.ctx;
+    if (blocks.some(b => b.active && !b.reflector)) {
+      ctx.fillStyle = 'rgba(34,211,238,0.09)'; ctx.fillRect(26,68,308,64);
+      this.setFont('9px "DotGothic16", monospace'); ctx.textAlign='center';
+      ctx.fillStyle='#fde047'; ctx.fillText('BACK HIT ×3',180,91);
+      ctx.fillStyle='#67e8f9'; ctx.fillText('↑',49,164); ctx.fillText('↑',311,164);
+    }
     for (const b of blocks) {
       if (!b.active) continue;
 
@@ -230,6 +237,12 @@ export class ArcadeRenderer {
       ctx.fillRect(x, y + h - 2, w, 2);
       ctx.fillRect(x + w - 2, y, 2, h);
 
+      if (!b.reflector) {
+        // Exposed back plate and remaining armor are readable during ricochets.
+        ctx.fillStyle = '#fde047'; ctx.fillRect(x + 3, y, w - 6, 4);
+        ctx.fillStyle = '#111827'; ctx.fillRect(x + 5, y + h - 8, w - 10, 3);
+        ctx.fillStyle = '#fff7ed'; ctx.fillRect(x + 5, y + h - 8, (w - 10) * b.hp / b.maxHp, 3);
+      }
       // Horizontal glossy sheen
       ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
       ctx.fillRect(x + 3, y + 3, w - 6, 2);
@@ -456,11 +469,9 @@ export class ArcadeRenderer {
         ctx.restore(); this.cachedFont = '';
       }
       const speed = Math.hypot(orb.vx, orb.vy);
-      const isFast = speed > 1.25;
       const isCharged = !!orb.isCharged;
-      const effectiveR = orb.mode === 'ORBIT'
-        ? (orb.orbitTier === 'SHORT' ? orb.radius * 0.75 : orb.orbitTier === 'LONG' ? orb.radius * 1.65 : orb.radius)
-        : (isCharged ? orb.radius * 1.4 : orb.radius);
+      const effectiveR = getOrbEffectiveRadius(orb);
+      const flameOpacity = 1 - (orb.restRatio || 0);
 
       // 0. Energy Tether (クリック長押しヒモ保持 vs フリー投擲ホーミング)
       ctx.save();
@@ -592,6 +603,7 @@ export class ArcadeRenderer {
       // 1. HITODAMA (人魂) & DIRECTIONAL FLYING EMBERS (火の粉)
       // =========================================================================
       ctx.save();
+      ctx.globalAlpha = flameOpacity;
       const headingAngle = Math.atan2(orb.vy, orb.vx);
       const isMoving = speed > 0.55;
 
@@ -738,11 +750,11 @@ export class ArcadeRenderer {
     this.cachedFont = '';
 
       // 2. Motion Trail
-      for (let i = 0; i < orb.trail.length; i++) {
+      for (let i = 0; i < orb.trail.length && flameOpacity > 0; i++) {
         const pt = orb.trail[i];
         ctx.fillStyle = isCharged
-          ? `rgba(255, 110, 0, ${pt.alpha * 0.55})`
-          : orb.level === 3 ? `rgba(255, 120, 255, ${pt.alpha * 0.4})` : `rgba(56, 189, 248, ${pt.alpha * 0.35})`;
+          ? `rgba(255, 110, 0, ${pt.alpha * 0.55 * flameOpacity})`
+          : orb.level === 3 ? `rgba(255, 120, 255, ${pt.alpha * 0.4 * flameOpacity})` : `rgba(56, 189, 248, ${pt.alpha * 0.35 * flameOpacity})`;
         ctx.beginPath();
         ctx.arc(pt.x, pt.y, (effectiveR * 0.45) * (1 - i / orb.trail.length), 0, Math.PI * 2);
         ctx.fill();
@@ -754,9 +766,7 @@ export class ArcadeRenderer {
       if (sprite) {
         ctx.save();
         ctx.translate(orb.x, orb.y);
-        const scale = isCharged ? 1.35 : isFast ? 1.25 : 1.0;
-        ctx.scale(scale, scale);
-        ctx.drawImage(sprite, -sprite.width / 2, -sprite.height / 2);
+        ctx.drawImage(sprite, -effectiveR, -effectiveR, effectiveR * 2, effectiveR * 2);
         ctx.restore();
     this.cachedFont = '';
       }
@@ -956,6 +966,19 @@ export class ArcadeRenderer {
     const ctx = this.ctx;
     ctx.save();
     ctx.translate(boss.x, boss.y);
+    // Full-size armored hull makes the gameplay silhouette match the collision body.
+    const hw = boss.width * .45, hh = boss.height * .42;
+    ctx.fillStyle = boss.hitCooldown ? '#64748b' : '#172033';
+    ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(-hw + 12,-hh); ctx.lineTo(hw - 12,-hh);
+    ctx.lineTo(hw,-hh+12); ctx.lineTo(hw,hh-12); ctx.lineTo(hw-12,hh);
+    ctx.lineTo(-hw+12,hh); ctx.lineTo(-hw,hh-12); ctx.lineTo(-hw,-hh+12);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    for (const side of [-1,1]) {
+      ctx.fillStyle='#334155';ctx.fillRect(side<0?-hw+8:hw-38,-hh+10,30,hh*2-20);
+      ctx.fillStyle='#22d3ee';ctx.fillRect(side<0?-hw+12:hw-34,-hh+14,22,3);
+      ctx.fillStyle='#fb923c';ctx.fillRect(side<0?-hw+15:hw-31,hh-9,16,5);
+    }
 
     if (boss.type === 'STAGE1_DEEPSEEK_KIMI') {
       // Stage 1: DeepSeek Whale + Kimi Moon + Qwen Core

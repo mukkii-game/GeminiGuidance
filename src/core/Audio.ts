@@ -1,6 +1,6 @@
 /**
  * Pure Audio Engine using genuine SFX from 効果音ラボ (soundeffect-lab.info)
- * and genuine 8-bit BGM tracks from 魔王魂 (maou.audio).
+ * and genuine 8-bit / neorock BGM tracks from 魔王魂 (maou.audio).
  * Strictly NO synthesized oscillators or generic AI sounds.
  * 
  * Features:
@@ -95,8 +95,6 @@ export class SoundEngine {
         this.currentBgmAudio.play().catch(() => {});
       } else if (this.currentBgmUrl) {
         this.switchBgm(this.currentBgmType || 'STAGE_A', this.currentBgmUrl, this.currentBgmVolume);
-      } else {
-        this.startBgm();
       }
     } else {
       if (this.currentBgmAudio) {
@@ -179,17 +177,25 @@ export class SoundEngine {
   }
 
   private switchBgm(type: 'STAGE_A' | 'STAGE_B' | 'BOSS', url: string, volume: number): void {
+    // Compare the *playing* selection before recording the requested selection.
+    // Different boss stages may share type BOSS but have different track URLs.
+    const sameTrack = this.currentBgmType === type && this.currentBgmUrl === url;
     this.currentBgmType = type;
     this.currentBgmUrl = url;
     this.currentBgmVolume = volume;
 
-    if (this.currentBgmType === type && this.currentBgmAudio && !this.currentBgmAudio.paused) {
+    if (sameTrack && this.currentBgmAudio) {
+      this.currentBgmAudio.volume = volume;
+      if (this.bgmEnabled && this.currentBgmAudio.paused) {
+        this.currentBgmAudio.play().catch(() => {});
+      }
       return;
     }
 
     if (this.currentBgmAudio) {
       this.currentBgmAudio.pause();
       this.currentBgmAudio.currentTime = 0;
+      this.currentBgmAudio = null;
     }
 
     try {
@@ -208,8 +214,11 @@ export class SoundEngine {
     if (this.currentBgmAudio) {
       this.currentBgmAudio.pause();
       this.currentBgmAudio.currentTime = 0;
-      this.currentBgmType = null;
     }
+    // Stopped means no requested track, unlike muted (which preserves selection).
+    this.currentBgmAudio = null;
+    this.currentBgmType = null;
+    this.currentBgmUrl = null;
   }
 
   private async loadSoundAssets(): Promise<void> {
@@ -246,17 +255,16 @@ export class SoundEngine {
     }
   }
 
-  private playBuffer(name: string, volume: number = 1.0, rate: number = 1.0, debounceMs: number = 40): boolean {
+  private playBuffer(name: string, volume: number = 1.0, rate: number = 1.0, debounceMs: number = 40, debounceKey: string = name): boolean {
     if (!this.seEnabled || !this.ctx || !this.sfxGain) return false;
     const now = performance.now();
-    const last = this.lastPlayedTime.get(name) || 0;
+    const last = this.lastPlayedTime.get(debounceKey) ?? -Infinity;
     if (now - last < debounceMs) {
       return false; // Skip redundant stacked trigger
     }
-    this.lastPlayedTime.set(name, now);
-
     const buf = this.buffers.get(name);
     if (!buf) return false;
+    this.lastPlayedTime.set(debounceKey, now);
 
     const source = this.ctx.createBufferSource();
     source.buffer = buf;
@@ -281,6 +289,21 @@ export class SoundEngine {
   /** Gemini strikes armored enemy and bounces off */
   public playGeminiBounce(): void {
     this.playBuffer('armor_hit', 0.85, 1.15, 60);
+  }
+
+  /** Boss hull strike: a crisp normal hit, or a lower, heavier released thrust.
+   * One boss-hit voice gate keeps simultaneous twin contacts from stacking.
+   * Strong strikes may cut through recent light contacts, but not each other.
+   */
+  public playBossHit(strong: boolean = false): void {
+    if (strong) {
+      if (this.playBuffer('armor_hit', 0.95, 0.78, 100, 'boss_hit_strong')) {
+        this.lastPlayedTime.set('boss_hit', performance.now());
+        this.playBuffer('bomb_crisp', 0.32, 1.45, 100, 'boss_hit_weight');
+      }
+    } else {
+      this.playBuffer('armor_hit', 0.68, 1.35, 70, 'boss_hit');
+    }
   }
 
   /** Bullet erased by Gemini orb */

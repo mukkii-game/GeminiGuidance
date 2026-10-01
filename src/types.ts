@@ -169,6 +169,7 @@ export interface GeminiOrb {
   collisionMode?: GeminiCollisionMode;
   isCharged?: boolean;
   chargeRatio?: number;
+  restRatio?: number; // 0 = active free thrust, 1 = settled small passive orb.
   orbitTier?: 'SHORT' | 'MEDIUM' | 'LONG';
   strokePhase?: 'INWARD' | 'OVERSHOOT' | 'APEX' | 'REST' | 'OUTWARD' | 'RETURN';
   castTargetX?: number;
@@ -347,6 +348,7 @@ export interface FloatingText {
 }
 
 export interface BreakoutBlock {
+  reflector?: boolean;
   id: string;
   x: number;
   y: number;

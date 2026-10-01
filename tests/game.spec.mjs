@@ -148,25 +148,59 @@ test('normal-damage guidance and aimed throwing pilots can both finish the campa
     let seed=42;Math.random=()=>((seed=(seed*1664525+1013904223)>>>0)/4294967296);
     const runs=[];
     for(const throwing of [true,false]) {
-      game.startNewGame();let frame=0,releasedAt=-100;
+      game.startNewGame();let frame=0,releasedAt=-100;const checkpoints=[];let previousState=game.state,seenBossStage=0;
       while(frame<60*60*12 && !['GAME_OVER','GAME_CLEAR'].includes(game.state)) {
         const boss=game.bossManager.currentBoss;
-        game.input.state.x=180+95*Math.sin(frame/47);
-        game.input.state.y=boss ? (throwing?225+35*Math.sin(frame/63):205+55*Math.sin(frame/27)) : 285+110*Math.sin(frame/63);
+        if(boss && game.stage!==seenBossStage) {
+          seenBossStage=game.stage;
+          checkpoints.push({event:'boss',stage:game.stage,seconds:Math.round(frame/60),hp:game.player.state.hp,lives:game.player.state.lives,bossHp:boss.hp});
+        }
+        game.input.state.x=180+(throwing?95:110)*Math.sin(frame/(throwing?47:37));
+        game.input.state.y=boss ? (throwing?225+35*Math.sin(frame/63):280+100*Math.sin(frame/22)) : 285+110*Math.sin(frame/63);
         game.input.state.isPointerDown=throwing && frame-releasedAt>75;
         if(game.input.state.isPointerDown) {
           const orb=game.geminiManager.orbs[0],dx=(boss?.x??180)-orb.x,dy=(boss?.y??80)-orb.y;
           const dot=(dx*orb.vx+dy*orb.vy)/(Math.hypot(dx,dy)*Math.hypot(orb.vx,orb.vy));
           if(orb.isTethered && dot>.985) {game.input.state.isPointerDown=false;releasedAt=frame;}
         }
+        if(!throwing) {
+          // Choose a nearby steering direction from visible hazards, without
+          // modifying actors. A wide stroke is useful only if the ship survives it.
+          const p=game.player.state,goal={x:game.input.state.x,y:game.input.state.y};
+          const threats=[...game.enemyManager.enemies.map(e=>({x:e.x,y:e.y,vx:e.vx,vy:e.vy,r:e.width*.45+18})),
+            ...game.enemyBullets.map(e=>({x:e.x,y:e.y,vx:e.vx,vy:e.vy,r:24}))];
+          let best=null;
+          for(let i=-1;i<16;i++) {
+            const angle=i<0?Math.atan2(goal.y-p.y,goal.x-p.x):i*Math.PI/8;
+            const vx=Math.cos(angle)*7,vy=Math.sin(angle)*7;
+            const x=Math.max(20,Math.min(340,p.x+vx*9)),y=Math.max(45,Math.min(505,p.y+vy*9));
+            let cost=Math.hypot(x-goal.x,y-goal.y)*.2;
+            for(const t of threats)for(const step of [3,6,9]) {
+              const px=p.x+(x-p.x)*step/9,py=p.y+(y-p.y)*step/9;
+              const distance=Math.hypot(px-t.x-t.vx*step,py-t.y-t.vy*step);
+              cost+=Math.max(0,t.r+12-distance)**2*4;
+            }
+            if(boss&&!boss.defeated)for(const step of [3,6,9]) {
+              const px=p.x+(x-p.x)*step/9,py=p.y+(y-p.y)*step/9;
+              if(Math.abs(px-boss.x)<boss.width*.32+16&&Math.abs(py-boss.y)<boss.height*.30+20)cost+=100000;
+            }
+            if(!best||cost<best.cost)best={x,y,cost};
+          }
+          game.input.state.x=best.x;game.input.state.y=best.y;
+        }
         // Actual inputs and unmodified lives, enemy HP, collisions, pickups, and damage.
         game.update();frame++;
+        if(game.state!==previousState && ['STAGE_CLEAR','GAME_OVER'].includes(game.state)) {
+          checkpoints.push({event:game.state,stage:game.stage,seconds:Math.round(frame/60),hp:game.player.state.hp,lives:game.player.state.lives,bossHp:game.bossManager.currentBoss?.hp});
+        }
+        previousState=game.state;
       }
-      runs.push({throwing,state:game.state,seconds:Math.round(frame/60),lives:game.player.state.lives});
+      runs.push({checkpoints,throwing,state:game.state,seconds:Math.round(frame/60),lives:game.player.state.lives,stage:game.stage,hp:game.player.state.hp,bossHp:game.bossManager.currentBoss?.hp});
     }
     return runs;
   });
+  console.log('Pilot diagnostics:',JSON.stringify(runs));
   expect(runs.map(run=>run.state)).toEqual(['GAME_CLEAR','GAME_CLEAR']);
   expect(runs.every(run=>run.lives>0)).toBe(true);
-  console.log('Normal-damage automated pilots:',runs);
+  expect(runs.every(run=>run.checkpoints.filter(event=>event.event==='STAGE_CLEAR').length===4)).toBe(true);
 });

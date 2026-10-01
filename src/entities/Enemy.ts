@@ -59,6 +59,12 @@ export class EnemyManager {
         width = 24; height = 76; hp = 12; points = 1000; color = '#ffffff'; collisionType = 'REFLECT'; mass = 999; break;
     }
 
+    // Larger silhouettes give the player time to line up a committed thrust.
+    // Light hulls survive idle contact, but a fast level-one thrust still clears a column.
+    width = Math.round(width * 1.2);
+    height = Math.round(height * 1.2);
+    hp += hp >= 6 ? 2 : 1;
+
     if (customHp !== undefined) {
       hp = customHp;
     }
@@ -128,7 +134,7 @@ export class EnemyManager {
   public spawnDeepSeekUfo(canvasWidth: number, fromLeft: boolean = true): EnemyEntity {
     const startX = fromLeft ? -35 : canvasWidth + 35;
     const ufo = this.spawn('DEEPSEEK_FLASH', startX, 44, 'UFO_FLYBY', 'ufo_wave', 1);
-    ufo.vx = fromLeft ? 0.65 : -0.65;
+    ufo.vx = fromLeft ? 0.8 : -0.8;
     ufo.vy = 0;
     return ufo;
   }
@@ -137,7 +143,7 @@ export class EnemyManager {
    * Spawn boss escort minion performing a direct high-speed body tackle (体当たり)
    */
   public spawnTackleMinion(type: EnemyType, x: number, y: number, vx: number, vy: number): EnemyEntity {
-    const minion = this.spawn(type, x, y, 'TACKLE_DASH', 'minion_tackle', 1);
+    const minion = this.spawn(type, x, y, 'TACKLE_DASH', 'minion_tackle', 2);
     minion.vx = 0;
     minion.vy = 0;
     minion.targetX = vx;
@@ -189,6 +195,7 @@ export class EnemyManager {
       if (e.pattern !== 'INVADER') {
         for (let j = i - 1; j >= 0; j--) {
           const other = this.enemies[j];
+          if (e.formationId && e.formationId === other.formationId && e.pattern === 'STRAIGHT_DOWN') continue;
           if (other.pattern === 'ROCKET_ASCENT' || e.pattern === 'ROCKET_ASCENT' || other.pattern === 'INVADER') continue;
           const minDist = (e.width + other.width) * 0.52;
           const dx = e.x - other.x;
@@ -407,7 +414,7 @@ export class EnemyManager {
         // Enter the visible arena, aim, freeze aim, then commit without homing.
         if (t < 40) {
           e.vx = 0;
-          e.vy = 2.6;
+          e.vy = 2.2;
           e.targetX = playerX;
           e.targetY = _playerY;
         } else if (t < 84) {
@@ -418,8 +425,8 @@ export class EnemyManager {
           const dx = (e.targetX ?? playerX) - e.x;
           const dy = (e.targetY ?? _playerY) - e.y;
           const distance = Math.hypot(dx, dy) || 1;
-          e.vx = dx / distance * 3.4;
-          e.vy = dy / distance * 3.4;
+          e.vx = dx / distance * 2.7;
+          e.vy = dy / distance * 2.7;
         }
         break;
       }
@@ -440,7 +447,7 @@ export class EnemyManager {
 
       case 'TOROID_SWOOP': {
         if (t < 45) {
-          e.vy = 1.6;
+          e.vy = 1.2;
           e.vx = 0;
         } else if (t < 95) {
           const progress = (t - 45) / 50;
@@ -460,7 +467,7 @@ export class EnemyManager {
           e.vy = 1.0;
           e.vx = (playerX - e.x) * 0.02;
         } else if (t < 80) {
-          e.vy = 2.2;
+          e.vy = 1.7;
           e.vx = 0;
         } else {
           e.vy = 1.5;
@@ -471,46 +478,46 @@ export class EnemyManager {
       case 'ZOSHI_REACTIVE_SWOOP': {
         if (t < 35) {
           const dir = e.x < canvasWidth / 2 ? 1 : -1;
-          e.vx = dir * 2.0;
-          e.vy = 1.1;
+          e.vx = dir * 1.5;
+          e.vy = 0.9;
         } else {
           e.vx *= 0.98;
-          e.vy = 1.8;
+          e.vy = 1.35;
         }
         break;
       }
 
       case 'GALAGA_LOOP': {
         if (t < 40) {
-          e.vy = 1.4;
+          e.vy = 1.05;
           e.vx = (canvasWidth / 2 - e.x) * 0.02;
         } else if (t < 90) {
           const loopProg = (t - 40) / 50;
           const loopAngle = loopProg * Math.PI * 2;
           const loopDir = e.x < canvasWidth / 2 ? 1 : -1;
-          e.vx = Math.cos(loopAngle) * 1.8 * loopDir;
-          e.vy = Math.sin(loopAngle) * 1.8;
+          e.vx = Math.cos(loopAngle) * 1.4 * loopDir;
+          e.vy = Math.sin(loopAngle) * 1.4;
         } else {
-          e.vy = 2.0;
+          e.vy = 1.5;
           e.vx = 0;
         }
         break;
       }
 
       case 'SPAROID_CRUISE': {
-        e.vy = 1.4;
-        e.vx = Math.sin(t * 0.04) * 1.5;
+        e.vy = 1.05;
+        e.vx = Math.sin(t * 0.04) * 1.05;
         break;
       }
 
       case 'ROCKET_ASCENT': {
-        e.vy = -2.2;
+        e.vy = -1.8;
         e.vx = 0;
         break;
       }
 
       default: {
-        e.vy = 1.4;
+        e.vy = 1.05;
         break;
       }
     }

@@ -856,7 +856,7 @@ export class Game {
     // 0. Breakout Blocks Collision (Stage 2 & Test Stage)
     if ((this.stage === 2 || this.state === 'TEST_STAGE') && this.breakoutManager.blocks.length > 0) {
       for (const orb of this.geminiManager.orbs) {
-        const res = this.breakoutManager.checkGeminiCollision(orb);
+        const res = this.breakoutManager.checkGeminiCollision(orb, this.geminiManager.getEffectiveRadius(orb), this.geminiManager.getEffectiveDamage(orb));
         if (res.hit && res.block) {
           // Elastic reflection off Breakout Block!
           if (!orb.isTethered) {
@@ -864,8 +864,15 @@ export class Game {
             if (dot < 0) {
               orb.vx -= 1.95 * dot * res.normalX;
               orb.vy -= 1.95 * dot * res.normalY;
-              orb.x = res.hitX + res.normalX * (orb.radius + 1.5);
-              orb.y = res.hitY + res.normalY * (orb.radius + 1.5);
+              // Local accelerator rails reward a deliberate entry; screen walls stay optional.
+              if (res.block.reflector || res.rear) {
+                const speed = Math.hypot(orb.vx, orb.vy) || 1;
+                const boost = Math.max(1, Math.min(16 / speed, 1.3));
+                orb.vx *= boost; orb.vy *= boost;
+                if (Math.abs(orb.vx) < 3) orb.vx = (orb.x < 180 ? 1 : -1) * 3;
+              }
+              orb.x = res.hitX + res.normalX * (this.geminiManager.getEffectiveRadius(orb) + 1.5);
+              orb.y = res.hitY + res.normalY * (this.geminiManager.getEffectiveRadius(orb) + 1.5);
             }
           }
 
@@ -920,7 +927,7 @@ export class Game {
           }
 
           // Determine reflection vs penetration:
-          const isReflect = this.geminiManager.collisionMode === 'REFLECT' || e.collisionType === 'REFLECT';
+          const isReflect = this.geminiManager.isPassiveOrb(orb) || this.geminiManager.collisionMode === 'REFLECT' || e.collisionType === 'REFLECT';
 
           // Damage application (1回の通過で1回のみダメージ判定)
           e.hp -= effectiveDmg;
@@ -1047,41 +1054,43 @@ export class Game {
       // 3. Gemini Orbs vs Boss (貫通 vs 反射)
       if (this.bossManager.currentBoss) {
         const b = this.bossManager.currentBoss;
-        const touching = Math.hypot(orb.x - b.x, orb.y - b.y) < Math.max(b.width, b.height) * 0.48 + orbRadius;
+        const touching = Math.hypot(
+          Math.max(0, Math.abs(orb.x - b.x) - b.width * .45),
+          Math.max(0, Math.abs(orb.y - b.y) - b.height * .42)) <= orbRadius;
         if (!touching) this.bossContacts.delete(orb.id);
         if (this.bossContacts.has(orb.id)) continue;
         if (!b.hitCooldown || b.hitCooldown <= 0) {
           const bdx = orb.x - b.x;
           const bdy = orb.y - b.y;
           const bdist = Math.hypot(bdx, bdy) || 1;
-          const bossHitRadius = Math.max(b.width, b.height) * 0.48 + orbRadius;
-
-          if (bdist < bossHitRadius) {
-            const isBossReflect = (this.state === 'TEST_STAGE')
+          if (touching) {
+            const isBossReflect = this.geminiManager.isPassiveOrb(orb) || ((this.state === 'TEST_STAGE')
               ? (this.testBossCollisionMode === 'REFLECT' || this.geminiManager.collisionMode === 'REFLECT')
-              : (this.geminiManager.collisionMode === 'REFLECT');
+              : (this.geminiManager.collisionMode === 'REFLECT'));
 
-            const res = this.bossManager.hit(effectiveDmg, orb.x, orb.y);
+            const hpBefore = b.hp;
+            const res = this.bossManager.hit(effectiveDmg, orb.x, orb.y, orbRadius);
             if (res.bossHit) {
+              const actualDamage = hpBefore - b.hp;
+              this.audio.playBossHit(!!orb.isCharged);
               this.bossContacts.add(orb.id);
               b.hitCooldown = isBossReflect ? 8 : 4;
               this.player.addScore(res.points);
 
               if (isBossReflect) {
-                this.audio.playGeminiBounce();
                 this.addExplosion(orb.x, orb.y, 22, false);
                 if (orb.mode === 'ORBIT') {
                   if (orb.spinLevel === 2) {
                     this.renderer.triggerShake(14, 7);
-                    this.addFloatingText(orb.x, orb.y - 16, `🔥室伏剛撃!! -${effectiveDmg}`, '#ff3b00');
+                    this.addFloatingText(orb.x, orb.y - 16, `🔥室伏剛撃!! -${actualDamage}`, '#ff3b00');
                   } else if (orb.spinLevel === 1) {
                     this.renderer.triggerShake(7, 3.5);
-                    this.addFloatingText(orb.x, orb.y - 16, `⚡遠心剛撃! -${effectiveDmg}`, '#fde047');
+                    this.addFloatingText(orb.x, orb.y - 16, `⚡遠心剛撃! -${actualDamage}`, '#fde047');
                   } else {
-                    this.addFloatingText(orb.x, orb.y - 16, `🛡️分銅打撃 -${effectiveDmg}`, '#38bdf8');
+                    this.addFloatingText(orb.x, orb.y - 16, `🛡️分銅打撃 -${actualDamage}`, '#38bdf8');
                   }
                 } else {
-                  this.addFloatingText(orb.x, orb.y - 16, `BOUNCE! -${effectiveDmg}`, '#f97316');
+                  this.addFloatingText(orb.x, orb.y - 16, `BOUNCE! -${actualDamage}`, '#f97316');
                 }
 
                 // Elastic reflection off boss body for both SLING and ORBIT (Hammerfight)
@@ -1101,11 +1110,11 @@ export class Game {
                 // Boss Penetration: NO bounce! Glides or hovers inside!
                 this.addExplosion(orb.x, orb.y, orb.isCharged ? 24 : 16, false);
                 if (orb.isCharged) {
-                  this.addFloatingText(b.x, b.y - 20, `🔥火の玉大突撃!! -${effectiveDmg}`, '#ff3b00');
+                  this.addFloatingText(b.x, b.y - 20, `🔥火の玉大突撃!! -${actualDamage}`, '#ff3b00');
                 } else if (orb.isHoveringApex) {
-                  this.addFloatingText(b.x, b.y - 20, `★APEX SHRED!! -${effectiveDmg * 2}`, '#fde047');
+                  this.addFloatingText(b.x, b.y - 20, `★APEX SHRED!! -${actualDamage}`, '#fde047');
                 } else {
-                  this.addFloatingText(b.x, b.y - 20, `貫通HIT! -${effectiveDmg}`, '#38bdf8');
+                  this.addFloatingText(b.x, b.y - 20, `貫通HIT! -${actualDamage}`, '#38bdf8');
                 }
               }
 

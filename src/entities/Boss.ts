@@ -9,7 +9,7 @@ export class BossManager {
     let dialogueQuote = '';
     let width = 200;
     let height = 90;
-    let hp = 100;
+    let hp = 140;
     let targetY = 75;
     const weakPoints: WeakPoint[] = [];
 
@@ -20,7 +20,7 @@ export class BossManager {
         name = 'DEEPSEEK, KIMI & QWEN : THUNDER CLOUD DREADNOUGHT';
         width = 200;
         height = 90;
-        hp = 100;
+        hp = 140;
         targetY = 75;
         weakPoints.push(
           { id: 'wp_ds', xOffset: -60, yOffset: 0, radius: 28, hp: 30, maxHp: 30, active: true, label: 'DEEPSEEK' },
@@ -35,7 +35,7 @@ export class BossManager {
         name = 'GROK 4.7 : SPACEX HEAVY STARSHIP FLEET';
         width = 210;
         height = 90;
-        hp = 120;
+        hp = 180;
         targetY = 60; // Perched high up behind the Breakout wall
         weakPoints.push(
           { id: 'wp_cursor_l', xOffset: -65, yOffset: 0, radius: 24, hp: 35, maxHp: 35, active: true, label: '{CURSOR}' },
@@ -50,7 +50,7 @@ export class BossManager {
         name = 'CLAUDE FABLE : APEX CODE PRO';
         width = 210;
         height = 100;
-        hp = 160;
+        hp = 230;
         targetY = 80;
         weakPoints.push(
           { id: 'wp_sonnet_l', xOffset: -65, yOffset: -10, radius: 24, hp: 30, maxHp: 30, active: true, label: 'SONNET' },
@@ -66,7 +66,7 @@ export class BossManager {
         name = 'GPT-6 ASTRA : WIZARD CHAPPY';
         width = 240;
         height = 115;
-        hp = 220;
+        hp = 300;
         targetY = 85;
         weakPoints.push(
           { id: 'wp_luna', xOffset: -75, yOffset: -25, radius: 24, hp: 35, maxHp: 35, active: true, label: 'LUNA' },
@@ -77,6 +77,13 @@ export class BossManager {
         break;
     }
 
+    width = Math.round(width * 1.15);
+    height = Math.round(height * 1.15);
+    for (const weakPoint of weakPoints) {
+      weakPoint.xOffset *= 1.15;
+      weakPoint.yOffset *= 1.15;
+      weakPoint.radius *= 1.1;
+    }
     this.currentBoss = {
       type,
       name,
@@ -126,7 +133,7 @@ export class BossManager {
 
     // Entrance uses phase rather than y: sway below targetY must not restart it.
     if (b.phase === 0) {
-      b.y = Math.min(b.targetY, b.y + 2.4);
+      b.y = Math.min(b.targetY, b.y + 2.8);
       if (b.y >= b.targetY) { b.phase = 1; b.timer = 0; }
       return;
     }
@@ -135,7 +142,7 @@ export class BossManager {
     const cycle = b.timer % 360;
     const opening = cycle >= 260;
     // Stable, slightly lowered target during each recovery window.
-    const sway = opening ? 18 : 42;
+    const sway = opening ? 12 : Math.min(35, (canvasWidth - b.width) / 2 - 8);
     b.x += (canvasWidth / 2 + Math.sin(b.timer * 0.012) * sway - b.x) * 0.055;
     b.y += (b.targetY + (opening ? 24 : Math.sin(b.timer * 0.018) * 8) - b.y) * 0.045;
     if (cycle === 260 && onBossShout) onBossShout('CORE OPEN — 突き・投擲のチャンス！');
@@ -144,21 +151,26 @@ export class BossManager {
     const types: EnemyType[] = ['MISTRAL_FLAME', 'CURSOR_PROBE', 'CLAUDE_HAIKU', 'GPT6_LUNA'];
     const launch = (side: number) => {
       if (!onSpawnTackleMinion) return;
+      // Destroying a wing permanently removes its aimed body-tackle lane.
+      if (side < 0 && !b.weakPoints[0]?.active) return;
+      if (side > 0 && !b.weakPoints[1]?.active) return;
       const x = b.x + side;
       const y = b.y + 32;
       const dx = playerX - x;
       const dy = playerY - y;
       const distance = Math.hypot(dx, dy) || 1;
-      const speed = 2.5 + stage * 0.18 + (b.phase === 2 ? 0.25 : 0);
+      const speed = 2.2 + stage * 0.15 + (b.phase === 2 ? 0.2 : 0);
       onSpawnTackleMinion(types[stage - 1], x, y, dx / distance * speed, dy / distance * speed);
     };
     if (cycle === 45 || cycle === 155) launch(cycle === 45 ? -58 : 58);
-    if (stage >= 3 && b.phase === 2 && cycle === 210) launch(0);
+    if (b.phase === 2 && cycle === 210) launch(0);
+    if (stage >= 3 && cycle === 85) launch(-58);
+    if (stage >= 3 && cycle === 195) launch(58);
 
     // Distinct readable attacks; every cycle retains a 100-frame quiet window.
     if (onSpawnBullet && cycle === 110) {
       const aim = Math.atan2(playerY - b.y, playerX - b.x);
-      const spread = stage === 1 ? [0] : stage === 2 ? [-0.24, 0.24] : [-0.32, 0, 0.32];
+      const spread = stage === 1 ? [-0.22, 0.22] : stage === 2 ? [-0.32, 0, 0.32] : [-0.44, -0.22, 0, 0.22, 0.44];
       for (const offset of spread) {
         const speed = 1.45 + stage * 0.12;
         onSpawnBullet(b.x, b.y + 30, Math.cos(aim + offset) * speed, Math.sin(aim + offset) * speed);
@@ -177,7 +189,7 @@ export class BossManager {
     }
   }
 
-  public hit(damage: number, hitX: number, hitY: number): { bossHit: boolean; defeated: boolean; points: number } {
+  public hit(damage: number, hitX: number, hitY: number, orbRadius: number = 16): { bossHit: boolean; defeated: boolean; points: number } {
     if (!this.currentBoss || this.currentBoss.defeated) {
       return { bossHit: false, defeated: false, points: 0 };
     }
@@ -185,6 +197,8 @@ export class BossManager {
     const b = this.currentBoss;
     let hitSomething = false;
     let points = 0;
+    const radius = Math.max(0, orbRadius);
+    const opening = b.phase > 0 && b.timer % 360 >= 260;
 
     // Check hit against individual weak points
     for (const wp of b.weakPoints) {
@@ -193,11 +207,12 @@ export class BossManager {
       const wpY = b.y + wp.yOffset;
       const dist = Math.hypot(hitX - wpX, hitY - wpY);
 
-      if (dist < wp.radius + 16) {
+      if (dist < wp.radius + radius) {
         hitSomething = true;
-        wp.hp -= damage;
-        b.hp -= damage;
-        points += 150 * damage;
+        const weakDamage = Math.max(1, Math.round(damage * (opening ? 2 : 1.5)));
+        wp.hp -= weakDamage;
+        b.hp -= weakDamage;
+        points += 150 * weakDamage;
 
         if (wp.hp <= 0) {
           wp.active = false;
@@ -209,8 +224,11 @@ export class BossManager {
 
     // Center body hit
     if (!hitSomething) {
-      const distCenter = Math.hypot(hitX - b.x, hitY - b.y);
-      if (distCenter < b.width * 0.45) {
+      // Closest point on the visible hull; a tiny resting orb cannot hit
+      // the empty space below a wide boss, while larger thrown orbs count.
+      const closestX = Math.max(b.x - b.width * 0.45, Math.min(hitX, b.x + b.width * 0.45));
+      const closestY = Math.max(b.y - b.height * 0.42, Math.min(hitY, b.y + b.height * 0.42));
+      if (Math.hypot(hitX - closestX, hitY - closestY) <= radius) {
         hitSomething = true;
         b.hp -= damage;
         points += 100 * damage;
