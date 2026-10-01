@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 const load = async path => import('data:text/javascript;base64,' + Buffer.from(ts.transpile(fs.readFileSync(path,'utf8'), {module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022})).toString('base64'));
 const {BreakoutManager}=await load('src/entities/BreakoutManager.ts');
 const manager=new BreakoutManager();manager.setupStage2Wall(360);
+const leftEdge=Math.min(...manager.blocks.filter(b=>!b.reflector).map(b=>b.x-b.width/2));
+assert(leftEdge-26 > 2*22*1.12+3,'fully upgraded charged sphere fits the side entry');
 const orb={id:'test',x:96,y:178,vx:0,vy:-10,radius:14,damage:3};
 const front=manager.checkGeminiCollision(orb,14,3);
 assert(front.hit && !front.broken);assert.equal(front.block.hp,10);

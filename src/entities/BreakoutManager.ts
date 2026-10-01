@@ -11,8 +11,8 @@ export class BreakoutManager {
     // Side entry lanes lead to a 64px pocket above the armored bank.
     for (let row = 0; row < 2; row++) {
       for (let col = 0; col < 4; col++) {
-        this.blocks.push({id: `block_${++this.blockCounter}`, x: center - 84 + col * 56,
-          y: 150 + row * 38, width: 50, height: 32, hp: 12, maxHp: 12,
+        this.blocks.push({id: `block_${++this.blockCounter}`, x: center - 72 + col * 48,
+          y: 150 + row * 38, width: 46, height: 32, hp: 12, maxHp: 12,
           color: row ? '#f97316' : '#ef4444', points: row ? 180 : 240, active: true});
       }
     }
