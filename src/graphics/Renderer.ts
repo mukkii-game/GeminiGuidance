@@ -1263,9 +1263,9 @@ export class ArcadeRenderer {
     const height = isBoss ? 112 : 59;
     const accent = isBoss ? '#fb7185' : isRest ? '#5eead4' : '#fbbf24';
     ctx.save(); ctx.globalAlpha = fade;
-    ctx.fillStyle = 'rgba(3, 8, 18, .93)'; ctx.fillRect(0, y, w, height);
-    ctx.fillStyle = accent; ctx.fillRect(0, y, w, 2); ctx.fillRect(0, y + height - 2, w, 2);
     if (isBoss) {
+      ctx.fillStyle = 'rgba(3, 8, 18, .93)'; ctx.fillRect(0, y, w, height);
+      ctx.fillStyle = accent; ctx.fillRect(0, y, w, 2); ctx.fillRect(0, y + height - 2, w, 2);
       // Moving hazard stripes provide impact without full-screen flashing.
       ctx.save(); ctx.beginPath(); ctx.rect(0, y - 9, w, 8); ctx.rect(0, y + height + 1, w, 8); ctx.clip();
       for (let x = -24 + elapsed % 24; x < w + 24; x += 24) {
@@ -1284,12 +1284,16 @@ export class ArcadeRenderer {
       this.setFont(this.readableFont9); ctx.fillStyle = '#94a3b8';
       ctx.fillText('誘導・投擲で装甲を砕け', w / 2, y + 100);
     } else {
-      ctx.textAlign = 'left'; this.setFont('bold 10px monospace'); ctx.fillStyle = accent;
-      ctx.fillText(isRest ? 'BREATHER / 体勢を整えろ' : `WAVE ${String(banner.wave ?? 1).padStart(2, '0')} / INCOMING`, 12, y + 16);
-      ctx.textAlign = 'left'; this.setFont(this.readableFont11); ctx.fillStyle = '#ffffff';
-      ctx.fillText(banner.title, 12, y + 33, w - 24);
-      this.setFont(this.readableFont9); ctx.fillStyle = '#94a3b8';
-      ctx.fillText(banner.subtitle || (isRest ? '距離を整え、次の突きを準備' : '敵を誘ってジェミニの突進へ導け'), 12, y + 49, w - 24);
+      // Transparent telop: only a narrow text shadow, no panel or divider lines.
+      ctx.shadowColor = '#08101c'; ctx.shadowBlur = 3; ctx.shadowOffsetY = 1;
+      ctx.textAlign = 'center'; this.setFont('bold 10px monospace'); ctx.fillStyle = accent;
+      ctx.fillText(isRest ? 'RELOAD' : banner.wave ? `WAVE ${String(banner.wave).padStart(2, '0')}` : 'INCOMING', w / 2, y + 14);
+      this.setFont(this.readableFont11); ctx.fillStyle = '#ffffff';
+      ctx.fillText(banner.title, w / 2, y + 31, w - 24);
+      if (banner.subtitle) {
+        this.setFont(this.readableFont9); ctx.fillStyle = '#dbeafe';
+        ctx.fillText(banner.subtitle, w / 2, y + 46, w - 24);
+      }
     }
     ctx.restore(); this.cachedFont = '';
   }
@@ -1440,7 +1444,7 @@ export class ArcadeRenderer {
       ctx.fillStyle = '#cbd5e1'; this.setFont(this.readableFont9);
       const cycle = boss.timer % 360;
       const opening = boss.phase > 0 && cycle >= 260;
-      const barrage = boss.phase > 0 && cycle >= 10 && cycle <= 75;
+      const barrage = boss.phase > 0 && cycle >= 10 && cycle <= 195;
       const diving = boss.phase > 0 && cycle >= 170 && cycle < 260;
       const bossStatus = opening ? 'CORE OPEN / 投擲のチャンス'
         : barrage ? 'BARRAGE / 捕獲で防御！'
