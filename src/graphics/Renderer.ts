@@ -22,6 +22,16 @@ import { getOrbEffectiveRadius } from '../entities/GeminiOrb';
 import { SpriteSheet } from './Sprites';
 import { TerrainEngine } from './Terrain';
 
+export interface EncounterBanner {
+  kind: 'wave' | 'rest' | 'boss';
+  title: string;
+  subtitle?: string;
+  wave?: number;
+  /** Remaining ticks; rendering does not advance gameplay clocks. */
+  timer: number;
+  duration: number;
+}
+
 export class ArcadeRenderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -102,7 +112,8 @@ export class ArcadeRenderer {
     testEnemySetup: TestEnemySetup = 'SWARM_PENETRATE',
     testBossCollisionMode: 'PENETRATE' | 'REFLECT' = 'PENETRATE',
     pointerPos?: { x: number; y: number },
-    audioSettings?: AudioSettings
+    audioSettings?: AudioSettings,
+    encounter?: EncounterBanner
   ): void {
     this.cachedFont = '';
     const ctx = this.ctx;
@@ -156,7 +167,7 @@ export class ArcadeRenderer {
     this.renderFloatingTexts(floatingTexts);
 
     // 10. Boss Dialogue Banner
-    if (boss && !boss.defeated && boss.quoteTimer > 0) {
+    if (boss && !boss.defeated && boss.phase > 0 && boss.quoteTimer > 0) {
       this.renderBossDialogue(boss);
     }
 
@@ -175,6 +186,17 @@ export class ArcadeRenderer {
       this.renderTestStageHUD(player, geminiOrbs, boss, presetConfig, telemetry, testBossDamage, testEnemySetup, testBossCollisionMode, audioSettings);
     } else if (state === 'PLAYING' || state === 'STAGE_CLEAR') {
       this.renderHUD(player, stage, geminiOrbs, boss, presetConfig, telemetry, audioSettings);
+    }
+
+    if (state === 'PLAYING') {
+      if (boss && !boss.defeated && boss.phase === 0) {
+        const name = boss.name.split(':');
+        this.renderEncounterBanner({ kind: 'boss', title: name[0].trim(),
+          subtitle: name.slice(1).join(':').trim() || boss.stageTitle,
+          timer: Math.max(1, 150 - boss.timer), duration: 150 });
+      } else if (encounter && encounter.timer > 0) {
+        this.renderEncounterBanner(encounter);
+      }
     }
 
     // 14. State Overlays (Title, Stage Clear, Game Over, Game Clear)
@@ -206,47 +228,56 @@ export class ArcadeRenderer {
     }
   }
 
-  // --- Stage 2 Breakout Blocks (Arkanoid Wall) ---
+  // --- AI data vaults and dedicated ricochet rails ---
   private renderBreakoutBlocks(blocks: BreakoutBlock[]): void {
     const ctx = this.ctx;
-    if (blocks.some(b => b.active && !b.reflector)) {
-      ctx.fillStyle = 'rgba(34,211,238,0.09)'; ctx.fillRect(26,68,308,64);
-      this.setFont('9px "DotGothic16", monospace'); ctx.textAlign='center';
-      ctx.fillStyle='#fde047'; ctx.fillText('BACK HIT ×3',180,91);
-      ctx.fillStyle='#67e8f9'; ctx.fillText('↑',49,164); ctx.fillText('↑',311,164);
-    }
+    const brands = [
+      { sprite: 'GROK_RAIDER', label: 'xAI', color: '#e2e8f0' },
+      { sprite: 'CURSOR_PROBE', label: 'CURSOR', color: '#a5b4fc' },
+      { sprite: 'CLAUDE_SONNET', label: 'CLAUDE', color: '#fb923c' },
+      { sprite: 'GPT6_LUNA', label: 'OPENAI', color: '#5eead4' },
+    ];
+    let vaultIndex = 0;
+    ctx.save();
     for (const b of blocks) {
+      if (!b.reflector) vaultIndex++;
       if (!b.active) continue;
-
-      const x = b.x - b.width / 2;
-      const y = b.y - b.height / 2;
-      const w = b.width;
-      const h = b.height;
-
-      // Base brick color
-      ctx.fillStyle = b.color;
-      ctx.fillRect(x, y, w, h);
-
-      // Top & Left 3D bevel highlight
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-      ctx.fillRect(x, y, w, 2);
-      ctx.fillRect(x, y, 2, h);
-
-      // Bottom & Right 3D bevel shadow
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-      ctx.fillRect(x, y + h - 2, w, 2);
-      ctx.fillRect(x + w - 2, y, 2, h);
-
-      if (!b.reflector) {
-        // Exposed back plate and remaining armor are readable during ricochets.
-        ctx.fillStyle = '#fde047'; ctx.fillRect(x + 3, y, w - 6, 4);
-        ctx.fillStyle = '#111827'; ctx.fillRect(x + 5, y + h - 8, w - 10, 3);
-        ctx.fillStyle = '#fff7ed'; ctx.fillRect(x + 5, y + h - 8, (w - 10) * b.hp / b.maxHp, 3);
+      const x = b.x - b.width / 2, y = b.y - b.height / 2;
+      const w = b.width, h = b.height;
+      if (b.reflector) {
+        ctx.fillStyle = '#122b3c'; ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = '#67e8f9'; ctx.lineWidth = 1; ctx.strokeRect(x, y, w, h);
+        ctx.fillStyle = '#d9faff';
+        if (w > h) {
+          ctx.fillRect(x + 2, y + h - 3, w - 4, 2);
+          for (let n = 6; n < w - 6; n += 16) {
+            ctx.fillStyle = '#25607b'; ctx.fillRect(x + n, y + 3, 7, h - 7);
+          }
+        } else {
+          ctx.fillRect(b.x < this.canvas.width / 2 ? x + w - 3 : x + 1, y + 2, 2, h - 4);
+          for (let n = 6; n < h - 6; n += 16) {
+            ctx.fillStyle = '#25607b'; ctx.fillRect(x + 3, y + n, w - 6, 7);
+          }
+        }
+        ctx.fillStyle = '#fbbf24';
+        ctx.fillRect(x + 2, y + 2, 3, 3); ctx.fillRect(x + w - 5, y + h - 5, 3, 3);
+        continue;
       }
-      // Horizontal glossy sheen
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-      ctx.fillRect(x + 3, y + 3, w - 6, 2);
+      const brand = brands[(vaultIndex - 1) % brands.length];
+      ctx.fillStyle = '#152235'; ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = brand.color; ctx.lineWidth = 1; ctx.strokeRect(x, y, w, h);
+      // Gold upper edge exposes the rear attack bonus; the lower edge is armor.
+      ctx.fillStyle = '#fde68a'; ctx.fillRect(x + 2, y, w - 4, 2);
+      ctx.fillStyle = '#415069'; ctx.fillRect(x + 1, y + h - 5, w - 2, 4);
+      const logo = this.sprites.get(brand.sprite);
+      const size = Math.min(18, h - 10);
+      if (logo) ctx.drawImage(logo, b.x - size / 2, y + 3, size, size);
+      this.setFont('bold 6px monospace'); ctx.textAlign = 'center'; ctx.fillStyle = brand.color;
+      ctx.fillText(brand.label, b.x, y + h - 7);
+      ctx.fillStyle = '#111827'; ctx.fillRect(x + 3, y + h - 3, w - 6, 1);
+      ctx.fillStyle = brand.color; ctx.fillRect(x + 3, y + h - 3, (w - 6) * Math.max(0, b.hp / b.maxHp), 1);
     }
+    ctx.restore(); this.cachedFont = '';
   }
 
   // --- Floating Gemini Drop Items (編隊を倒すと出現) ---
@@ -456,6 +487,22 @@ export class ArcadeRenderer {
   // --- Autonomous Gemini Orbs (ジェミニ誘導 - Safe to touch!) ---
   private renderGeminiOrbs(orbs: GeminiOrb[], playerX: number, playerY: number): void {
     const ctx = this.ctx;
+
+    const shieldActive = orbs.some(orb => (orb.isTethered || orb.mode === 'ORBIT')
+      && Math.hypot(orb.x - playerX, orb.y - playerY) <= 70);
+    if (shieldActive) {
+      ctx.save();
+      const glow = ctx.createRadialGradient(playerX, playerY, 28, playerX, playerY, 58);
+      glow.addColorStop(0, 'rgba(34,211,238,0)'); glow.addColorStop(1, 'rgba(34,211,238,.13)');
+      ctx.fillStyle = glow; ctx.strokeStyle = 'rgba(103,232,249,.6)'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(playerX, playerY, 58, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = 'rgba(207,250,254,.75)'; ctx.lineWidth = 2;
+      for (let i = 0; i < 4; i++) {
+        const angle = i * Math.PI / 2;
+        ctx.beginPath(); ctx.arc(playerX, playerY, 58, angle - .12, angle + .12); ctx.stroke();
+      }
+      ctx.restore(); this.cachedFont = '';
+    }
 
     for (const orb of orbs) {
       // A clipped orb remains readable without bouncing it back for the player.
@@ -967,19 +1014,26 @@ export class ArcadeRenderer {
     ctx.save();
     ctx.translate(boss.x, boss.y);
     // Full-size armored hull makes the gameplay silhouette match the collision body.
-    const hw = boss.width * .45, hh = boss.height * .42;
+    const hw = boss.width * .5, hh = boss.height * .5;
     ctx.fillStyle = boss.hitCooldown ? '#64748b' : '#172033';
     ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(-hw + 12,-hh); ctx.lineTo(hw - 12,-hh);
     ctx.lineTo(hw,-hh+12); ctx.lineTo(hw,hh-12); ctx.lineTo(hw-12,hh);
     ctx.lineTo(-hw+12,hh); ctx.lineTo(-hw,hh-12); ctx.lineTo(-hw,-hh+12);
     ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(148,163,184,.3)'; ctx.lineWidth = 1;
+    for (let col=1;col<5;col++) { const x=-hw+col*hw*2/5; ctx.beginPath();ctx.moveTo(x,-hh+4);ctx.lineTo(x,hh-4);ctx.stroke(); }
+    for (let row=1;row<3;row++) { const y=-hh+row*hh*2/3; ctx.beginPath();ctx.moveTo(-hw+4,y);ctx.lineTo(hw-4,y);ctx.stroke(); }
     for (const side of [-1,1]) {
       ctx.fillStyle='#334155';ctx.fillRect(side<0?-hw+8:hw-38,-hh+10,30,hh*2-20);
       ctx.fillStyle='#22d3ee';ctx.fillRect(side<0?-hw+12:hw-34,-hh+14,22,3);
       ctx.fillStyle='#fb923c';ctx.fillRect(side<0?-hw+15:hw-31,hh-9,16,5);
     }
 
+    ctx.save();
+    const baseWidth = boss.type === 'STAGE1_DEEPSEEK_KIMI' ? 200 : boss.type === 'STAGE4_GPT6_ASTRA' ? 240 : 210;
+    const baseHeight = boss.type === 'STAGE3_CLAUDE_FABLE' ? 100 : boss.type === 'STAGE4_GPT6_ASTRA' ? 115 : 90;
+    ctx.scale(boss.width / baseWidth, boss.height / baseHeight);
     if (boss.type === 'STAGE1_DEEPSEEK_KIMI') {
       // Stage 1: DeepSeek Whale + Kimi Moon + Qwen Core
       ctx.fillStyle = '#0f172a';
@@ -1077,6 +1131,7 @@ export class ArcadeRenderer {
       if (astraSprite) ctx.drawImage(astraSprite, -24, -24, 48, 48);
     }
 
+    ctx.restore(); this.cachedFont = '';
     // Weak Point Reticles & HP
     for (const wp of boss.weakPoints) {
       if (!wp.active) continue;
@@ -1195,6 +1250,48 @@ export class ArcadeRenderer {
 
     ctx.restore();
     this.cachedFont = '';
+  }
+
+  private renderEncounterBanner(banner: EncounterBanner): void {
+    const ctx = this.ctx;
+    const w = this.canvas.width;
+    const elapsed = Math.max(0, banner.duration - banner.timer);
+    const isBoss = banner.kind === 'boss';
+    const isRest = banner.kind === 'rest';
+    const fade = Math.min(1, (elapsed + 1) / 10, banner.timer / 16);
+    const y = isBoss ? 193 : 116;
+    const height = isBoss ? 112 : 59;
+    const accent = isBoss ? '#fb7185' : isRest ? '#5eead4' : '#fbbf24';
+    ctx.save(); ctx.globalAlpha = fade;
+    ctx.fillStyle = 'rgba(3, 8, 18, .93)'; ctx.fillRect(0, y, w, height);
+    ctx.fillStyle = accent; ctx.fillRect(0, y, w, 2); ctx.fillRect(0, y + height - 2, w, 2);
+    if (isBoss) {
+      // Moving hazard stripes provide impact without full-screen flashing.
+      ctx.save(); ctx.beginPath(); ctx.rect(0, y - 9, w, 8); ctx.rect(0, y + height + 1, w, 8); ctx.clip();
+      for (let x = -24 + elapsed % 24; x < w + 24; x += 24) {
+        ctx.beginPath(); ctx.moveTo(x, y - 9); ctx.lineTo(x + 12, y - 9);
+        ctx.lineTo(x + 4, y - 1); ctx.lineTo(x - 8, y - 1); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(x, y + height + 1); ctx.lineTo(x + 12, y + height + 1);
+        ctx.lineTo(x + 4, y + height + 9); ctx.lineTo(x - 8, y + height + 9); ctx.fill();
+      }
+      ctx.restore(); this.cachedFont = '';
+      ctx.textAlign = 'center'; this.setFont('bold 32px monospace');
+      ctx.fillStyle = accent; ctx.fillText('WARNING', w / 2, y + 35);
+      this.setFont('bold 16px monospace'); ctx.fillStyle = '#ffffff';
+      ctx.fillText(banner.title, w / 2, y + 62, w - 24);
+      this.setFont(this.readableFont11); ctx.fillStyle = '#fda4af';
+      ctx.fillText(banner.subtitle || '大型敵接近 / BOSS APPROACHING', w / 2, y + 83, w - 26);
+      this.setFont(this.readableFont9); ctx.fillStyle = '#94a3b8';
+      ctx.fillText('誘導・投擲で装甲を砕け', w / 2, y + 100);
+    } else {
+      ctx.textAlign = 'left'; this.setFont('bold 10px monospace'); ctx.fillStyle = accent;
+      ctx.fillText(isRest ? 'BREATHER / 体勢を整えろ' : `WAVE ${String(banner.wave ?? 1).padStart(2, '0')} / INCOMING`, 12, y + 16);
+      ctx.textAlign = 'left'; this.setFont(this.readableFont11); ctx.fillStyle = '#ffffff';
+      ctx.fillText(banner.title, 12, y + 33, w - 24);
+      this.setFont(this.readableFont9); ctx.fillStyle = '#94a3b8';
+      ctx.fillText(banner.subtitle || (isRest ? '距離を整え、次の突きを準備' : '敵を誘ってジェミニの突進へ導け'), 12, y + 49, w - 24);
+    }
+    ctx.restore(); this.cachedFont = '';
   }
 
   // --- Stage Start Title Banner ---
@@ -1320,7 +1417,7 @@ export class ArcadeRenderer {
     ctx.fillRect(38, 27, 58 * Math.max(0, player.hp / player.maxHp), 6);
     ctx.fillStyle = '#e2e8f0'; ctx.fillText(`×${player.lives}`, 101, 34);
     ctx.fillStyle = caught ? '#67e8f9' : '#fde68a';
-    ctx.fillText(caught ? 'CAPTURE / 捕獲' : 'GUIDANCE / 誘導', 134, 34);
+    ctx.fillText(caught ? 'SHIELD / 防御' : 'GUIDANCE / 誘導', 134, 34);
     ctx.textAlign = 'right'; ctx.fillStyle = telemetry?.screenEdgeBounce ? '#fbbf24' : '#94a3b8';
     ctx.fillText(telemetry?.screenEdgeBounce ? '[Q] 壁反射 ON' : '[Q] 壁反射 OFF', w - 8, 34);
     if (telemetry?.screenEdgeBounce) {
@@ -1329,7 +1426,7 @@ export class ArcadeRenderer {
     }
     ctx.textAlign = 'left'; this.setFont(this.readableFont10);
     ctx.fillStyle = caught ? '#67e8f9' : '#fde68a';
-    ctx.fillText(caught ? '離して投擲 → 接線方向へ強打' : '距離を取る → 誘う → 横へかわす', 8, h - 10);
+    ctx.fillText(caught ? '捕獲中は防御専用 → 離して攻撃' : '距離を取る → 誘う → 横へかわす', 8, h - 10);
     ctx.textAlign = 'right'; ctx.fillStyle = '#c4b5fd';
     ctx.fillText(`GEMINI ×${geminiOrbs.length}`, w - 8, h - 10);
     ctx.beginPath(); ctx.arc(318, 466, 24, 0, Math.PI * 2);
@@ -1341,9 +1438,17 @@ export class ArcadeRenderer {
     if (boss && !boss.defeated && boss.y > 0) {
       ctx.fillStyle = 'rgba(3,10,20,0.88)'; ctx.fillRect(48, 44, w - 96, 22);
       ctx.fillStyle = '#cbd5e1'; this.setFont(this.readableFont9);
-      const opening = boss.timer % 360 >= 260;
-      if (opening) ctx.fillStyle = '#5eead4';
-      ctx.fillText(opening ? 'CORE OPEN / 投擲のチャンス' : boss.name, w / 2, 53);
+      const cycle = boss.timer % 360;
+      const opening = boss.phase > 0 && cycle >= 260;
+      const barrage = boss.phase > 0 && cycle >= 10 && cycle <= 75;
+      const diving = boss.phase > 0 && cycle >= 170 && cycle < 260;
+      const bossStatus = opening ? 'CORE OPEN / 投擲のチャンス'
+        : barrage ? 'BARRAGE / 捕獲で防御！'
+        : diving ? (cycle < 200 ? 'DIVE LOCK / 横へ回避！' : 'DIVE / 突進注意！')
+        : boss.name.split(':')[0].trim();
+      if (opening || barrage) ctx.fillStyle = '#5eead4';
+      if (diving) ctx.fillStyle = '#fda4af';
+      ctx.fillText(bossStatus, w / 2, 53, w - 110);
       ctx.fillStyle = '#1e293b'; ctx.fillRect(58, 57, w - 116, 4);
       ctx.fillStyle = boss.hp / boss.maxHp > 0.5 ? '#fb7185' : '#fbbf24';
       ctx.fillRect(58, 57, (w - 116) * Math.max(0, boss.hp / boss.maxHp), 4);
@@ -1794,7 +1899,7 @@ export class ArcadeRenderer {
       ctx.fillStyle = '#22c55e';
       ctx.fillText('① 誘導：距離を取り、自機へ突っ込む球を横へかわす', w / 2, 316);
       ctx.fillStyle = '#38bdf8';
-      ctx.fillText('② 捕獲：クリック / Z 長押しで近くを回す・白弾を消す', w / 2, 332);
+      ctx.fillText('② 捕獲：長押しで白弾を消す防御専用。敵への攻撃力なし', w / 2, 332);
       ctx.fillStyle = '#fef08a';
       ctx.fillText('③ 投擲：離した瞬間の進行方向へ。速い一撃ほど強い', w / 2, 348);
       ctx.fillStyle = '#ec4899';

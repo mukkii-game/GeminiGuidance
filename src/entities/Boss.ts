@@ -2,6 +2,16 @@ import { BossEntity, BossType, EnemyType, WeakPoint } from '../types';
 
 export class BossManager {
   public currentBoss: BossEntity | null = null;
+  private pushX = 0;
+  private pushY = 0;
+  private diveX = 180;
+
+  /** Captured defensive orbs can repel the hull without dealing damage. */
+  public pushBack(vx: number, vy: number): void {
+    if (!this.currentBoss || this.currentBoss.defeated) return;
+    this.pushX = Math.max(-18, Math.min(18, this.pushX + vx));
+    this.pushY = Math.max(-18, Math.min(18, this.pushY + vy));
+  }
 
   public spawn(type: BossType, canvasWidth: number): BossEntity {
     let name = '';
@@ -9,7 +19,7 @@ export class BossManager {
     let dialogueQuote = '';
     let width = 200;
     let height = 90;
-    let hp = 140;
+    let hp = 320;
     let targetY = 75;
     const weakPoints: WeakPoint[] = [];
 
@@ -20,7 +30,7 @@ export class BossManager {
         name = 'DEEPSEEK, KIMI & QWEN : THUNDER CLOUD DREADNOUGHT';
         width = 200;
         height = 90;
-        hp = 140;
+        hp = 320;
         targetY = 75;
         weakPoints.push(
           { id: 'wp_ds', xOffset: -60, yOffset: 0, radius: 28, hp: 30, maxHp: 30, active: true, label: 'DEEPSEEK' },
@@ -35,7 +45,7 @@ export class BossManager {
         name = 'GROK 4.7 : SPACEX HEAVY STARSHIP FLEET';
         width = 210;
         height = 90;
-        hp = 180;
+        hp = 420;
         targetY = 60; // Perched high up behind the Breakout wall
         weakPoints.push(
           { id: 'wp_cursor_l', xOffset: -65, yOffset: 0, radius: 24, hp: 35, maxHp: 35, active: true, label: '{CURSOR}' },
@@ -50,7 +60,7 @@ export class BossManager {
         name = 'CLAUDE FABLE : APEX CODE PRO';
         width = 210;
         height = 100;
-        hp = 230;
+        hp = 540;
         targetY = 80;
         weakPoints.push(
           { id: 'wp_sonnet_l', xOffset: -65, yOffset: -10, radius: 24, hp: 30, maxHp: 30, active: true, label: 'SONNET' },
@@ -66,7 +76,7 @@ export class BossManager {
         name = 'GPT-6 ASTRA : WIZARD CHAPPY';
         width = 240;
         height = 115;
-        hp = 300;
+        hp = 700;
         targetY = 85;
         weakPoints.push(
           { id: 'wp_luna', xOffset: -75, yOffset: -25, radius: 24, hp: 35, maxHp: 35, active: true, label: 'LUNA' },
@@ -77,13 +87,15 @@ export class BossManager {
         break;
     }
 
-    width = Math.round(width * 1.15);
-    height = Math.round(height * 1.15);
+    width = Math.round(width * 1.28);
+    height = Math.round(height * 1.5);
     for (const weakPoint of weakPoints) {
       weakPoint.xOffset *= 1.15;
       weakPoint.yOffset *= 1.15;
       weakPoint.radius *= 1.1;
+      weakPoint.hp *= 2; weakPoint.maxHp *= 2;
     }
+    this.pushX = 0; this.pushY = 0;
     this.currentBoss = {
       type,
       name,
@@ -133,7 +145,7 @@ export class BossManager {
 
     // Entrance uses phase rather than y: sway below targetY must not restart it.
     if (b.phase === 0) {
-      b.y = Math.min(b.targetY, b.y + 2.8);
+      b.y = Math.min(b.targetY, b.y + 3.4);
       if (b.y >= b.targetY) { b.phase = 1; b.timer = 0; }
       return;
     }
@@ -141,12 +153,33 @@ export class BossManager {
     b.phase = b.hp <= b.maxHp * 0.5 ? 2 : 1;
     const cycle = b.timer % 360;
     const opening = cycle >= 260;
-    // Stable, slightly lowered target during each recovery window.
-    const sway = opening ? 12 : Math.min(35, (canvasWidth - b.width) / 2 - 8);
-    b.x += (canvasWidth / 2 + Math.sin(b.timer * 0.012) * sway - b.x) * 0.055;
-    b.y += (b.targetY + (opening ? 24 : Math.sin(b.timer * 0.018) * 8) - b.y) * 0.045;
+    // Aim-lock gives the player half a second to move before the hull dives.
+    if (cycle === 170) {
+      this.diveX = Math.max(b.width * .36, Math.min(canvasWidth - b.width * .36, playerX));
+      if (onBossShout) onBossShout('DIVE LOCK — 左右へ回避！');
+    }
+    const diving = cycle >= 200 && cycle < 260;
+    const sway = opening ? 10 : Math.max(4, Math.min(26, (canvasWidth - b.width) / 2 - 8));
+    const goalX = diving ? this.diveX : canvasWidth / 2 + Math.sin(b.timer * .012) * sway;
+    const goalY = diving ? b.targetY + 175 + stage * 12 : b.targetY + (opening ? 24 : Math.sin(b.timer * .018) * 8);
+    b.x += (goalX - b.x) * .055 + this.pushX;
+    b.y += (goalY - b.y) * (diving ? .045 : .065) + this.pushY;
+    b.x = Math.max(b.width * .36, Math.min(canvasWidth - b.width * .36, b.x));
+    b.y = Math.max(b.targetY - 38, Math.min(360, b.y));
+    this.pushX *= .82; this.pushY *= .82;
     if (cycle === 260 && onBossShout) onBossShout('CORE OPEN — 突き・投擲のチャンス！');
     if (opening) return;
+
+    if (cycle === 10 && onBossShout) onBossShout('弾幕波 — 長押しで防御！');
+    // A short curtain is followed by a gap: capture has a specific defensive job.
+    if (onSpawnBullet && cycle >= 35 && cycle <= 65 && cycle % 10 === 5) {
+      const aim = Math.atan2(playerY - b.y, playerX - b.x);
+      const rays = b.phase === 2 ? 7 : 5;
+      for (let ray = -rays; ray <= rays; ray++) {
+        const angle = aim + ray * .12;
+        onSpawnBullet(b.x, b.y + b.height * .35, Math.cos(angle) * 1.25, Math.sin(angle) * 1.25);
+      }
+    }
 
     const types: EnemyType[] = ['MISTRAL_FLAME', 'CURSOR_PROBE', 'CLAUDE_HAIKU', 'GPT6_LUNA'];
     const launch = (side: number) => {
@@ -162,13 +195,13 @@ export class BossManager {
       const speed = 2.2 + stage * 0.15 + (b.phase === 2 ? 0.2 : 0);
       onSpawnTackleMinion(types[stage - 1], x, y, dx / distance * speed, dy / distance * speed);
     };
-    if (cycle === 45 || cycle === 155) launch(cycle === 45 ? -58 : 58);
+    if (cycle === 45 || cycle === 75 || cycle === 125 || cycle === 155) launch(cycle === 45 || cycle === 125 ? -58 : 58);
     if (b.phase === 2 && cycle === 210) launch(0);
     if (stage >= 3 && cycle === 85) launch(-58);
     if (stage >= 3 && cycle === 195) launch(58);
 
     // Distinct readable attacks; every cycle retains a 100-frame quiet window.
-    if (onSpawnBullet && cycle === 110) {
+    if (onSpawnBullet && (cycle === 90 || cycle === 110 || (b.phase === 2 && cycle === 140))) {
       const aim = Math.atan2(playerY - b.y, playerX - b.x);
       const spread = stage === 1 ? [-0.22, 0.22] : stage === 2 ? [-0.32, 0, 0.32] : [-0.44, -0.22, 0, 0.22, 0.44];
       for (const offset of spread) {
@@ -209,7 +242,7 @@ export class BossManager {
 
       if (dist < wp.radius + radius) {
         hitSomething = true;
-        const weakDamage = Math.max(1, Math.round(damage * (opening ? 2 : 1.5)));
+        const weakDamage = Math.max(0, Math.round(damage * (opening ? 2 : 1.5)));
         wp.hp -= weakDamage;
         b.hp -= weakDamage;
         points += 150 * weakDamage;

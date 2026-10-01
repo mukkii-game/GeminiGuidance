@@ -122,7 +122,7 @@ test('touch steering, capture finger handoff and cancel do not jump or stick', a
   expect(result.captured && result.noJump && result.released).toBe(true);
 });
 
-test('boss camping causes one hit per pass and staggered waves cannot pay early', async ({ page }) => {
+test('boss camping cannot repeat one armor point and staggered waves cannot pay early', async ({ page }) => {
   const result=await page.evaluate(() => {
     game.startNewGame();
     const boss=game.bossManager.spawn('STAGE1_DEEPSEEK_KIMI',360);
@@ -131,7 +131,7 @@ test('boss camping causes one hit per pass and staggered waves cannot pay early'
     game.handleCollisions();const once=boss.hp;
     for(let i=0;i<60;i++){boss.hitCooldown=0;game.handleCollisions();}
     const camp=boss.hp;
-    orb.y=400;game.handleCollisions();orb.y=90;game.handleCollisions();const again=boss.hp;
+    orb.y=400;game.stageTick+=3;game.handleCollisions();orb.y=90;game.handleCollisions();const again=boss.hp;
     game.bossManager.clear();
     game.stageManager.stageTick=240;
     game.enemyManager.spawn('MISTRAL_FLAME',180,90,'DUMMY','s1_wave1');
@@ -155,18 +155,26 @@ test('normal-damage guidance and aimed throwing pilots can both finish the campa
           seenBossStage=game.stage;
           checkpoints.push({event:'boss',stage:game.stage,seconds:Math.round(frame/60),hp:game.player.state.hp,lives:game.player.state.lives,bossHp:boss.hp});
         }
-        game.input.state.x=180+(throwing?95:110)*Math.sin(frame/(throwing?47:37));
-        game.input.state.y=boss ? (throwing?225+35*Math.sin(frame/63):280+100*Math.sin(frame/22)) : 285+110*Math.sin(frame/63);
-        game.input.state.isPointerDown=throwing && frame-releasedAt>75;
+        game.input.state.x=180+(throwing?95:120)*Math.sin(frame/(throwing?47:31));
+        game.input.state.y=boss ? (throwing?225+35*Math.sin(frame/63):285+115*Math.sin(frame/17)) : 285+110*Math.sin(frame/63);
+        const p=game.player.state;
+        const nearbyBullets=game.enemyBullets.filter(b=>Math.hypot(b.x-p.x,b.y-p.y)<105).length;
+        const defending=nearbyBullets >= (throwing ? 5 : 14) && (throwing || !boss || boss.timer%360<100);
+        const diveWarning=boss && boss.phase>0 && boss.timer%360>=170 && boss.timer%360<275;
+        if(diveWarning) {
+          game.input.state.y=440;
+          game.input.state.x=p.x<180?35:325;
+        }
+        game.input.state.isPointerDown=defending || (throwing && frame-releasedAt>75);
         if(game.input.state.isPointerDown) {
           const orb=game.geminiManager.orbs[0],dx=(boss?.x??180)-orb.x,dy=(boss?.y??80)-orb.y;
           const dot=(dx*orb.vx+dy*orb.vy)/(Math.hypot(dx,dy)*Math.hypot(orb.vx,orb.vy));
-          if(orb.isTethered && dot>.985) {game.input.state.isPointerDown=false;releasedAt=frame;}
+          if(!defending && orb.isTethered && dot>.985) {game.input.state.isPointerDown=false;releasedAt=frame;}
         }
-        if(!throwing) {
+        {
           // Choose a nearby steering direction from visible hazards, without
           // modifying actors. A wide stroke is useful only if the ship survives it.
-          const p=game.player.state,goal={x:game.input.state.x,y:game.input.state.y};
+          const goal={x:game.input.state.x,y:game.input.state.y};
           const threats=[...game.enemyManager.enemies.map(e=>({x:e.x,y:e.y,vx:e.vx,vy:e.vy,r:e.width*.45+18})),
             ...game.enemyBullets.map(e=>({x:e.x,y:e.y,vx:e.vx,vy:e.vy,r:24}))];
           let best=null;

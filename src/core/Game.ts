@@ -32,6 +32,9 @@ export class Game {
   private rewardedFormations = new Set<string>();
   private escapedFormations = new Set<string>();
   private bossContacts = new Set<string>();
+  private bossLastHit = new Map<string, number>();
+  private encounter?: {kind:'wave'|'rest'|'boss';title:string;subtitle?:string;wave?:number;timer:number;duration:number};
+  private announcedFormations = new Set<string>();
 
   private canvas: HTMLCanvasElement;
   private input: InputManager;
@@ -49,8 +52,6 @@ export class Game {
   private breakoutManager: BreakoutManager;
   private stageManager: StageManager;
 
-  private stage1InvadersSpawned: boolean = false;
-  private stage1BossTriggered: boolean = false;
 
   private geminiItems: GeminiDropItem[] = [];
   private enemyBullets: EnemyBullet[] = [];
@@ -95,8 +96,11 @@ export class Game {
     this.stageManager = new StageManager();
 
     this.setupAudioAndCrtControls();
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && (this.state === 'PLAYING' || this.state === 'TEST_STAGE')) this.setPaused(true);
+    });
     window.addEventListener('blur', () => {
-      if (this.state === 'PLAYING' || this.state === 'TEST_STAGE') this.paused = true;
+      if (this.state === 'PLAYING' || this.state === 'TEST_STAGE') this.setPaused(true);
     });
   }
 
@@ -352,11 +356,14 @@ export class Game {
     this.stage = Math.max(1, Math.min(4, stageNum));
     this.stageTick = 0;
     this.state = 'PLAYING';
-    this.paused = false;
+    this.setPaused(false);
     this.endingTick = 0;
     this.playerRespawnTimer = 0;
     this.rewardedFormations.clear();
     this.bossContacts.clear();
+    this.bossLastHit.clear();
+    this.announcedFormations.clear();
+    this.encounter = undefined;
     this.escapedFormations.clear();
     this.player.setControlMode('LIMITED');
     this.player.setSpeedMultiplier(3);
@@ -378,8 +385,6 @@ export class Game {
     this.particles = [];
     this.explosions = [];
     this.floatingTexts = [];
-    this.stage1InvadersSpawned = false;
-    this.stage1BossTriggered = false;
 
     this.terrain.setStage(this.stage);
     this.stageManager.loadStage(this.stage);
@@ -415,6 +420,9 @@ export class Game {
     this.stageTick = 0;
     this.stageClearTimer = 0;
     this.bossContacts.clear();
+    this.bossLastHit.clear();
+    this.announcedFormations.clear();
+    this.encounter = undefined;
     this.rewardedFormations.clear();
     this.escapedFormations.clear();
     this.player.reset(this.canvas.width / 2, this.canvas.height - 90);
@@ -425,8 +433,6 @@ export class Game {
     this.breakoutManager.clear();
     this.geminiItems = [];
     this.enemyBullets = [];
-    this.stage1InvadersSpawned = false;
-    this.stage1BossTriggered = false;
 
     this.terrain.setStage(this.stage);
     this.stageManager.loadStage(this.stage);
@@ -532,13 +538,20 @@ export class Game {
     }
   }
 
+  private setPaused(paused: boolean): void {
+    this.paused = paused;
+    this.audio.setPaused(paused);
+    if (paused) this.voice.stop();
+  }
+
   public update(dtFactor: number = 1.0): void {
-    if (this.input.consumePause()) this.paused = !this.paused;
+    if (this.input.consumePause()) this.setPaused(!this.paused);
     if (this.paused) {
-      if (this.input.consumeEnter() || this.input.consumeClick()) this.paused = false;
+      if (this.input.consumeEnter() || this.input.consumeClick()) this.setPaused(false);
       return;
     }
     this.stageTick++;
+    if (this.encounter && --this.encounter.timer <= 0) this.encounter = undefined;
 
     // Consume UI hotkeys
     if (this.input.consumeCrtToggle()) {
@@ -812,19 +825,23 @@ export class Game {
     for (const ev of events) {
       if (ev.type === 'ENEMY' && ev.enemyType) {
         this.enemyManager.spawn(ev.enemyType, ev.x ?? 180, ev.y ?? -20, ev.pattern, ev.formationId);
+        if (ev.formationId && !this.announcedFormations.has(ev.formationId)) {
+          this.announcedFormations.add(ev.formationId);
+          const name = ev.enemyType.replaceAll('_', ' ');
+          this.encounter = {kind:'wave',title:name,subtitle:'ENEMY FORMATION',wave:ev.wave,timer:145,duration:145};
+        }
       } else if (ev.type === 'GROUND' && ev.groundType) {
         const targetWorldY = -scrollY - 40;
         this.groundManager.spawn(ev.groundType, ev.x ?? 180, targetWorldY);
       } else if (ev.type === 'INVADER_GRID') {
         this.enemyManager.spawnInvaderGrid(this.canvas.width);
-        this.stage1InvadersSpawned = true;
-        this.addFloatingText(this.canvas.width / 2, 160, 'SPACE INVADERS DETECTED!', '#38bdf8');
+        this.encounter = {kind:'wave',title:'MISTRAL / KIMI / QWEN',subtitle:'INVADER WALL — 18機を全消し',wave:ev.wave,timer:180,duration:180};
       } else if (ev.type === 'UFO') {
         this.enemyManager.spawnDeepSeekUfo(this.canvas.width, Math.random() > 0.5);
         this.addFloatingText(this.canvas.width / 2, 45, 'DEEPSEEK UFO DETECTED!', '#4D6BFE');
       } else if (ev.type === 'BREAKOUT_WALL') {
         this.breakoutManager.setupStage2Wall(this.canvas.width);
-        this.addFloatingText(this.canvas.width / 2, 110, 'BLOCK BREAKER! PUNCH THROUGH!', '#fde047');
+        this.encounter = {kind:'wave',title:'xAI / CURSOR SERVER WALL',subtitle:'側面から奥へ — 裏面を連続攻撃',timer:180,duration:180};
       } else if (ev.type === 'ALERT') {
         this.audio.playBossAlert();
         this.audio.playBossBgm(this.stage);
@@ -833,22 +850,11 @@ export class Game {
         this.bossManager.spawn(ev.bossType, this.canvas.width);
         this.voice.playBossVoice(this.stage);
       } else if (ev.type === 'CUE' && ev.message) {
-        this.floatingTexts.push({ x: 180, y: 155, text: ev.message, color: '#a5f3fc', timer: 0, duration: 240 });
+        const rest = /休|REST|RELOAD|間奏/.test(ev.message);
+        this.encounter = {kind:rest?'rest':'wave',title:ev.message,wave:Number(ev.message.match(/WAVE (\d+)/)?.[1]) || undefined,timer:180,duration:180};
       }
     }
 
-    // Auto-trigger Stage 1 Boss as soon as all Space Invaders are eliminated!
-    if (this.stage === 1 && this.stage1InvadersSpawned && !this.stage1BossTriggered) {
-      const activeInvaders = this.enemyManager.enemies.filter(e => e.pattern === 'INVADER');
-      if (activeInvaders.length === 0) {
-        this.stage1BossTriggered = true;
-        this.audio.playBossAlert();
-        this.audio.playBossBgm(1); // High octane rock battle theme!
-        this.bossManager.spawn('STAGE1_DEEPSEEK_KIMI', this.canvas.width);
-        this.voice.playBossVoice(1);
-        this.addFloatingText(this.canvas.width / 2, 140, 'INVADERS WIPED! BOSS ATTACK', '#ef4444');
-      }
-    }
   }
 
   // --- Collision Detections ---
@@ -856,6 +862,7 @@ export class Game {
     // 0. Breakout Blocks Collision (Stage 2 & Test Stage)
     if ((this.stage === 2 || this.state === 'TEST_STAGE') && this.breakoutManager.blocks.length > 0) {
       for (const orb of this.geminiManager.orbs) {
+        if (orb.isTethered || orb.mode === 'ORBIT') continue;
         const res = this.breakoutManager.checkGeminiCollision(orb, this.geminiManager.getEffectiveRadius(orb), this.geminiManager.getEffectiveDamage(orb));
         if (res.hit && res.block) {
           // Elastic reflection off Breakout Block!
@@ -899,7 +906,10 @@ export class Game {
         const b = this.enemyBullets[bi];
         const dist = Math.hypot(orb.x - b.x, orb.y - b.y);
 
-        if (dist < orbRadius + b.radius) {
+        const guardReady = (orb.isTethered || orb.mode === 'ORBIT') &&
+          Math.hypot(orb.x - this.player.state.x, orb.y - this.player.state.y) <= 70;
+        const guarded = guardReady && Math.hypot(b.x - this.player.state.x, b.y - this.player.state.y) < 58 + b.radius;
+        if (dist < orbRadius + b.radius || guarded) {
           // Bullet erased instantly!
           this.enemyBullets.splice(bi, 1);
           this.audio.playBulletErased();
@@ -926,6 +936,16 @@ export class Game {
             continue;
           }
 
+          if (orb.isTethered || orb.mode === 'ORBIT') {
+            const nx = (e.x - this.player.state.x) / (Math.hypot(e.x - this.player.state.x, e.y - this.player.state.y) || 1);
+            const ny = (e.y - this.player.state.y) / (Math.hypot(e.x - this.player.state.x, e.y - this.player.state.y) || 1);
+            const power = (e.mass || 1) >= 100 ? 5 : 11;
+            e.knockbackVx = nx * power; e.knockbackVy = ny * power;
+            e.hitCooldown = 12;
+            this.audio.playGeminiBounce(); this.addExplosion(orb.x, orb.y, 12, false);
+            continue;
+          }
+
           // Determine reflection vs penetration:
           const isReflect = this.geminiManager.isPassiveOrb(orb) || this.geminiManager.collisionMode === 'REFLECT' || e.collisionType === 'REFLECT';
 
@@ -945,9 +965,7 @@ export class Game {
               orb.x = e.x + nx * (orbRadius + e.width * 0.46);
               orb.y = e.y + ny * (orbRadius + e.width * 0.46);
             }
-            if (orb.mode === 'ORBIT') {
-              orb.orbitAngularVel = -orb.orbitAngularVel * 0.85;
-            }
+
 
             // Knockback on enemy (if mass < 100)
             if ((e.mass || 2) < 100) {
@@ -961,17 +979,7 @@ export class Game {
               this.audio.playGeminiBounce();
               this.addExplosion(e.x, e.y, orb.isCharged ? 20 : 14, false);
               this.player.addScore(50 * effectiveDmg);
-              if (orb.mode === 'ORBIT') {
-                if (orb.spinLevel === 2) {
-                  this.renderer.triggerShake(12, 6);
-                  this.addFloatingText(e.x, e.y - 14, `🔥室伏剛撃!! -${effectiveDmg}`, '#ff3b00');
-                } else if (orb.spinLevel === 1) {
-                  this.renderer.triggerShake(6, 3);
-                  this.addFloatingText(e.x, e.y - 14, `⚡遠心剛撃! -${effectiveDmg}`, '#fde047');
-                } else {
-                  this.addFloatingText(e.x, e.y - 14, `🛡️分銅打撃 -${effectiveDmg}`, '#38bdf8');
-                }
-              } else if (orb.isCharged) {
+              if (orb.isCharged) {
                 this.addFloatingText(e.x, e.y - 14, `🔥大突撃BOUNCE! -${effectiveDmg}`, '#ff3b00');
               } else {
                 this.addFloatingText(e.x, e.y - 14, `BOUNCE! -${effectiveDmg}`, '#f97316');
@@ -1043,7 +1051,8 @@ export class Game {
                 this.rewardedFormations.add(formationId);
                 this.spawnGeminiDropItem(deadX, deadY);
                 this.player.repair(20);
-                this.addFloatingText(deadX, deadY - 24, 'FORMATION WIPE! +20 SHIELD', '#22c55e');
+                this.addFloatingText(deadX, deadY - 24, formationId === 'invaders_wave' ? 'INVADER ALL CLEAR! +20 SHIELD' : 'FORMATION WIPE! +20 SHIELD', '#22c55e');
+                if (formationId === 'invaders_wave') { this.renderer.triggerShake(12, 4); this.player.addScore(5000); }
                 this.player.addScore(1500);
               }
             }
@@ -1054,12 +1063,32 @@ export class Game {
       // 3. Gemini Orbs vs Boss (貫通 vs 反射)
       if (this.bossManager.currentBoss) {
         const b = this.bossManager.currentBoss;
-        const touching = Math.hypot(
+        const hullDistance = Math.hypot(
           Math.max(0, Math.abs(orb.x - b.x) - b.width * .45),
-          Math.max(0, Math.abs(orb.y - b.y) - b.height * .42)) <= orbRadius;
-        if (!touching) this.bossContacts.delete(orb.id);
-        if (this.bossContacts.has(orb.id)) continue;
-        if (!b.hitCooldown || b.hitCooldown <= 0) {
+          Math.max(0, Math.abs(orb.y - b.y) - b.height * .42));
+        const touching = hullDistance <= orbRadius;
+        if (hullDistance > orbRadius + 24) {
+          for (const key of this.bossContacts) if (key.startsWith(orb.id + ':')) this.bossContacts.delete(key);
+        }
+        if (touching && (orb.isTethered || orb.mode === 'ORBIT')) {
+          if (this.stageTick - (this.bossLastHit.get(orb.id) ?? -100) >= 18) {
+            const dx = b.x - this.player.state.x, dy = b.y - this.player.state.y;
+            const distance = Math.hypot(dx, dy) || 1;
+            this.bossManager.pushBack(dx / distance * 14, dy / distance * 14);
+            this.bossLastHit.set(orb.id, this.stageTick);
+            this.audio.playGeminiBounce(); this.renderer.triggerShake(4, 2);
+            this.addFloatingText(orb.x, orb.y, 'GUARD PUSH', '#67e8f9');
+          }
+          continue;
+        }
+        if (b.phase === 0) continue;
+        const hitsThisPass = [...this.bossContacts].filter(key => key.startsWith(orb.id + ':')).length;
+        if (hitsThisPass >= (this.geminiManager.isPassiveOrb(orb) ? 1 : 5)) continue;
+        const col = Math.max(0, Math.min(4, Math.floor((orb.x - b.x + b.width * .45) / (b.width * .9) * 5)));
+        const row = Math.max(0, Math.min(2, Math.floor((orb.y - b.y + b.height * .42) / (b.height * .84) * 3)));
+        const contactKey = orb.id + ':' + col + ':' + row;
+        if (this.bossContacts.has(contactKey)) continue;
+        if (this.stageTick - (this.bossLastHit.get(orb.id) ?? -100) >= 3) {
           const bdx = orb.x - b.x;
           const bdy = orb.y - b.y;
           const bdist = Math.hypot(bdx, bdy) || 1;
@@ -1073,7 +1102,9 @@ export class Game {
             if (res.bossHit) {
               const actualDamage = hpBefore - b.hp;
               this.audio.playBossHit(!!orb.isCharged);
-              this.bossContacts.add(orb.id);
+              this.renderer.triggerShake(3, 1.6);
+              this.bossContacts.add(contactKey);
+              this.bossLastHit.set(orb.id, this.stageTick);
               b.hitCooldown = isBossReflect ? 8 : 4;
               this.player.addScore(res.points);
 
@@ -1377,7 +1408,8 @@ export class Game {
       this.testEnemySetup,
       this.testBossCollisionMode,
       { x: this.input.state.x, y: this.input.state.y },
-      { bgm: this.audio.isBgmEnabled(), se: this.audio.isSeEnabled() }
+      { bgm: this.audio.isBgmEnabled(), se: this.audio.isSeEnabled() },
+      this.encounter
     );
     if (this.paused) {
       const ctx = this.canvas.getContext('2d')!;
@@ -1428,7 +1460,7 @@ export class Game {
 
   private exitTestStage(): void {
     this.state = 'TITLE';
-    this.paused = false;
+    this.setPaused(false);
     this.input.releaseAll();
     this.audio.stopBgm();
   }

@@ -75,3 +75,13 @@ sound.seEnabled = false; now = 240; sound.playBossHit(true);
 assert.equal(voices.length, 5, 'SE mute applies to both heavy-hit layers');
 sound.seEnabled = true; sound.playBossHit(true); assert.equal(voices.length, 7);
 console.log('Audio regression: track transitions, mute/unmute, stop, normal/strong hit routing and debounce passed.');
+
+let suspended=0;
+sound.ctx.state='running';sound.ctx.suspend=()=>{suspended++;sound.ctx.state='suspended';return Promise.resolve();};
+const playing=tracks.at(-1);playing.currentTime=19;
+sound.setPaused(true);assert(playing.paused);assert.equal(suspended,1);
+now=500;sound.playBossHit(true);assert.equal(voices.length,7,'paused SE is silent');
+sound.toggleBgm();sound.toggleBgm();assert(playing.paused,'audio buttons cannot bypass pause');
+sound.playBossBgm(2);assert(tracks.at(-1).paused,'new tracks remain paused');
+sound.setPaused(false);assert(!tracks.at(-1).paused,'resume starts requested track');
+console.log('Pause suspends SFX, freezes BGM, rejects playback while paused and resumes selection OK');

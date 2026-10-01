@@ -170,6 +170,7 @@ export interface GeminiOrb {
   isCharged?: boolean;
   chargeRatio?: number;
   restRatio?: number; // 0 = active free thrust, 1 = settled small passive orb.
+  nearPlayerFrames?: number; // Nearby residence at fixed 60 Hz, independent of spin speed.
   orbitTier?: 'SHORT' | 'MEDIUM' | 'LONG';
   strokePhase?: 'INWARD' | 'OVERSHOOT' | 'APEX' | 'REST' | 'OUTWARD' | 'RETURN';
   castTargetX?: number;
