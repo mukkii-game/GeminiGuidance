@@ -147,6 +147,7 @@ export class GeminiOrbManager {
     overshootRatio: 0.5,
   };
   private orbCounter: number = 0;
+  private spinDirections = new WeakMap<GeminiOrb, number>();
 
   public toggleScreenEdgeBounce(): boolean {
     this.screenEdgeBounce = !this.screenEdgeBounce;
@@ -216,10 +217,10 @@ export class GeminiOrbManager {
   }
 
   public setOrbCount(count: number, playerX: number, playerY: number): number {
-    const targetCount = Math.max(1, Math.min(3, count));
+    const targetCount = Math.max(1, Math.min(2, count));
     while (this.orbs.length < targetCount) {
       const offset = this.orbs.length * 35;
-      this.spawn(playerX + (Math.random() - 0.5) * 40, playerY - 60 - offset);
+      this.spawn(playerX + (this.orbs.length % 2 === 0 ? -24 : 24), playerY - 60 - offset);
     }
     while (this.orbs.length > targetCount) {
       this.orbs.pop();
@@ -228,7 +229,7 @@ export class GeminiOrbManager {
   }
 
   public cycleOrbCount(playerX: number, playerY: number): number {
-    const next = (this.orbs.length % 3) + 1;
+    const next = (this.orbs.length % 2) + 1;
     return this.setOrbCount(next, playerX, playerY);
   }
 
@@ -357,22 +358,10 @@ export class GeminiOrbManager {
 
   public getEffectiveDamage(orb: GeminiOrb): number {
     const baseDamage = orb.level === 1 ? 1 : orb.level === 2 ? 2 : 4;
-    if (orb.mode === 'ORBIT') {
-      // ② 分銅 (Tethered Flail)
-      const speed = Math.hypot(orb.vx, orb.vy);
-      if (orb.spinLevel === 2) {
-        return baseDamage + 2; // Giga spin (室伏ジャイアントスイング): Lv1なら3ダメージ
-      } else if (orb.spinLevel === 1 || speed > 1.8) {
-        return baseDamage + 1; // High spin: Lv1なら2ダメージ
-      }
-      return baseDamage; // 通常旋回: Lv1なら1ダメージ
-    } else {
-      // ① ハレー彗星 / ヨーヨー (COMET / SLING)
-      if (orb.isCharged) {
-        return baseDamage + 1; // 高速スイングバイ火の玉チャージ: Lv1なら2ダメージ
-      }
-      return baseDamage; // 通常突進: Lv1なら1ダメージ (HP2やHP3の敵がしっかり耐えて手応えが出る)
-    }
+    // Close orbit is a defensive tool. Free thrusts and throws reward commitment.
+    if (orb.isTethered || orb.mode === 'ORBIT') return Math.max(1, baseDamage / 2);
+    const speed = Math.hypot(orb.vx, orb.vy);
+    return baseDamage + (speed > 9 ? 3 : speed > 5 ? 2 : speed > 2.5 ? 1 : 0);
   }
 
   public getEffectiveRadius(orb: GeminiOrb): number {
@@ -464,7 +453,7 @@ export class GeminiOrbManager {
       x,
       y,
       vx: initialVx || 0,
-      vy: initialVy || -2.2,
+      vy: initialVy,
       level: 1,
       radius: 16,
       damage: 1,
@@ -475,7 +464,7 @@ export class GeminiOrbManager {
       collisionMode: this.collisionMode,
       orbitRadius: this.tuning.orbitRadius,
       orbitAngle: -Math.PI / 2,
-      orbitAngularVel: 0.045,
+      orbitAngularVel: this.orbs.length % 2 === 0 ? 0.065 : -0.065,
       apexDwellTimer: 0,
       isHoveringApex: false,
       strokePhase: 'INWARD',
@@ -488,6 +477,7 @@ export class GeminiOrbManager {
       returnGoalY: undefined,
       tetherLength: this.tuning.orbitRadius,
     };
+    this.spinDirections.set(orb, this.orbs.length % 2 === 0 ? 1 : -1);
     this.orbs.push(orb);
     return orb;
   }
@@ -554,7 +544,8 @@ export class GeminiOrbManager {
     }
 
     // Check for Gemini Fusion
-    this.checkFusion(onMerge);
+    // Twin orbs remain independent weapons, even when their paths cross.
+    void onMerge;
   }
 
   /**
@@ -882,266 +873,69 @@ export class GeminiOrbManager {
     this.updateExelicaFlail(orb, playerX, playerY, playerVx, playerVy, cfg);
   }
 
-  /**
-   * エグゼリカ式分銅物理 (Triggerheart Exelica Orbital Physics)
-   * 1. 自機を中心とした極座標 (R, θ, ω) による滑らかで確実な公転軌道
-   * 2. 自機の横移動・旋回入力をダイレクトに角加速度 ω へ変換（エグゼリカの操作感）
-   * 3. 停滞せず常に生き生きと回転し、入力に合わせて超高速スピン（室伏剛撃）へ加速
-   * 4. 離した瞬間、接線方向の物理慣性ベクトルで狙った方向へ正確に射出
-   */
+  /** Held capture: automatic close orbit, bounded reel-in and deliberate motion pumping. */
   private updateExelicaFlail(
-    orb: GeminiOrb,
-    playerX: number,
-    playerY: number,
-    playerVx: number,
-    playerVy: number,
-    _cfg: PhysicsPresetConfig
+    orb: GeminiOrb, playerX: number, playerY: number,
+    playerVx: number, playerVy: number, _cfg: PhysicsPresetConfig
   ): void {
-    orb.mode = 'ORBIT';
-    orb.isTethered = true;
-    orb.isHoveringApex = false;
-    orb.apexDwellTimer = 0;
-
-    const chainLen = (this.tuning.orbitRadius || 75);
-
-    // 初回キャッチ時の角度と半径初期化
-    if (orb.orbitAngle === undefined || isNaN(orb.orbitAngle)) {
-      orb.orbitAngle = Math.atan2(orb.y - playerY, orb.x - playerX);
-    }
-    if (!orb.orbitRadius || orb.orbitRadius < 20) {
-      orb.orbitRadius = Math.max(35, Math.hypot(orb.x - playerX, orb.y - playerY));
-    }
-    if (orb.orbitAngularVel === undefined || isNaN(orb.orbitAngularVel)) {
-      const sinA0 = Math.sin(orb.orbitAngle);
-      const cosA0 = Math.cos(orb.orbitAngle);
-      const tangentSpeed0 = -orb.vx * sinA0 + orb.vy * cosA0;
-      orb.orbitAngularVel = Math.max(-0.10, Math.min(0.10, tangentSpeed0 / orb.orbitRadius));
-    }
-
-    // 1. 自機の移動による角加速度（エグゼリカのトルク注入）
-    // 接線方向単位ベクトル (-sin θ, cos θ)
-    const sinA = Math.sin(orb.orbitAngle);
-    const cosA = Math.cos(orb.orbitAngle);
-    const tangentialShipMotion = -playerVx * sinA + playerVy * cosA;
-
-    if (Math.abs(tangentialShipMotion) > 0.03) {
-      // 自機の横移動・旋回で角加速度を加算（プレイヤーの操作でブンブン回す）
-      const torque = (tangentialShipMotion / chainLen) * 1.25 * this.tuning.tensionMultiplier;
-      orb.orbitAngularVel += torque;
-    }
-
-    // 2. 自機直進時の追従・引きずり（Trailing）
-    // 回転が穏やかな時（|ω| < 0.06）、自機が一定速度以上で直進していれば自機後方に自然と引きずられる
-    const pSpeed = Math.hypot(playerVx, playerVy);
-    if (Math.abs(orb.orbitAngularVel) < 0.06 && pSpeed > 0.35) {
-      const trailAngle = Math.atan2(-playerVy, -playerVx);
-      let diff = trailAngle - orb.orbitAngle;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      orb.orbitAngle += diff * 0.055 * Math.min(1.0, pSpeed / 2.5);
-    }
-
-    // 3. 自然な角速度減衰（止まっている時は回転が自然に静止する：強制回転を廃止）
-    orb.orbitAngularVel *= 0.992;
-
-    // 角速度クランプ（エグゼリカ式高速スピン: 最大約3.3回転/秒〜神速）
-    const maxOmega = 0.35 * this.tuning.maxSpeedMultiplier;
-    if (Math.abs(orb.orbitAngularVel) > maxOmega) {
-      orb.orbitAngularVel = Math.sign(orb.orbitAngularVel) * maxOmega;
-    }
-
-    // 4. 半径のゴム伸縮（自然長へスムーズに追従）
-    const targetR = chainLen;
-    orb.orbitRadius += (targetR - orb.orbitRadius) * 0.12;
-
-    // 5. 角度更新
-    orb.orbitAngle += orb.orbitAngularVel;
-    while (orb.orbitAngle > Math.PI) orb.orbitAngle -= Math.PI * 2;
-    while (orb.orbitAngle < -Math.PI) orb.orbitAngle += Math.PI * 2;
-
-    // 6. 実際の位置と速度ベクトルを計算（接線速度を反映）
-    const currentCos = Math.cos(orb.orbitAngle);
-    const currentSin = Math.sin(orb.orbitAngle);
-    orb.x = playerX + orb.orbitRadius * currentCos;
-    orb.y = playerY + orb.orbitRadius * currentSin;
-
-    // 接線速度（離した時にそのまま強烈な射出ベクトルとなる）
-    const linearTangentialSpeed = orb.orbitAngularVel * orb.orbitRadius;
-    orb.vx = -currentSin * linearTangentialSpeed + playerVx * 0.50;
-    orb.vy = currentCos * linearTangentialSpeed + playerVy * 0.50;
-
-    // 7. スピンレベル判定（激しい回転で剛撃ジャイアントスイング）
-    const absOmega = Math.abs(orb.orbitAngularVel);
-    if (absOmega > 0.18) {
-      orb.spinLevel = 2; // 🔥 GIGA SPIN (室伏剛撃)
-      orb.isCharged = true;
-      orb.chargeRatio = 1.0;
-    } else if (absOmega > 0.08) {
-      orb.spinLevel = 1; // ⚡ ACTIVE SPIN
-      orb.isCharged = false;
-      orb.chargeRatio = 0.5;
-    } else {
-      orb.spinLevel = 0; // IDLE / TRAILING
-      orb.isCharged = false;
-      orb.chargeRatio = 0;
-    }
+    orb.mode = 'ORBIT'; orb.isTethered = true; orb.isHoveringApex = false;
+    const dx = orb.x - playerX, dy = orb.y - playerY;
+    const distance = Math.hypot(dx, dy);
+    const angle = Math.atan2(dy, dx);
+    const direction = this.spinDirections.get(orb) ?? 1;
+    const baseOmega = 0.065;
+    const tangentMotion = -playerVx * Math.sin(angle) + playerVy * Math.cos(angle);
+    // Only motion in the spin direction pumps energy; the baseline is always controllable.
+    const pump = Math.max(0, tangentMotion * direction) * 0.0008;
+    const omega = Math.min(0.15, Math.abs(orb.orbitAngularVel || baseOmega) * 0.976 + baseOmega * 0.024 + pump);
+    orb.orbitAngularVel = omega * direction;
+    const targetRadius = Math.max(48, Math.min(90, this.tuning.orbitRadius));
+    // Reel in at a bounded speed, so catching a distant orb never teleports it.
+    const radius = distance + Math.max(-9, Math.min(9, (targetRadius - distance) * 0.10));
+    const step = orb.orbitAngularVel * Math.min(1, targetRadius / Math.max(targetRadius, distance));
+    orb.orbitAngle = angle + step;
+    orb.orbitRadius = radius; orb.orbitTier = 'SHORT';
+    orb.x = playerX + Math.cos(orb.orbitAngle) * radius;
+    orb.y = playerY + Math.sin(orb.orbitAngle) * radius;
+    // Stored velocity is the release tangent, not the radial reeling velocity.
+    orb.vx = -Math.sin(orb.orbitAngle) * omega * targetRadius * direction + playerVx * 0.3;
+    orb.vy = Math.cos(orb.orbitAngle) * omega * targetRadius * direction + playerVy * 0.3;
+    orb.spinLevel = omega > 0.125 ? 2 : omega > 0.085 ? 1 : 0;
+    orb.isCharged = false;
+    orb.chargeRatio = Math.min(1, (omega - baseOmega) / 0.085);
   }
 
-  /**
-   * 発射後の誘導ホーミング ＆ オーバーラン突き抜け物理
-   * 1. OUTWARD: 投擲の勢いで敵陣へ直線射出（深宇宙へ豪快に突進）
-   * 2. INWARD: 自機への円弧誘導ホーミング（美しいカーブで猛烈に接近）
-   * 3. OVERSHOOT: 自機を通過した瞬間、そのまま前方深宇宙へ滑らかにオーバーラン突き抜け！
-   * 4. APEX: 最遠到達点で滞空停止せず即座に自機へのホーミングへ折り返し
-   */
+  /** Free guidance: underdamped player-directed attraction, evaluated at fixed 60 Hz. */
   private updateHomingOverrun(
-    orb: GeminiOrb,
-    playerX: number,
-    playerY: number,
-    _playerVx: number,
-    _playerVy: number,
-    cfg: PhysicsPresetConfig
+    orb: GeminiOrb, playerX: number, playerY: number,
+    _playerVx: number, _playerVy: number, cfg: PhysicsPresetConfig
   ): void {
-    orb.mode = 'COMET';
-    orb.isTethered = false;
-
-    const dx = playerX - orb.x;
-    const dy = playerY - orb.y;
-    const distToPlayer = Math.hypot(dx, dy) || 1;
-    const curSpd = Math.hypot(orb.vx, orb.vy);
-
-    if (!orb.strokePhase) {
-      orb.strokePhase = 'INWARD';
-    }
-
-    if (orb.strokePhase === 'OUTWARD') {
-      // --- 投擲射出フェーズ ---
-      orb.strokeElapsed = (orb.strokeElapsed || 0) + 1;
-      const flyDist = Math.hypot(orb.x - (orb.launchStartX || orb.x), orb.y - (orb.launchStartY || orb.y));
-
-      // 慣性保存（低い空気抵抗）
-      orb.vx *= 0.995;
-      orb.vy *= 0.995;
-
-      // 飛翔距離が一定（約240px）を超えるか、速度減衰でホーミングへ移行（壁反射ON時は壁接触でも即移行）
-      const hitWall = this.screenEdgeBounce && (orb.x <= 16 || orb.x >= 344 || orb.y <= 24 || orb.y >= 516);
-      if (flyDist > 240 || orb.strokeElapsed > 40 || curSpd < 2.0 || hitWall) {
-        orb.strokePhase = 'INWARD';
-        orb.strokeDist = Math.max(50, distToPlayer);
-      }
-
-    } else if (orb.strokePhase === 'APEX') {
-      // 滞空停止させず即座に自機ホーミングへ移行（敵衝突時のフリーズ・停止感を完全解消）
-      orb.strokePhase = 'INWARD';
-      orb.isHoveringApex = false;
-      orb.strokeDist = Math.max(50, distToPlayer);
-
-    } else if (orb.strokePhase === 'OVERSHOOT') {
-      // --- OVERSHOOTオーバーラン突き抜けフェーズ ---
-      orb.isHoveringApex = false;
-      const dirX = orb.strokeDirX ?? (curSpd > 0.01 ? orb.vx / curSpd : 0);
-      const dirY = orb.strokeDirY ?? (curSpd > 0.01 ? orb.vy / curSpd : -1);
-
-      // 自機通過位置からの進行距離 s
-      const anchorX = orb.castTargetX ?? playerX;
-      const anchorY = orb.castTargetY ?? playerY;
-      const s = (orb.x - anchorX) * dirX + (orb.y - anchorY) * dirY;
-      const forwardV = orb.vx * dirX + orb.vy * dirY;
-
-      // 目標オーバーラン距離 (深宇宙へ伸びる自然な突き抜け)
-      const targetOvershoot = Math.min(160, Math.max(60, (orb.peakSpeed || 5.0) * 15));
-
-      // 前進速度の自然なブレーキ
-      const peakV = Math.max(3.0, orb.peakSpeed || curSpd);
-      const brakeAccel = (peakV * peakV) / (2 * targetOvershoot);
-      orb.vx -= dirX * brakeAccel * 0.85;
-      orb.vy -= dirY * brakeAccel * 0.85;
-
-      // 直線整流
-      const perpVx = orb.vx - forwardV * dirX;
-      const perpVy = orb.vy - forwardV * dirY;
-      orb.vx = forwardV * dirX + perpVx * 0.88;
-      orb.vy = forwardV * dirY + perpVy * 0.88;
-
-      // 目標距離到達または前進速度停止でスムーズに自機ホーミングへ移行（壁反射ON時は壁接触でも即移行）
-      const hitWallOvershoot = this.screenEdgeBounce && (orb.x <= 16 || orb.x >= 344 || orb.y <= 24 || orb.y >= 516);
-      if (s >= targetOvershoot || forwardV <= 0.30 || hitWallOvershoot) {
-        orb.strokePhase = 'INWARD';
-        orb.isHoveringApex = false;
-        orb.strokeDist = Math.max(50, distToPlayer);
-      }
-
-    } else {
-      // --- INWARD誘導ホーミング接近フェーズ ---
-      orb.isHoveringApex = false;
-
-      // 旋回制限ホーミングで自機へ向かう
-      const targetAngle = Math.atan2(dy, dx);
-      let currentAngle = Math.atan2(orb.vy, orb.vx);
-      let speed = Math.hypot(orb.vx, orb.vy);
-
-      if (speed < 0.2) {
-        currentAngle = targetAngle;
-        speed = 1.0;
-      }
-
-      let angleDiff = targetAngle - currentAngle;
-      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-
-      // 1Fあたりの最大旋回角度制限 (美しい円弧を描く)
-      const maxTurn = (this.tuning.maxTurnRate || 0.035) * 1.15;
-      const clampedTurn = Math.max(-maxTurn, Math.min(maxTurn, angleDiff));
-      const newAngle = currentAngle + clampedTurn;
-
-      // 自機への推進加速 (機敏なアーケード加速)
-      const accel = (0.35 + Math.min(0.35, distToPlayer * 0.0018)) * this.tuning.tensionMultiplier;
-      speed += accel;
-      speed *= this.tuning.damping;
-
-      const maxSpd = (cfg.maxSpeed * 1.25) * this.tuning.maxSpeedMultiplier;
-      if (speed > maxSpd) speed = maxSpd;
-
-      orb.vx = Math.cos(newAngle) * speed;
-      orb.vy = Math.sin(newAngle) * speed;
-
-      // 自機通過（オーバーラン開始）判定
-      const dirToPlayerX = dx / distToPlayer;
-      const dirToPlayerY = dy / distToPlayer;
-      const forwardToPlayer = orb.vx * dirToPlayerX + orb.vy * dirToPlayerY;
-
-      if (distToPlayer <= 32 || (distToPlayer < 65 && forwardToPlayer < 0)) {
-        orb.strokePhase = 'OVERSHOOT';
-        orb.peakSpeed = Math.hypot(orb.vx, orb.vy);
-        const pSpd = Math.max(0.01, orb.peakSpeed);
-        orb.strokeDirX = orb.vx / pSpd;
-        orb.strokeDirY = orb.vy / pSpd;
-        orb.castTargetX = playerX;
-        orb.castTargetY = playerY;
-      }
-    }
-
-    // 最高速度クランプ (最高速倍率に対応)
-    const finalSpd = Math.hypot(orb.vx, orb.vy);
-    const maxAllowed = (cfg.maxSpeed * 1.30) * this.tuning.maxSpeedMultiplier;
-    if (finalSpd > maxAllowed) {
-      orb.vx = (orb.vx / finalSpd) * maxAllowed;
-      orb.vy = (orb.vy / finalSpd) * maxAllowed;
-    }
-
-    // 火の玉チャージ判定
-    if (distToPlayer > 45 && finalSpd > 3.5) {
-      orb.isCharged = true;
-      orb.chargeRatio = Math.min(1.0, (distToPlayer - 35) / 60);
-    } else {
-      orb.isCharged = false;
-      orb.chargeRatio = 0;
-    }
-
-    orb.x += orb.vx;
-    orb.y += orb.vy;
+    orb.mode = 'COMET'; orb.isTethered = false; orb.isHoveringApex = false;
+    const dx = playerX - orb.x, dy = playerY - orb.y;
+    const distance = Math.hypot(dx, dy);
+    const beforeDot = dx * orb.vx + dy * orb.vy;
+    const release = orb.strokePhase === 'OUTWARD' && (orb.strokeElapsed || 0) < 12;
+    orb.strokeElapsed = (orb.strokeElapsed || 0) + 1;
+    // A damped spring adds acceleration toward the PLAYER, never along velocity.
+    // Momentum therefore passes through the player, while every idle swing loses energy.
+    const stiffness = 0.0035 * (cfg.springK / 0.0025) * this.tuning.tensionMultiplier;
+    const force = Math.min(1.15, distance * stiffness) * (release ? 0.18 : 1);
+    const outside = Math.max(0, -orb.x, orb.x - 360, -orb.y, orb.y - 540);
+    const recovery = this.screenEdgeBounce ? 0 : Math.min(1.4, outside * 0.018);
+    const damping = release ? 0.996 : Math.min(0.997, this.tuning.damping - 0.005);
+    // Outside the playfield: progressive drag and PLAYER-directed pull, no wall normal.
+    const drag = damping * (1 - Math.min(0.12, outside * 0.0015));
+    orb.vx = orb.vx * drag + dx / Math.max(1, distance) * (force + recovery);
+    orb.vy = orb.vy * drag + dy / Math.max(1, distance) * (force + recovery);
+    const speed = Math.hypot(orb.vx, orb.vy);
+    const maxSpeed = cfg.maxSpeed * (release ? 1.9 : 1.35) * this.tuning.maxSpeedMultiplier;
+    if (speed > maxSpeed) { orb.vx *= maxSpeed / speed; orb.vy *= maxSpeed / speed; }
+    orb.x += orb.vx; orb.y += orb.vy;
+    if (!release) orb.strokePhase = beforeDot < 0 ? 'OVERSHOOT' : 'INWARD';
+    orb.isCharged = Math.hypot(orb.vx, orb.vy) > 4.2;
+    orb.chargeRatio = Math.min(1, Math.hypot(orb.vx, orb.vy) / 10);
     orb.orbitAngle = Math.atan2(orb.y - playerY, orb.x - playerX);
-    orb.orbitRadius = distToPlayer;
+    orb.orbitRadius = Math.hypot(orb.x - playerX, orb.y - playerY);
   }
 
   /**
@@ -1172,15 +966,17 @@ export class GeminiOrbManager {
       const sinA = Math.sin(orb.orbitAngle);
       const cosA = Math.cos(orb.orbitAngle);
       const tangentSpeed = -orb.vx * sinA + orb.vy * cosA;
-      orb.orbitAngularVel = Math.max(-0.25, Math.min(0.25, tangentSpeed / orb.orbitRadius));
+      const spinDirection = Math.abs(tangentSpeed) > 0.5 ? Math.sign(tangentSpeed) : Math.sign(orb.orbitAngularVel || 1);
+      orb.orbitAngularVel = (this.spinDirections.get(orb) ?? spinDirection) * Math.max(0.065, Math.min(0.15, Math.abs(tangentSpeed) / Math.max(1, orb.orbitRadius)));
     } else if (!isTetherHeld && wasTethered) {
       // 投擲リリース！
       orb.isTethered = false;
       orb.mode = 'COMET';
       const spd = Math.hypot(orb.vx, orb.vy);
       if (spd > 0.3) {
-        orb.vx *= 1.35; // 遠心力カタパルト射出初速
-        orb.vy *= 1.35;
+        const launchSpeed = Math.max(10, Math.min(16, spd * 1.7));
+        orb.vx *= launchSpeed / spd;
+        orb.vy *= launchSpeed / spd;
       }
       orb.strokePhase = 'OUTWARD';
       orb.launchStartX = orb.x;
@@ -1208,7 +1004,7 @@ export class GeminiOrbManager {
     const minY = 24;
     const maxY = 516;
 
-    if (this.screenEdgeBounce) {
+    if (this.screenEdgeBounce && !orb.isTethered) {
       // 🧱 壁反射モード (ON): 意図して壁当てトリック攻撃・裏回り反射を使いたい時だけ跳ね返る
       let bounced = false;
       if (orb.x < minX) { orb.x = minX; orb.vx = Math.abs(orb.vx) * 0.92; bounced = true; }
@@ -1216,17 +1012,9 @@ export class GeminiOrbManager {
       if (orb.y < minY) { orb.y = minY; orb.vy = Math.abs(orb.vy) * 0.92; bounced = true; }
       if (orb.y > maxY) { orb.y = maxY; orb.vy = -Math.abs(orb.vy) * 0.92; bounced = true; }
       if (bounced && onWallHit) onWallHit(orb.x, orb.y);
-    } else {
-      // 🚪 通過モード (OFF / デフォルト): 壁で勝手に跳ねない！
-      // 少しはみ出してもOK。プレイヤー自身の腕・自機の位置取り・引力でジェミニをコントロールする。
-      // 画面端を越えても跳ね返りや強制反転は一切せず、自然に飛行させる。
-      // 万が一極端に離れすぎた場合（約65px以上外側）のみ、緩やかに戻す。
-      const outerMargin = 65;
-      if (orb.x < -outerMargin) { orb.x = -outerMargin; orb.vx += 0.20; }
-      if (orb.x > 360 + outerMargin) { orb.x = 360 + outerMargin; orb.vx -= 0.20; }
-      if (orb.y < -outerMargin) { orb.y = -outerMargin; orb.vy += 0.20; }
-      if (orb.y > 540 + outerMargin) { orb.y = 540 + outerMargin; orb.vy -= 0.20; }
     }
+    // Free mode has no position clamp or automatic reflection. Recovery is a
+    // continuous acceleration toward the player in updateHomingOverrun.
   }
 
   public levelUpOrb(orb: GeminiOrb): void {
@@ -1237,37 +1025,6 @@ export class GeminiOrbManager {
       orb.fuseTimer = 25; // Sparkling burst
     } else {
       orb.fuseTimer = 20;
-    }
-  }
-
-  private checkFusion(onMerge?: (level: number, x: number, y: number) => void): void {
-    for (let i = 0; i < this.orbs.length; i++) {
-      for (let j = i + 1; j < this.orbs.length; j++) {
-        const o1 = this.orbs[i];
-        const o2 = this.orbs[j];
-        const dist = Math.hypot(o1.x - o2.x, o1.y - o2.y);
-
-        if (dist < o1.radius + o2.radius + 6) {
-          // Merge o2 into o1
-          const newLevel = Math.min(3, Math.max(o1.level, o2.level) + 1);
-          o1.level = newLevel;
-          o1.radius = newLevel === 1 ? 16 : newLevel === 2 ? 24 : 32;
-          o1.damage = newLevel === 1 ? 1 : newLevel === 2 ? 3 : 8;
-          o1.fuseTimer = 25; // Sparkling burst
-
-          o1.x = (o1.x + o2.x) / 2;
-          o1.y = (o1.y + o2.y) / 2;
-          o1.vx = (o1.vx + o2.vx) * 0.65;
-          o1.vy = (o1.vy + o2.vy) * 0.65;
-
-          if (onMerge) {
-            onMerge(newLevel, o1.x, o1.y);
-          }
-
-          this.orbs.splice(j, 1);
-          return;
-        }
-      }
     }
   }
 

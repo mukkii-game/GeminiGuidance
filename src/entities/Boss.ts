@@ -124,64 +124,56 @@ export class BossManager {
       b.hitCooldown--;
     }
 
-    // Entrance flight
-    if (b.y < b.targetY) {
-      b.y += 0.32;
+    // Entrance uses phase rather than y: sway below targetY must not restart it.
+    if (b.phase === 0) {
+      b.y = Math.min(b.targetY, b.y + 2.4);
+      if (b.y >= b.targetY) { b.phase = 1; b.timer = 0; }
       return;
     }
+    const stage = b.type === 'STAGE1_DEEPSEEK_KIMI' ? 1 : b.type === 'STAGE2_GROK_CURSOR' ? 2 : b.type === 'STAGE3_CLAUDE_FABLE' ? 3 : 4;
+    b.phase = b.hp <= b.maxHp * 0.5 ? 2 : 1;
+    const cycle = b.timer % 360;
+    const opening = cycle >= 260;
+    // Stable, slightly lowered target during each recovery window.
+    const sway = opening ? 18 : 42;
+    b.x += (canvasWidth / 2 + Math.sin(b.timer * 0.012) * sway - b.x) * 0.055;
+    b.y += (b.targetY + (opening ? 24 : Math.sin(b.timer * 0.018) * 8) - b.y) * 0.045;
+    if (cycle === 260 && onBossShout) onBossShout('CORE OPEN — 突き・投擲のチャンス！');
+    if (opening) return;
 
-    // --- 1. デカくてゆっくりうごく (Huge, majestic, slow sway at top) ---
-    b.x = canvasWidth / 2 + Math.sin(b.timer * 0.008) * 65;
-    b.y = b.targetY + Math.cos(b.timer * 0.010) * 10;
+    const types: EnemyType[] = ['MISTRAL_FLAME', 'CURSOR_PROBE', 'CLAUDE_HAIKU', 'GPT6_LUNA'];
+    const launch = (side: number) => {
+      if (!onSpawnTackleMinion) return;
+      const x = b.x + side;
+      const y = b.y + 32;
+      const dx = playerX - x;
+      const dy = playerY - y;
+      const distance = Math.hypot(dx, dy) || 1;
+      const speed = 2.5 + stage * 0.18 + (b.phase === 2 ? 0.25 : 0);
+      onSpawnTackleMinion(types[stage - 1], x, y, dx / distance * speed, dy / distance * speed);
+    };
+    if (cycle === 45 || cycle === 155) launch(cycle === 45 ? -58 : 58);
+    if (stage >= 3 && b.phase === 2 && cycle === 210) launch(0);
 
-    // --- 2. ザコが体当たりしてくる (Minion Targeted Body Slam) ---
-    // Every 140 ticks (~2.3s), boss launches a tackle minion aimed directly at Solvalou!
-    if (onSpawnTackleMinion && b.timer % 140 === 70) {
-      let minionType: EnemyType = 'MISTRAL_FLAME';
-      const launchSide = (b.timer % 280 === 70) ? -55 : 55;
-
-      if (b.type === 'STAGE1_DEEPSEEK_KIMI') {
-        minionType = Math.random() > 0.5 ? 'MISTRAL_FLAME' : 'KIMI_MOON';
-        if (b.timer % 280 === 70 && onBossShout) {
-          onBossShout('雷雲旋風拳！ サンダークラウド……フォーメーション！');
-        }
-      } else if (b.type === 'STAGE2_GROK_CURSOR') {
-        minionType = 'CURSOR_PROBE';
-      } else if (b.type === 'STAGE3_CLAUDE_FABLE') {
-        minionType = 'CLAUDE_HAIKU';
-      } else {
-        minionType = 'GPT6_LUNA';
+    // Distinct readable attacks; every cycle retains a 100-frame quiet window.
+    if (onSpawnBullet && cycle === 110) {
+      const aim = Math.atan2(playerY - b.y, playerX - b.x);
+      const spread = stage === 1 ? [0] : stage === 2 ? [-0.24, 0.24] : [-0.32, 0, 0.32];
+      for (const offset of spread) {
+        const speed = 1.45 + stage * 0.12;
+        onSpawnBullet(b.x, b.y + 30, Math.cos(aim + offset) * speed, Math.sin(aim + offset) * speed);
       }
-
-      const launchX = b.x + launchSide;
-      const launchY = b.y + 25;
-
-      const dx = playerX - launchX;
-      const dy = playerY - launchY;
-      const dist = Math.hypot(dx, dy) || 1;
-      const tackleSpeed = 1.20; // Readable, dodgeable high-speed tackle!
-
-      onSpawnTackleMinion(
-        minionType,
-        launchX,
-        launchY,
-        (dx / dist) * tackleSpeed,
-        (dy / dist) * tackleSpeed
-      );
     }
-
-    // Stage 2 Grok launches SpaceX Starship fleet from bottom
-    if (b.type === 'STAGE2_GROK_CURSOR' && b.timer % 280 === 180) {
-      if (onBossShout) onBossShout('スペース・エックス！');
+    if (stage === 2 && cycle === 200 && b.timer % 720 < 360) {
+      if (onBossShout) onBossShout('スペース・エックス！ 下方に注意');
       if (onSpawnRocketFleet) onSpawnRocketFleet();
     }
-
-    // Very rare, slow white bullet from center
-    if (onSpawnBullet && b.timer % 240 === 0) {
-      const bdx = playerX - b.x;
-      const bdy = playerY - b.y;
-      const dist = Math.hypot(bdx, bdy) || 1;
-      onSpawnBullet(b.x, b.y + 25, (bdx / dist) * 0.30, (bdy / dist) * 0.30);
+    if (stage === 4 && cycle === 200 && onSpawnBullet) {
+      // A broad fan leaves lanes between rays and never seals the arena.
+      for (let ray = 0; ray < 5; ray++) {
+        const angle = Math.PI * (0.2 + ray * 0.15);
+        onSpawnBullet(b.x, b.y + 30, Math.cos(angle) * 1.85, Math.sin(angle) * 1.85);
+      }
     }
   }
 
