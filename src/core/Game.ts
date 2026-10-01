@@ -734,8 +734,8 @@ export class Game {
         },
         () => {
           // Grok launches SpaceX Starship fleet from bottom!
-          this.enemyManager.spawn('SPACEX_ROCKET', 70, this.canvas.height + 60, 'ROCKET_ASCENT');
-          this.enemyManager.spawn('SPACEX_ROCKET', 290, this.canvas.height + 60, 'ROCKET_ASCENT');
+          this.enemyManager.spawn('SPACEX_ROCKET', 150, this.canvas.height + 60, 'ROCKET_ASCENT');
+          this.enemyManager.spawn('SPACEX_ROCKET', 210, this.canvas.height + 60, 'ROCKET_ASCENT');
           this.addFloatingText(this.canvas.width / 2, 450, '下方の左右からロケット！', '#ef4444');
         },
         (quote) => {
@@ -906,10 +906,7 @@ export class Game {
         const b = this.enemyBullets[bi];
         const dist = Math.hypot(orb.x - b.x, orb.y - b.y);
 
-        const guardReady = (orb.isTethered || orb.mode === 'ORBIT') &&
-          Math.hypot(orb.x - this.player.state.x, orb.y - this.player.state.y) <= 70;
-        const guarded = guardReady && Math.hypot(b.x - this.player.state.x, b.y - this.player.state.y) < 58 + b.radius;
-        if (dist < orbRadius + b.radius || guarded) {
+        if (dist < orbRadius + b.radius) {
           // Bullet erased instantly!
           this.enemyBullets.splice(bi, 1);
           this.audio.playBulletErased();

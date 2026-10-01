@@ -14,9 +14,9 @@ assert(lastPeak<20, 'idle player must damp the orbit, not sustain a comet loop')
 const capture = new GeminiOrbManager(); const c = capture.spawn(180,40,0,0);
 let largestStep=0;
 for(let i=0;i<180;i++){const x=c.x,y=c.y;tick(capture,180,270,true); largestStep=Math.max(largestStep,Math.hypot(c.x-x,c.y-y));}
-assert(largestStep<13,'capture must reel in smoothly');
+assert(largestStep<20,'capture must reel in smoothly at double angular speed');
 assert(Math.abs(c.orbitRadius-50)<1,'capture must settle to controllable radius');
-assert(Math.abs(c.orbitAngularVel)>=0.109,'held orb must auto-spin without input');
+assert(Math.abs(c.orbitAngularVel)>=0.219,'held orb must auto-spin at the new defensive speed');
 const heldDamage=capture.getEffectiveDamage(c);assert.equal(heldDamage,0,'captured orbit is defense, never contact damage');let releases=0;
 tick(capture,180,270,false,0,0,()=>releases++);
 assert(releases===1);assert(Math.hypot(c.vx,c.vy)>9,'release must be an energetic throw');

@@ -171,16 +171,18 @@ export class BossManager {
     if (opening) return;
 
     if (cycle === 10 && onBossShout) onBossShout('弾幕波 — 長押しで防御！');
-    // Sustained curtain: 21 volleys across 2.67 seconds, then a recovery window.
+    // Alternating lanes: dense walls reward a rotating orb, while one flank
+    // remains clear enough for players who reposition and keep attacking.
     if (onSpawnBullet && cycle >= 35 && cycle <= 195 && (cycle - 35) % 8 === 0) {
       const volley = (cycle - 35) / 8;
-      const sourceX = b.x + ((volley % 3) - 1) * b.width * .28;
-      const sourceY = b.y + b.height * .35;
-      const aim = Math.atan2(playerY - sourceY, playerX - sourceX);
-      const rays = b.phase === 2 ? 11 : 8;
-      for (let ray = -rays; ray <= rays; ray++) {
-        const angle = aim + ray * .10 + Math.sin(volley * .7) * .045;
-        onSpawnBullet(sourceX, sourceY, Math.cos(angle) * 1.8, Math.sin(angle) * 1.8, 8);
+      const safeX = b.timer % 720 < 360 ? 82 : 278;
+      const dense = volley < 7 || volley >= 14;
+      const spacing = dense ? 16 : 28;
+      const speed = dense ? 2.0 : 1.55;
+      const radius = dense ? 8 : 6;
+      for (let x = 20 + (volley % 2) * 8; x <= 340; x += spacing) {
+        if (Math.abs(x - safeX) < 43 + radius) continue;
+        onSpawnBullet(x, b.y + b.height * .35, 0, speed, radius);
       }
     }
 
@@ -203,26 +205,11 @@ export class BossManager {
     if (stage >= 3 && cycle === 85) launch(-58);
     if (stage >= 3 && cycle === 195) launch(58);
 
-    // Distinct readable attacks; every cycle retains a 100-frame quiet window.
-    if (onSpawnBullet && (cycle === 90 || cycle === 110 || (b.phase === 2 && cycle === 140))) {
-      const aim = Math.atan2(playerY - b.y, playerX - b.x);
-      const spread = stage === 1 ? [-0.22, 0.22] : stage === 2 ? [-0.32, 0, 0.32] : [-0.44, -0.22, 0, 0.22, 0.44];
-      for (const offset of spread) {
-        const speed = 1.45 + stage * 0.12;
-        onSpawnBullet(b.x, b.y + 30, Math.cos(aim + offset) * speed, Math.sin(aim + offset) * speed);
-      }
-    }
     if (stage === 2 && cycle === 200 && b.timer % 720 < 360) {
       if (onBossShout) onBossShout('スペース・エックス！ 下方に注意');
       if (onSpawnRocketFleet) onSpawnRocketFleet();
     }
-    if (stage === 4 && cycle === 200 && onSpawnBullet) {
-      // A broad fan leaves lanes between rays and never seals the arena.
-      for (let ray = 0; ray < 5; ray++) {
-        const angle = Math.PI * (0.2 + ray * 0.15);
-        onSpawnBullet(b.x, b.y + 30, Math.cos(angle) * 1.85, Math.sin(angle) * 1.85);
-      }
-    }
+
   }
 
   public hit(damage: number, hitX: number, hitY: number, orbRadius: number = 16): { bossHit: boolean; defeated: boolean; points: number } {

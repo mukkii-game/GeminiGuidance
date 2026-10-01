@@ -488,22 +488,6 @@ export class ArcadeRenderer {
   private renderGeminiOrbs(orbs: GeminiOrb[], playerX: number, playerY: number): void {
     const ctx = this.ctx;
 
-    const shieldActive = orbs.some(orb => (orb.isTethered || orb.mode === 'ORBIT')
-      && Math.hypot(orb.x - playerX, orb.y - playerY) <= 70);
-    if (shieldActive) {
-      ctx.save();
-      const glow = ctx.createRadialGradient(playerX, playerY, 28, playerX, playerY, 58);
-      glow.addColorStop(0, 'rgba(34,211,238,0)'); glow.addColorStop(1, 'rgba(34,211,238,.13)');
-      ctx.fillStyle = glow; ctx.strokeStyle = 'rgba(103,232,249,.6)'; ctx.lineWidth = 1.2;
-      ctx.beginPath(); ctx.arc(playerX, playerY, 58, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      ctx.strokeStyle = 'rgba(207,250,254,.75)'; ctx.lineWidth = 2;
-      for (let i = 0; i < 4; i++) {
-        const angle = i * Math.PI / 2;
-        ctx.beginPath(); ctx.arc(playerX, playerY, 58, angle - .12, angle + .12); ctx.stroke();
-      }
-      ctx.restore(); this.cachedFont = '';
-    }
-
     for (const orb of orbs) {
       // A clipped orb remains readable without bouncing it back for the player.
       if (orb.x < 6 || orb.x > this.canvas.width - 6 || orb.y < 44 || orb.y > this.canvas.height - 28) {
@@ -1447,8 +1431,8 @@ export class ArcadeRenderer {
       const barrage = boss.phase > 0 && cycle >= 10 && cycle <= 195;
       const diving = boss.phase > 0 && cycle >= 170 && cycle < 260;
       const bossStatus = opening ? 'CORE OPEN / 投擲のチャンス'
-        : barrage ? 'BARRAGE / 捕獲で防御！'
         : diving ? (cycle < 200 ? 'DIVE LOCK / 横へ回避！' : 'DIVE / 突進注意！')
+        : barrage ? (boss.timer % 720 < 360 ? '弾幕 / 左の隙間か回転防御' : '弾幕 / 右の隙間か回転防御')
         : boss.name.split(':')[0].trim();
       if (opening || barrage) ctx.fillStyle = '#5eead4';
       if (diving) ctx.fillStyle = '#fda4af';
