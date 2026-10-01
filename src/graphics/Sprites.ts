@@ -24,6 +24,12 @@ export class SpriteSheet {
   }
 
   private generateAllSprites(): void {
+    // Kenney's CC0 Pixel Shmup hulls give enemy collision boxes a readable
+    // arcade silhouette; official AI logos remain their faction markings.
+    this.registerExternalSprite('HULL_LIGHT', './assets/kenney-pixel-shmup/ship_light.png', 32, 32);
+    this.registerExternalSprite('HULL_DIVER', './assets/kenney-pixel-shmup/ship_diver.png', 32, 32);
+    this.registerExternalSprite('HULL_HEAVY', './assets/kenney-pixel-shmup/ship_heavy.png', 32, 32);
+    this.registerExternalSprite('GROUND_BUNKER', './assets/kenney-pixel-shmup/ground_base.png', 16, 16);
     // 1. Solvalou Player Ship (Authentic 1983 Arcade Pixel Art Matrix)
     this.createPlayerShip('PLAYER_CENTER', 0);
     this.createPlayerShip('PLAYER_LEFT', -1);
@@ -53,6 +59,14 @@ export class SpriteSheet {
 
     // 7. Official GenAI Enemy Logos (Strictly Official, No Creative Arrangement)
     this.loadOfficialLogos();
+  }
+
+  private registerExternalSprite(key: string, path: string, width: number, height: number): void {
+    const [canvas, ctx] = this.createCanvas(width, height);
+    this.cache.set(key, canvas);
+    const image = new Image();
+    image.onload = () => ctx.drawImage(image, 0, 0, width, height);
+    image.src = path;
   }
 
   // --- 1. Solvalou Player Ship: Authentic 1983 Arcade Pixel Art (ドット絵) ---

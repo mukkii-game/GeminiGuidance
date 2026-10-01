@@ -52,19 +52,24 @@ export class InputManager {
 
   private setupMouseAndTouch(): void {
     // Mouse Events
-    this.canvas.addEventListener('mousemove', (e) => {
-      const rect = this.canvas.getBoundingClientRect();
-      const scaleX = this.canvas.width / rect.width;
-      const scaleY = this.canvas.height / rect.height;
-      this.state.x = (e.clientX - rect.left) * scaleX;
-      this.state.y = (e.clientY - rect.top) * scaleY;
-      this.state.active = true;
+    this.canvas.addEventListener('mousemove', () => {
+      // On desktop, the mouse is reserved for Gemini actions. WASD alone
+      // steers the ship; moving the pointer never changes the target.
       this.state.isTouch = false;
     });
 
     this.canvas.addEventListener('mousedown', (e) => {
-      if (e.button === 0 || e.button === 2) {
-        this.state.active = true;
+      if (e.button === 2) {
+        e.preventDefault();
+        this.state.wallTogglePressed = true;
+        return;
+      }
+      if (e.button === 1) {
+        e.preventDefault();
+        this.pausePressed = true;
+        return;
+      }
+      if (e.button === 0) {
         this.state.isPointerDown = true;
         const rect = this.canvas.getBoundingClientRect();
         const scaleX = this.canvas.width / rect.width;
@@ -76,13 +81,16 @@ export class InputManager {
       }
     });
 
-    window.addEventListener('mouseup', () => {
-      this.state.isPointerDown = false;
+    window.addEventListener('mouseup', (e) => {
+      if (e.button === 0) this.state.isPointerDown = false;
     });
 
-    // Right-Click: Toggle Attack Mode (ヨーヨー ⇄ 公転)
+    // Native right-click menu and middle-click auto-scroll would interrupt play.
     this.canvas.addEventListener('contextmenu', (e) => {
       e.preventDefault();
+    });
+    this.canvas.addEventListener('auxclick', (e) => {
+      if (e.button === 1) e.preventDefault();
     });
 
     // Touch Events: Relative Delta Dragging (Ergonomic 1-finger control)
