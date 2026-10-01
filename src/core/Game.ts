@@ -726,7 +726,7 @@ export class Game {
         this.canvas.width,
         this.player.state.x,
         this.player.state.y,
-        (bx, by, bvx, bvy) => this.spawnBullet(bx, by, bvx, bvy),
+        (bx, by, bvx, bvy, radius) => this.spawnBullet(bx, by, bvx, bvy, radius),
         (type, mx, my, mvx, mvy) => {
           // Boss launches minion targeting player for high-speed body tackle!
           this.enemyManager.spawnTackleMinion(type, mx, my, mvx, mvy);
@@ -760,14 +760,14 @@ export class Game {
     this.updateEffects();
   }
 
-  private spawnBullet(x: number, y: number, vx: number, vy: number): void {
+  private spawnBullet(x: number, y: number, vx: number, vy: number, radius: number = 4.5): void {
     this.enemyBullets.push({
       id: `bullet_${++this.bulletCounter}`,
       x,
       y,
       vx,
       vy,
-      radius: 4.5,
+      radius,
       age: 0,
     });
     this.audio.playEnemyBulletFire();

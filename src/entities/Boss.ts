@@ -126,7 +126,7 @@ export class BossManager {
     canvasWidth: number,
     playerX: number,
     playerY: number,
-    onSpawnBullet?: (x: number, y: number, vx: number, vy: number) => void,
+    onSpawnBullet?: (x: number, y: number, vx: number, vy: number, radius?: number) => void,
     onSpawnTackleMinion?: (type: EnemyType, x: number, y: number, vx: number, vy: number) => void,
     onSpawnRocketFleet?: () => void,
     onBossShout?: (quote: string) => void
@@ -171,13 +171,16 @@ export class BossManager {
     if (opening) return;
 
     if (cycle === 10 && onBossShout) onBossShout('弾幕波 — 長押しで防御！');
-    // A short curtain is followed by a gap: capture has a specific defensive job.
-    if (onSpawnBullet && cycle >= 35 && cycle <= 65 && cycle % 10 === 5) {
-      const aim = Math.atan2(playerY - b.y, playerX - b.x);
-      const rays = b.phase === 2 ? 7 : 5;
+    // Sustained curtain: 21 volleys across 2.67 seconds, then a recovery window.
+    if (onSpawnBullet && cycle >= 35 && cycle <= 195 && (cycle - 35) % 8 === 0) {
+      const volley = (cycle - 35) / 8;
+      const sourceX = b.x + ((volley % 3) - 1) * b.width * .28;
+      const sourceY = b.y + b.height * .35;
+      const aim = Math.atan2(playerY - sourceY, playerX - sourceX);
+      const rays = b.phase === 2 ? 11 : 8;
       for (let ray = -rays; ray <= rays; ray++) {
-        const angle = aim + ray * .12;
-        onSpawnBullet(b.x, b.y + b.height * .35, Math.cos(angle) * 1.25, Math.sin(angle) * 1.25);
+        const angle = aim + ray * .10 + Math.sin(volley * .7) * .045;
+        onSpawnBullet(sourceX, sourceY, Math.cos(angle) * 1.8, Math.sin(angle) * 1.8, 8);
       }
     }
 

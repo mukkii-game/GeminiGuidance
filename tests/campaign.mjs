@@ -91,3 +91,9 @@ assert(invaders.enemies.every(e=>e.y>70 && e.collisionType==='PENETRATE'));
 assert(new Set(invaders.enemies.map(e=>e.x)).size===6);
 for(let i=0;i<600;i++)invaders.update(360,540,180,450);
 assert.equal(invaders.enemies.length,0,'unfinished grid withdraws rather than blocking the next wave');
+
+const sustained=new BossManager();const curtainBoss=sustained.spawn('STAGE1_DEEPSEEK_KIMI',360);
+curtainBoss.phase=1;curtainBoss.y=curtainBoss.targetY;let large=0,lastLargeTick=0;
+for(let tick=1;tick<=360;tick++)sustained.update(360,180,450,(x,y,vx,vy,radius)=>{if(radius===8){large++;lastLargeTick=tick;}});
+assert.equal(large,357);assert.equal(lastLargeTick,195);
+console.log('Boss curtain: 357 large bullets, sustained through tick 195, then recovery');

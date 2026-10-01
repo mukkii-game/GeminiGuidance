@@ -158,14 +158,14 @@ test('normal-damage guidance and aimed throwing pilots can both finish the campa
         game.input.state.x=180+(throwing?95:120)*Math.sin(frame/(throwing?47:31));
         game.input.state.y=boss ? (throwing?225+35*Math.sin(frame/63):285+115*Math.sin(frame/17)) : 285+110*Math.sin(frame/63);
         const p=game.player.state;
-        const nearbyBullets=game.enemyBullets.filter(b=>Math.hypot(b.x-p.x,b.y-p.y)<105).length;
-        const defending=nearbyBullets >= (throwing ? 5 : 14) && (throwing || !boss || boss.timer%360<100);
+        const nearbyBullets=game.enemyBullets.filter(b=>Math.hypot(b.x-p.x,b.y-p.y)<85 && (p.x-b.x)*b.vx+(p.y-b.y)*b.vy>0).length;
+        const defending=nearbyBullets >= 5;
         const diveWarning=boss && boss.phase>0 && boss.timer%360>=170 && boss.timer%360<275;
         if(diveWarning) {
           game.input.state.y=440;
           game.input.state.x=p.x<180?35:325;
         }
-        game.input.state.isPointerDown=defending || (throwing && frame-releasedAt>75);
+        game.input.state.isPointerDown=defending || (throwing && frame-releasedAt>75) || (!throwing && game.geminiManager.orbs[0].isTethered);
         if(game.input.state.isPointerDown) {
           const orb=game.geminiManager.orbs[0],dx=(boss?.x??180)-orb.x,dy=(boss?.y??80)-orb.y;
           const dot=(dx*orb.vx+dy*orb.vy)/(Math.hypot(dx,dy)*Math.hypot(orb.vx,orb.vy));
