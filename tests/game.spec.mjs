@@ -35,6 +35,41 @@ test('keyboard start, held capture/release, deliberate walls and focus pause', a
   expect(errors).toEqual([]);
 });
 
+test('WASD steers while mouse buttons own capture, walls and pause', async ({ page }) => {
+  const result = await page.evaluate(() => {
+    game.startNewGame();
+    const canvas = document.getElementById('game-canvas');
+    const initialX = game.input.state.x;
+    const initialY = game.input.state.y;
+    canvas.dispatchEvent(new MouseEvent('mousemove', {clientX:20,clientY:20,bubbles:true}));
+    const pointerDidNotSteer = game.input.state.x === initialX && game.input.state.y === initialY;
+    window.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyW',bubbles:true}));
+    window.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyD',bubbles:true}));
+    game.update();
+    const wasdMoved = game.input.state.x > initialX && game.input.state.y < initialY;
+    window.dispatchEvent(new KeyboardEvent('keyup',{code:'KeyW',bubbles:true}));
+    window.dispatchEvent(new KeyboardEvent('keyup',{code:'KeyD',bubbles:true}));
+    canvas.dispatchEvent(new MouseEvent('mousedown',{button:2,bubbles:true,cancelable:true}));
+    game.update();
+    const wallOn = game.geminiManager.screenEdgeBounce && !game.input.isTetherHeld();
+    canvas.dispatchEvent(new MouseEvent('mousedown',{button:0,bubbles:true,cancelable:true}));
+    game.update();
+    const caught = game.input.isTetherHeld();
+    window.dispatchEvent(new MouseEvent('mouseup',{button:2,bubbles:true}));
+    const rightReleaseKeepsCapture = game.input.isTetherHeld();
+    window.dispatchEvent(new MouseEvent('mouseup',{button:0,bubbles:true}));
+    game.update();
+    const released = !game.input.isTetherHeld();
+    canvas.dispatchEvent(new MouseEvent('mousedown',{button:1,bubbles:true,cancelable:true}));
+    game.update();
+    const paused = game.paused;
+    canvas.dispatchEvent(new MouseEvent('mousedown',{button:1,bubbles:true,cancelable:true}));
+    game.update();
+    return {pointerDidNotSteer,wasdMoved,wallOn,caught,rightReleaseKeepsCapture,released,paused,resumed:!game.paused};
+  });
+  expect(Object.values(result).every(Boolean)).toBe(true);
+});
+
 test('all four real timelines reach bosses and collision-driven clears reach the ending', async ({ page }) => {
   const report = await page.evaluate(() => {
     game.startNewGame(1);

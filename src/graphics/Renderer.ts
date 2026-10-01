@@ -221,6 +221,11 @@ export class ArcadeRenderer {
         ctx.ellipse(3, 4, g.width * 0.45, g.height * 0.35, 0, 0, Math.PI * 2);
         ctx.fill();
 
+        const bunker = this.sprites.get('GROUND_BUNKER');
+        if (bunker && g.type !== 'SOL_CITADEL') {
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(bunker, -24, -24, 48, 48);
+        }
         ctx.drawImage(sprite, -sprite.width / 2, -sprite.height / 2);
         ctx.restore();
     this.cachedFont = '';
@@ -921,8 +926,18 @@ export class ArcadeRenderer {
         ctx.save();
         ctx.translate(e.x, e.y);
 
-        // Keep strictly upright (no rotation)
-        ctx.drawImage(sprite, -sprite.width / 2, -sprite.height / 2);
+        const hullKey = e.maxHp >= 4 ? 'HULL_HEAVY'
+          : e.pattern === 'RUSH_DIVE' || e.pattern === 'TACKLE_DASH' ? 'HULL_DIVER'
+          : 'HULL_LIGHT';
+        const hull = this.sprites.get(hullKey);
+        if (hull) {
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(hull, -e.width * .5, -e.height * .5, e.width, e.height);
+        }
+        // The faction logo stays upright and smaller than the hull, so the
+        // approach direction and enemy size are legible at game speed.
+        const decal = Math.min(24, e.width * .44, e.height * .44);
+        ctx.drawImage(sprite, -decal / 2, -decal / 2, decal, decal);
 
         // Damage flash if hit (無敵時間中の点滅・被弾フラッシュ)
         if (e.hitCooldown && e.hitCooldown > 0) {

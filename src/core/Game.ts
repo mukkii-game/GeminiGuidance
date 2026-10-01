@@ -275,7 +275,7 @@ export class Game {
     const btnWall = document.getElementById('btn-wall');
     if (btnWall) {
       const wallOn = this.geminiManager.screenEdgeBounce;
-      btnWall.textContent = wallOn ? '🧱 壁: 反射ON [Q]' : '🚪 壁: 通過OFF [Q]';
+      btnWall.textContent = wallOn ? '🧱 壁: 反射ON [右クリック]' : '🚪 壁: 通過OFF [右クリック]';
       btnWall.style.borderColor = wallOn ? '#38bdf8' : '#64748b';
       btnWall.style.color = wallOn ? '#38bdf8' : '#94a3b8';
     }
