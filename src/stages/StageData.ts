@@ -11,6 +11,7 @@ export interface SpawnEvent {
   y?: number;
   pattern?: MovementPattern;
   message?: string;
+  subtitle?: string;
   wave?: number;
 }
 
@@ -49,10 +50,10 @@ export class StageManager {
     const events: SpawnEvent[] = [];
     let formation = 0;
     const cue = (second: number, message: string) => events.push({ tick: second * 60, type: 'CUE', message });
-    const group = (second: number, enemyType: EnemyType, pattern: MovementPattern, positions: number[], stagger = 24, sharedFormation?: string) => {
+    const group = (second: number, enemyType: EnemyType, pattern: MovementPattern, positions: number[], stagger = 24, sharedFormation?: string, title?: string, subtitle?: string) => {
       const wave = Math.floor((second - 3) / 10) + 1;
       const formationId = sharedFormation ?? `s${stage}_wave${wave}_group${++formation}`;
-      positions.forEach((x, index) => events.push({ tick: second * 60 + index * stagger, type: 'ENEMY', enemyType, pattern, formationId, wave, x, y: -32 }));
+      positions.forEach((x, index) => events.push({ tick: second * 60 + index * stagger, type: 'ENEMY', enemyType, pattern, formationId, wave, x, y: -32, message: title, subtitle }));
     };
     const ground: GroundType[] = ['NVIDIA_BASE', 'META_BASE', 'HUGGINGFACE_BASE', 'SOL_CITADEL', 'STABILITY_BASE'];
     for (let second = 3; second < 48 + stage * 4; second += 7) {
@@ -63,39 +64,92 @@ export class StageManager {
     const heavy: EnemyType[] = ['QWEN_CUBE', 'GROK_RAIDER', 'CLAUDE_OPUS', 'GPT6_SOL'];
     const sniper: EnemyType[] = ['KIMI_MOON', 'CURSOR_PROBE', 'PERPLEXITY_SPINNER', 'GPT6_TERRA'];
     const rank = Math.max(0, Math.min(3, stage - 1));
-    const rows = (second: number, pattern: MovementPattern) => {
-      const formationId = `s${stage}_wave${Math.floor((second - 3) / 10) + 1}`;
-      group(second, light[rank], pattern, [60, 120, 180, 240, 300], 0, formationId);
-      group(second + 1, light[rank], pattern, [60, 120, 180, 240, 300], 0, formationId);
+    // Reusable set pieces. Each formation has one reward identity so a partial
+    // clear cannot grant the shield bonus before the second rank arrives.
+    const spear = (second: number, wave: number) => {
+      const id = `s${stage}_spear_${wave}`;
+      // Two slowly descending columns: pass the free orb through a whole rank.
+      for (let row = 0; row < 5; row++) {
+        for (const x of [112, 248]) events.push({ tick: second * 60 + row * 12, type: 'ENEMY', enemyType: light[rank], pattern: 'STRAIGHT_DOWN', formationId: id, wave, x, y: -32, message: 'SPEAR LINE', subtitle: '縦に誘導して列を貫く' });
+      }
     };
-    cue(1, 'WAVE 1 / 柔らかい編隊を大きな誘導でまとめて貫け');
-    rows(3, 'STRAIGHT_DOWN');
+    const sweep = (second: number, wave: number, curved = false) => {
+      const id = `s${stage}_sweep_${wave}`;
+      group(second, light[rank], curved ? 'GALAGA_LOOP' : 'STRAIGHT_DOWN', [48, 100, 152, 204, 256, 308], 0, id, 'SWEEP LINE', '横に振って列を薙ぐ');
+      group(second + 1, light[rank], curved ? 'GALAGA_LOOP' : 'STRAIGHT_DOWN', [74, 126, 178, 230, 282], 0, id);
+    };
+    const matador = (second: number, wave: number) => {
+      const id = `s${stage}_matador_${wave}`;
+      group(second, light[rank], 'RUSH_DIVE', [58, 110, 180, 250, 302], 10, id, 'MATADOR', '照準を引きつけ 横へかわす');
+      group(second + 2, light[rank], 'RUSH_DIVE', [86, 145, 215, 274], 10, id);
+    };
+    const press = (second: number, wave: number) => {
+      const id = `s${stage}_press_${wave}`;
+      group(second, heavy[rank], 'SHIELD_FORWARD', [100, 260], 0, id, 'PRESS & SPEAR', '捕獲で押して 整列したら解放');
+      group(second + 1, light[rank], 'STRAIGHT_DOWN', [75, 125, 235, 285], 0, id);
+      group(second + 2, light[rank], 'STRAIGHT_DOWN', [75, 125, 235, 285], 0, id);
+    };
+    const curtain = (second: number, wave: number) => {
+      const id = `s${stage}_curtain_${wave}`;
+      group(second, sniper[rank], 'BARRAGE_DRIFT', [180], 0, id, 'BULLET CURTAIN', '回転で弾を消す  薄い側から反撃');
+      group(second + 1, sniper[rank], 'SNIPER_HOVER', [72, 288], 0, id);
+      group(second + 2, light[rank], 'GALAGA_LOOP', [55, 110, 250, 305], 12, id);
+    };
+
+    cue(1, 'WAVE 1 / 縦の列を一気に貫け');
+    spear(3, 1);
     if (stage === 1) {
-      cue(11, 'WAVE 2 / INVADER WALL — 列の奥まで貫け');
-      events.push({tick:13*60,type:'INVADER_GRID',wave:2});
-    } else {
-      cue(11, 'WAVE 2 / 重装甲は直進  射撃の間に奥へ通せ');
-      group(13, heavy[rank], 'SPAROID_CRUISE', [95, 265], 0);
-      group(13, light[rank], 'GALAGA_LOOP', [55, 180, 305], 24);
-    }
-    cue(21, 'WAVE 3 / 停止した砲台は狙い撃ち  弾は捕獲で防げ');
-    group(23, sniper[rank], 'SNIPER_HOVER', [75, 285], 0);
-    rows(24, 'GALAGA_LOOP');
-    group(23, sniper[rank], 'BARRAGE_DRIFT', [180]);
-    cue(25, '弾幕波 / 長押しで防御 → 止んだら投擲');
-    if (stage === 2) {
+      cue(11, 'WAVE 2 / 横薙ぎで道を開け');
+      sweep(13, 2);
+      // The iconic invader bank enters during the sweep; the free orb has
+      // enough targets for a skilled player to continue the same arc.
+      events.push({ tick: 15 * 60, type: 'INVADER_GRID', wave: 2 });
+      cue(21, 'WAVE 3 / 敵の突進をかわし ジェミニを通せ');
+      matador(23, 3);
+      cue(31, 'WAVE 4 / 捕獲してタックルを押し返せ');
+      press(33, 4);
+      cue(41, 'WAVE 5 / 弾幕を回転で防ぎ 止んだら解放');
+      curtain(43, 5);
+    } else if (stage === 2) {
+      cue(11, 'WAVE 2 / 横薙ぎから奥へ差し込め');
+      sweep(13, 2, true);
+      cue(21, 'WAVE 3 / 押し分けてから貫け');
+      press(23, 3);
       events.push({ tick: 25 * 60, type: 'BREAKOUT_WALL' });
-      cue(26, '左右から奥へ / 裏面3倍・天井で連続反射');
-    }
-    cue(31, 'WAVE 4 / 左右から下へ回り込む  中央で迎え撃て');
-    group(33, light[rank], 'TOROID_SWOOP', [38, 322, 38, 322, 38, 322], 25);
-    group(34, light[rank], 'RUSH_DIVE', [115, 245], 45);
-    cue(41, 'WAVE 5 / 照準を引きつけ 横へかわして突き返せ');
-    rows(43, 'RUSH_DIVE');
-    if (stage >= 3) {
-      cue(51, 'FINAL WAVE / 重巡の射線を抜けて背面を狙え');
-      group(53, heavy[rank], 'SPAROID_CRUISE', [95, 265], 0);
-      group(53, light[rank], 'ZOSHI_REACTIVE_SWOOP', [40, 320, 40, 320], 25);
+      cue(26, '側面から奥へ / 裏面3倍  反射で連続撃破');
+      cue(31, 'WAVE 4 / 狙わせて横へ 追ってくる球で刺せ');
+      matador(33, 4);
+      cue(41, 'WAVE 5 / 弾幕の薄い側で反撃');
+      curtain(43, 5);
+    } else if (stage === 3) {
+      cue(11, 'WAVE 2 / 曲がる列を横から薙げ');
+      sweep(13, 2, true);
+      cue(21, 'WAVE 3 / 弾幕の中を押し進め');
+      curtain(23, 3);
+      cue(31, 'WAVE 4 / 包囲を押し分けて射線を作れ');
+      press(33, 4);
+      group(34, light[rank], 'TOROID_SWOOP', [38, 322, 38, 322], 20);
+      cue(41, 'WAVE 5 / 引きつけて回避 返す球で縦突き');
+      matador(43, 5);
+      cue(51, 'FINAL WAVE / 複合編隊を一息で崩せ');
+      spear(53, 6);
+      group(54, heavy[rank], 'SPAROID_CRUISE', [180], 0);
+    } else {
+      cue(11, 'WAVE 2 / 重巡をかわして列を貫け');
+      spear(13, 2);
+      group(14, heavy[rank], 'SPAROID_CRUISE', [180], 0);
+      cue(21, 'WAVE 3 / 弾幕と突進 位置取りで抜けろ');
+      curtain(23, 3);
+      group(24, light[rank], 'RUSH_DIVE', [90, 270], 25);
+      cue(31, 'WAVE 4 / 包囲を押し分けて横薙ぎ');
+      press(33, 4);
+      sweep(35, 4, true);
+      cue(41, 'WAVE 5 / 闘牛士のように狙わせろ');
+      matador(43, 5);
+      group(44, light[rank], 'TOROID_SWOOP', [38, 322, 38, 322], 20);
+      cue(51, 'FINAL WAVE / 縦 横 防御をつなげ');
+      curtain(53, 6);
+      spear(56, 6);
     }
     for (const second of [8, 18, 28, 38, 48, ...(stage >= 3 ? [58] : [])]) {
       cue(second, 'RELOAD / 残敵をかわし 次の編隊に備えろ');
@@ -104,7 +158,6 @@ export class StageManager {
     const bosses: BossType[] = ['STAGE1_DEEPSEEK_KIMI', 'STAGE2_GROK_CURSOR', 'STAGE3_CLAUDE_FABLE', 'STAGE4_GPT6_ASTRA'];
     events.push({ tick: (bossSecond - 2) * 60, type: 'ALERT' });
     events.push({ tick: bossSecond * 60, type: 'BOSS', bossType: bosses[stage - 1] ?? bosses[3] });
-    if (stage === 1) for (const event of events) if (event.tick >= 18 * 60) event.tick += 10 * 60;
     return events.sort((a, b) => a.tick - b.tick);
   }
 }

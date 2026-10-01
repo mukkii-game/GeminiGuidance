@@ -11,7 +11,7 @@ for(let stage=1;stage<=4;stage++){
  for(let tick=1;tick<=4000;tick++)for(const event of manager.update()){
   if(event.type==='INVADER_GRID')enemies+=18;
   if(event.type==='ENEMY'){enemies++;if(!first){first=event;}}
-  if(event.type==='BOSS'){bosses++;assert.equal(tick,(50+stage*4+(stage===1?10:0))*60);}
+  if(event.type==='BOSS'){bosses++;assert.equal(tick,(50+stage*4)*60);}
   if(event.type==='CUE')cues++;
  }
  assert.equal(bosses,1);assert(enemies>=43);assert(cues>=3);assert(!manager.hasPendingFormation(first.formationId));
@@ -83,7 +83,23 @@ const rowEvents=openingEvents.filter(event=>event.type==='ENEMY');
 assert.equal(rowEvents.length,10);assert.equal(new Set(rowEvents.map(event=>event.formationId)).size,1);assert(rowEvents.every(event=>event.wave===1));
 const retreat=new EnemyManager();retreat.spawn('MISTRAL_FLAME',180,-32,'GALAGA_LOOP');
 for(let i=0;i<360;i++)retreat.update(360,540,180,450);assert.equal(retreat.enemies.length,0);
-console.log('Shared row identity and smooth no-warp withdrawal before next wave OK');
+console.log('Shared spear identity and smooth no-warp withdrawal before next wave OK');
+
+// Each lesson is a distinct, repeatable layout; later stages combine them.
+for(let stage=1;stage<=4;stage++){
+ const timeline=new StageManager();timeline.loadStage(stage);const events=[];
+ for(let tick=0;tick<4000;tick++)events.push(...timeline.update());
+ const labels=new Set(events.filter(event=>event.type==='ENEMY').map(event=>event.message));
+ for(const lesson of ['SPEAR LINE','PRESS & SPEAR','MATADOR','BULLET CURTAIN'])assert(labels.has(lesson),`stage ${stage}: ${lesson}`);
+ assert(labels.has('SWEEP LINE'),`stage ${stage}: SWEEP LINE`);
+ const spear=events.filter(event=>event.message==='SPEAR LINE'&&event.wave===1);
+ assert.equal(spear.length,10);assert.equal(new Set(spear.map(event=>event.x)).size,2);
+ const press=events.filter(event=>event.message==='PRESS & SPEAR');
+ assert(press.every(event=>event.pattern==='SHIELD_FORWARD'));
+ const sweep=events.filter(event=>event.message==='SWEEP LINE');
+ if(sweep.length)assert(new Set(sweep.map(event=>event.x)).size>=6);
+}
+console.log('Spear, sweep, matador, defensive curtain, and push-then-release set pieces are present');
 
 const invaders=new EnemyManager();invaders.spawnInvaderGrid(360);assert.equal(invaders.enemies.length,18);
 for(let i=0;i<360;i++)invaders.update(360,540,180,450);

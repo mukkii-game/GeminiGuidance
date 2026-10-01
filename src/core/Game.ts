@@ -35,6 +35,8 @@ export class Game {
   private bossLastHit = new Map<string, number>();
   private encounter?: {kind:'wave'|'rest'|'boss';title:string;subtitle?:string;wave?:number;timer:number;duration:number};
   private announcedFormations = new Set<string>();
+  private chainKills = 0;
+  private chainLastTick = -999;
 
   private canvas: HTMLCanvasElement;
   private input: InputManager;
@@ -363,6 +365,8 @@ export class Game {
     this.bossContacts.clear();
     this.bossLastHit.clear();
     this.announcedFormations.clear();
+    this.chainKills = 0;
+    this.chainLastTick = -999;
     this.encounter = undefined;
     this.escapedFormations.clear();
     this.player.setControlMode('LIMITED');
@@ -422,6 +426,8 @@ export class Game {
     this.bossContacts.clear();
     this.bossLastHit.clear();
     this.announcedFormations.clear();
+    this.chainKills = 0;
+    this.chainLastTick = -999;
     this.encounter = undefined;
     this.rewardedFormations.clear();
     this.escapedFormations.clear();
@@ -827,8 +833,8 @@ export class Game {
         this.enemyManager.spawn(ev.enemyType, ev.x ?? 180, ev.y ?? -20, ev.pattern, ev.formationId);
         if (ev.formationId && !this.announcedFormations.has(ev.formationId)) {
           this.announcedFormations.add(ev.formationId);
-          const name = ev.enemyType.replaceAll('_', ' ');
-          this.encounter = {kind:'wave',title:name,subtitle:'ENEMY FORMATION',wave:ev.wave,timer:145,duration:145};
+          const name = ev.message ?? ev.enemyType.replaceAll('_', ' ');
+          this.encounter = {kind:'wave',title:name,subtitle:ev.subtitle ?? 'ENEMY FORMATION',wave:ev.wave,timer:145,duration:145};
         }
       } else if (ev.type === 'GROUND' && ev.groundType) {
         const targetWorldY = -scrollY - 40;
@@ -1014,9 +1020,19 @@ export class Game {
             this.addExplosion(e.x, e.y, 18 + orb.level * 4, false);
 
             const mult = orb.level === 3 ? 4 : orb.level === 2 ? 2 : 1;
-            const pointsEarned = e.points * mult;
+            // Fast free-guidance penetrations pay for routing an entire line.
+            // Captured orbs cannot damage enemies, so the defensive choice
+            // remains useful without becoming the fastest way to clear.
+            this.chainKills = this.stageTick - this.chainLastTick <= 90 ? this.chainKills + 1 : 1;
+            this.chainLastTick = this.stageTick;
+            const chainMult = Math.min(2, 1 + (this.chainKills - 1) * 0.1);
+            const pointsEarned = Math.round(e.points * mult * chainMult);
             this.player.addScore(pointsEarned);
             this.addFloatingText(e.x, e.y - 12, `+${pointsEarned}`, mult > 1 ? '#ec4899' : '#ffffff');
+            if (this.chainKills >= 3 && this.chainKills % 3 === 0) {
+              this.addFloatingText(e.x, e.y - 30, `${this.chainKills} CHAIN`, '#fde047');
+              this.renderer.triggerShake(5, 2);
+            }
 
             const formationId = e.formationId;
             const deadX = e.x;
