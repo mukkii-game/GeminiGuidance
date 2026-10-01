@@ -131,6 +131,14 @@ export const PATTERN_ORDER: PhysicsPatternId[] = [
   'HYBRID_COMET_FLAIL',
 ];
 
+/** Shared visual/collision body size. Decorative glow does not enlarge the hitbox. */
+export function getOrbEffectiveRadius(orb: GeminiOrb): number {
+  if (orb.isTethered || orb.mode === 'ORBIT') return orb.level === 1 ? 12 : orb.level === 2 ? 15 : 18;
+  const baseRadius = orb.level === 1 ? 14 : orb.level === 2 ? 18 : 22;
+  const rest = Math.max(0, Math.min(1, orb.restRatio ?? 0));
+  return baseRadius * (1 - rest * 0.5) * (orb.isCharged ? 1.12 : 1);
+}
+
 export class GeminiOrbManager {
   public orbs: GeminiOrb[] = [];
   public currentPresetId: PhysicsPresetId = 'SNAP_SLING';
@@ -356,37 +364,43 @@ export class GeminiOrbManager {
     }
   }
 
+  /** Passive orbs defend and bounce off targets; they never drill through a body. */
+  public isPassiveOrb(orb: GeminiOrb): boolean {
+    return !!orb.isTethered || orb.mode === 'ORBIT' || (orb.restRatio ?? 0) >= 0.5;
+  }
+
   public getEffectiveDamage(orb: GeminiOrb): number {
     const baseDamage = orb.level === 1 ? 1 : orb.level === 2 ? 2 : 4;
-    // Close orbit is a defensive tool. Free thrusts and throws reward commitment.
-    if (orb.isTethered || orb.mode === 'ORBIT') return Math.max(1, baseDamage / 2);
+    if (this.isPassiveOrb(orb)) return Math.max(1, baseDamage / 2);
     const speed = Math.hypot(orb.vx, orb.vy);
     return baseDamage + (speed > 9 ? 3 : speed > 5 ? 2 : speed > 2.5 ? 1 : 0);
   }
 
   public getEffectiveRadius(orb: GeminiOrb): number {
-    const baseR = orb.level === 1 ? 16 : orb.level === 2 ? 24 : 32;
-    if (orb.mode === 'ORBIT') {
-      const speed = Math.hypot(orb.vx, orb.vy);
-      const expandBonus = Math.min(1.4, 1.0 + (speed / 3.0) * 0.4);
-      if (orb.spinLevel === 2) {
-        return baseR * 1.35 * expandBonus;
-      }
-      if (orb.orbitTier === 'SHORT') {
-        return baseR * 0.75 * expandBonus;
-      } else if (orb.orbitTier === 'LONG') {
-        return baseR * 1.65 * expandBonus;
-      } else {
-        return baseR * 1.0 * expandBonus;
-      }
+    return getOrbEffectiveRadius(orb);
+  }
+
+  /** Fade only low-speed, close-range motion. A fast pass by the ship stays lethal. */
+  private updateRestState(orb: GeminiOrb, playerX: number, playerY: number): void {
+    if (orb.isTethered || orb.mode === 'ORBIT') {
+      orb.restRatio = 0;
+      return;
+    }
+    const speed = Math.hypot(orb.vx, orb.vy);
+    const distance = Math.hypot(orb.x - playerX, orb.y - playerY);
+    if (speed > 3.2 || distance > 100) {
+      // Moving away winds up the next spear immediately, with no stale passive damage.
+      orb.restRatio = 0;
     } else {
-      if (orb.isCharged) {
-        return baseR * 1.35;
-      }
-      if (orb.isHoveringApex) {
-        return baseR * 1.25;
-      }
-      return baseR;
+      const settled = speed < 2.2 && distance < 55;
+      const rest = orb.restRatio ?? 0;
+      orb.restRatio = settled ? Math.min(1, rest + 1 / 60) : Math.max(0, rest - 1 / 15);
+    }
+    if (this.isPassiveOrb(orb)) {
+      orb.isCharged = false;
+      orb.chargeRatio = 0;
+    } else {
+      orb.chargeRatio = (orb.chargeRatio ?? 0) * (1 - (orb.restRatio ?? 0));
     }
   }
 
@@ -457,6 +471,7 @@ export class GeminiOrbManager {
       level: 1,
       radius: 16,
       damage: 1,
+      restRatio: 0,
       trail: [],
       fuseTimer: 20,
       mode: 'COMET',
@@ -541,6 +556,7 @@ export class GeminiOrbManager {
 
       // 画面端処理
       this.applyScreenBoundaries(orb, onWallHit);
+      this.updateRestState(orb, playerX, playerY);
     }
 
     // Check for Gemini Fusion

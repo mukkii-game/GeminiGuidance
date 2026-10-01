@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "node tests/physics.mjs && node tests/campaign.mjs",
+    "test": "node tests/physics.mjs && node tests/campaign.mjs && node tests/audio.mjs && node tests/breakout.mjs",
     "test:browser": "playwright test"
   },
   "devDependencies": {

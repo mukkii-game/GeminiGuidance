@@ -71,21 +71,21 @@ export class StageManager {
       events.push({ tick: 40 * 60, type: 'UFO' });
       group(42, 'QWEN_CUBE', 'SPAROID_CRUISE', [180]);
       group(45, 'DEEPSEEK_FLASH', 'RUSH_DIVE', [70, 290], 60);
-      cue(49, 'ボスの攻撃後がチャンス  突き・投擲を当てよう');
+      cue(49, '左右部位を壊せば追撃停止 / CORE OPENで大ダメージ');
     } else if (stage === 2) {
       cue(1, '反射する装甲を使い  奥へジェミニを通せ');
       group(4, 'COPILOT_GLIDER', 'STRAIGHT_DOWN', [80, 180, 280], 0);
       group(9, 'CURSOR_PROBE', 'RUSH_DIVE', [90, 270], 60);
       group(14, 'GROK_RAIDER', 'SPAROID_CRUISE', [100, 260], 0);
       group(19, 'COPILOT_GLIDER', 'GALAGA_LOOP', [80, 140, 220, 280]);
-      cue(24, '壁反射は Q で任意ON / 中央の隙間も使える');
+      cue(24, '左右から奥へ入れる / ブロック裏面はダメージ3倍');
       events.push({ tick: 25 * 60, type: 'BREAKOUT_WALL' });
       group(28, 'CURSOR_PROBE', 'RUSH_DIVE', [70, 290], 70);
       group(34, 'COPILOT_GLIDER', 'STRAIGHT_DOWN', [180, 180, 180], 32);
       group(39, 'GROK_RAIDER', 'SPAROID_CRUISE', [95, 265], 0);
       group(44, 'CURSOR_PROBE', 'RUSH_DIVE', [80, 180, 280], 50);
       group(49, 'COPILOT_GLIDER', 'GALAGA_LOOP', [110, 250]);
-      cue(53, 'ゲートの内側へ投擲  反射は補助として使おう');
+      cue(53, '左右から奥へ投擲 / 天井反射で裏面を崩せ');
     } else if (stage === 3) {
       cue(1, '交差する敵列  引きつける位置を選べ');
       group(4, 'CLAUDE_HAIKU', 'GALAGA_LOOP', [75, 135, 225, 285]);
@@ -115,6 +115,14 @@ export class StageManager {
       group(53, 'GPT6_LUNA', 'RUSH_DIVE', [70, 180, 290], 60);
       cue(60, '最後の決闘  攻撃の合間に大きく突け');
     }
+    // Slow, spaced columns are attack opportunities, not extra bullet curtains.
+    // Same-x spacing rewards crossing the whole train with a long free thrust.
+    const columnTypes: EnemyType[] = ['MISTRAL_FLAME', 'COPILOT_GLIDER', 'CLAUDE_HAIKU', 'GPT6_LUNA'];
+    const columnType = columnTypes[stage - 1] ?? 'GPT6_LUNA';
+    for (const [second, x] of [[7, 75], [17, 285], [28, 180], [39, 75], [47, 285]]) {
+      group(second, columnType, 'STRAIGHT_DOWN', [x, x, x, x], 64);
+    }
+    cue(6, '長い誘導で縦列を貫通 / 近くで待つだけでは崩せない');
     const bossSecond = 50 + stage * 4;
     const bosses: BossType[] = ['STAGE1_DEEPSEEK_KIMI', 'STAGE2_GROK_CURSOR', 'STAGE3_CLAUDE_FABLE', 'STAGE4_GPT6_ASTRA'];
     events.push({ tick: (bossSecond - 2) * 60, type: 'ALERT' });
